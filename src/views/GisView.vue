@@ -15,9 +15,10 @@ import { ref, onMounted } from 'vue'
 const gisUrl = ref('')
 
 onMounted(() => {
-  // 指向 base-cesium-vue/dist 的 index.html
-  // 通过 vite 静态资源服务访问
-  gisUrl.value = '/base-cesium-vue/dist/index.html'
+  // 指向 public/gis 的 index.html
+  // 包含 base-cesium-vue/dist 和 public/cdn 的所有资源
+  // 运行 npm run update-gis 来生成这些文件
+  gisUrl.value = '/gis/index.html'
 })
 </script>
 
