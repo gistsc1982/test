@@ -2,9 +2,9 @@
  * 更新 GIS 静态资源脚本
  *
  * 功能：
- * 1. 进入 base-cesium-vue 目录执行 npm run build
- * 2. 将编译产物从 base-cesium-vue/dist 复制到 test/public/gis
- * 3. 将 base-cesium-vue/public/cdn 复制到 test/public/gis/cdn
+ * 1. 进入 cesiumBase 目录执行 npm run build
+ * 2. 将编译产物从 cesiumBase/dist 复制到 test/public/gis
+ * 3. 将 cesiumBase/public/cdn 复制到 test/public/gis/cdn
  */
 
 const { execSync } = require('child_process');
@@ -29,7 +29,7 @@ const log = {
 
 // 路径配置
 const ROOT_DIR = path.resolve(__dirname, '..');
-const BASE_CESIUM_DIR = path.join(ROOT_DIR, 'base-cesium-vue');
+const BASE_CESIUM_DIR = path.join(ROOT_DIR, 'cesiumBase');
 const TEST_PUBLIC_DIR = path.join(ROOT_DIR, 'test', 'public');
 const GIS_TARGET_DIR = path.join(TEST_PUBLIC_DIR, 'gis');
 
@@ -48,7 +48,7 @@ function checkDirectories() {
   log.info('检查目录...');
 
   if (!fs.existsSync(BASE_CESIUM_DIR)) {
-    throw new Error(`base-cesium-vue 目录不存在: ${BASE_CESIUM_DIR}`);
+    throw new Error(`cesiumBase 目录不存在: ${BASE_CESIUM_DIR}`);
   }
 
   if (!fs.existsSync(DIST_SOURCE)) {
@@ -78,10 +78,10 @@ function cleanTargetDir() {
 }
 
 /**
- * 编译 base-cesium-vue
+ * 编译 cesiumBase
  */
 function buildBaseCesium() {
-  log.info('开始编译 base-cesium-vue...');
+  log.info('开始编译 cesiumBase...');
   log.info('执行: npm run build');
 
   try {
@@ -218,7 +218,7 @@ async function main() {
     console.log('========================================' + colors.reset);
     console.log('');
 
-    log.info(`base-cesium-vue: ${BASE_CESIUM_DIR}`);
+    log.info(`cesiumBase: ${BASE_CESIUM_DIR}`);
     log.info(`目标目录: ${GIS_TARGET_DIR}`);
     console.log('');
 
@@ -230,7 +230,7 @@ async function main() {
     cleanTargetDir();
     console.log('');
 
-    // 3. 编译 base-cesium-vue
+    // 3. 编译 cesiumBase
     buildBaseCesium();
     console.log('');
 

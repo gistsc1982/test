@@ -1,10 +1,10 @@
 # Test Project
 
-Vue 3 测试项目，集成 base-cesium-vue GIS 页面。
+Vue 3 测试项目，集成 cesiumBase GIS 页面。
 
 ## 功能
 
-- 集成 base-cesium-vue 的 Cesium GIS 页面
+- 集成 cesiumBase 的 Cesium GIS 页面
 - 通过 iframe 展示 3D 地理信息内容
 - 支持倾斜摄影模型加载
 
@@ -38,7 +38,7 @@ npm install
 npm run update-gis
 ```
 此命令会：
-- 进入 `../base-cesium-vue` 目录执行编译
+- 进入 `../cesiumBase` 目录执行编译
 - 将编译产物复制到 `public/gis/` 目录
 - 复制 CDN 资源到 `public/gis/cdn/` 目录
 
@@ -51,7 +51,7 @@ npm run dev
 
 ### 更新 GIS 内容
 
-当 base-cesium-vue 代码更新后，运行：
+当 cesiumBase 代码更新后，运行：
 ```bash
 npm run update-gis
 ```
@@ -66,4 +66,4 @@ npm run build
 
 - `public/gis/` 目录已被添加到 `.gitignore`，不应提交到 git
 - 每次部署前需要运行 `npm run update-gis` 更新静态资源
-- 确保 `../base-cesium-vue` 项目存在且可正常编译
+- 确保 `../cesiumBase` 项目存在且可正常编译

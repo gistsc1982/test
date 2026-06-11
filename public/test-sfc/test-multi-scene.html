@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>多场景管理器 - 测试页面</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      margin: 0;
+    }
+    h1 {
+      color: #4ec9b0;
+      border-bottom: 2px solid #4ec9b0;
+      padding-bottom: 10px;
+    }
+    .section {
+      background: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 5px;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    .section-title {
+      color: #569cd6;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    code {
+      background: #1e1e1e;
+      border: 1px solid #3e3e42;
+      border-radius: 3px;
+      padding: 2px 6px;
+      color: #ce9178;
+    }
+    pre {
+      background: #1e1e1e;
+      border: 1px solid #3e3e42;
+      border-radius: 5px;
+      padding: 15px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+    button {
+      background: #0e639c;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #1177bb;
+    }
+    button:disabled {
+      background: #3e3e42;
+      cursor: not-allowed;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 3px;
+      margin: 10px 0;
+    }
+    .status.success {
+      background: #0f3d0f;
+      border: 1px solid #0f0;
+    }
+    .status.error {
+      background: #3d0f0f;
+      border: 1px solid #f00;
+    }
+    .status.info {
+      background: #0f0f3d;
+      border: 1px solid #00f;
+    }
+    .console-output {
+      background: #1e1e1e;
+      border: 1px solid #3e3e42;
+      border-radius: 5px;
+      padding: 15px;
+      height: 300px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .console-output div {
+      margin: 2px 0;
+    }
+    .console-output .log { color: #d4d4d4; }
+    .console-output .info { color: #569cd6; }
+    .console-output .success { color: #4ec9b0; }
+    .console-output .error { color: #f48771; }
+    .console-output .warn { color: #dcdcaa; }
+  </style>
+</head>
+<body>
+  <h1>🎬 多场景管理器 - 测试页面</h1>
+
+  <div class="section">
+    <div class="section-title">📋 说明</div>
+    <p>此页面用于测试多场景管理器的分层 Near/Far 功能。</p>
+    <p>请确保已在含有 DualCanvasViewer 的页面中打开控制台执行测试脚本。</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🚀 快速测试</div>
+    <p>在含有 DualCanvasViewer 的页面控制台中，执行以下任一方式：</p>
+
+    <h3>方式1：使用一键测试脚本（推荐）</h3>
+    <p>1. 确保以下文件在服务器上可访问：</p>
+    <ul>
+      <li><code>multi-scene-manager.js</code></li>
+      <li><code>multi-scene-debug.js</code></li>
+      <li><code>test-multi-scene.js</code></li>
+    </ul>
+    <p>2. 在控制台执行：</p>
+    <pre>load('test-multi-scene.js')</pre>
+
+    <h3>方式2：手动加载脚本</h3>
+    <p>在控制台依次执行：</p>
+    <pre>// 加载核心管理器
+const script = document.createElement('script');
+script.src = 'multi-scene-manager.js';
+document.head.appendChild(script);
+
+// 等待加载后初始化
+setTimeout(() => {
+  const manager = new MultiSceneManager(window.__dualCanvasViewer);
+  manager.initialize();
+  window.__multiSceneManager = manager;
+}, 1000);</pre>
+
+    <h3>方式3：直接在控制台粘贴代码</h3>
+    <p>打开 <code>multi-scene-manager.js</code>，复制全部内容到控制台执行</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🔧 测试命令</div>
+    <p>初始化完成后，可以使用以下命令测试：</p>
+
+    <h3>查看调试信息</h3>
+    <pre>// 查看当前状态
+const info = window.__multiSceneManager.getDebugInfo();
+console.table(info.scenes);
+console.table(info.cameras);
+
+// 显示调试面板（需加载 multi-scene-debug.js）
+showMultiSceneDebug();</pre>
+
+    <h3>测试相机同步</h3>
+    <pre>// 手动触发相机同步
+window.__multiSceneManager.syncCameras();
+
+// 查看相机位置
+console.log('大坐标相机:', window.__multiSceneManager.cameras.layer1Large.position);
+console.log('小坐标相机:', window.__multiSceneManager.cameras.layer1Small.position);</pre>
+
+    <h3>测试渲染</h3>
+    <pre>// 手动触发渲染
+window.__multiSceneManager.renderLayer1();
+window.__multiSceneManager.renderLayer2();</pre>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📊 预期结果</div>
+    <p>成功初始化后，你应该看到：</p>
+
+    <h3>1. 控制台输出</h3>
+    <pre>╔══════════════════════════════════════════════════════════╗
+║  🚀 多场景管理器 - 一键测试脚本                          ║
+╚══════════════════════════════════════════════════════════╝
+
+🔍 [步骤1/5] 检查 DualCanvasViewer 实例...
+  ✅ DualCanvasViewer 实例已找到
+
+📊 [步骤2/5] 当前场景状态...
+  原始层模型: X 个
+  BIM层模型: Y 个
+
+📦 [步骤3/5] 加载多场景管理器...
+  ✅ 多场景管理器已加载
+
+🏗️ [步骤4/5] 初始化多场景架构...
+  ✅ 多场景架构初始化成功
+
+📊 [步骤5/5] 多场景架构结果...
+  🎬 场景模型分布:
+    原始层-大坐标场景: X 个模型
+    原始层-小坐标场景: Y 个模型
+    ...
+
+╔══════════════════════════════════════════════════════════╗
+║  ✅ 多场景架构部署完成！                                  ║
+╚══════════════════════════════════════════════════════════╝</pre>
+
+    <h3>2. 调试面板</h3>
+    <p>右上角会显示实时调试面板，包含：</p>
+    <ul>
+      <li>场景统计（每个场景的模型数量）</li>
+      <li>相机 Near/Far 配置</li>
+      <li>相机当前位置</li>
+      <li>距离信息</li>
+    </ul>
+
+    <h3>3. 渲染效果</h3>
+    <p>模型应该正常显示，没有深度排序问题</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">🐛 故障排查</div>
+
+    <h3>问题：DualCanvasViewer 未找到</h3>
+    <p><strong>原因：</strong>页面未正确加载 DualCanvasViewer</p>
+    <p><strong>解决：</strong>确保在正确的页面中执行脚本</p>
+
+    <h3>问题：脚本加载失败</h3>
+    <p><strong>原因：</strong>文件路径不正确或服务器未启动</p>
+    <p><strong>解决：</strong>检查文件路径，确保通过 HTTP 服务器访问</p>
+
+    <h3>问题：模型显示位置不正确</h3>
+    <p><strong>原因：</strong>参考点选择不当</p>
+    <p><strong>解决：</strong></p>
+    <pre>// 查看当前参考点
+const info = window.__multiSceneManager.getDebugInfo();
+console.log('参考点:', info.referencePoints);
+
+// 重新分类模型
+window.__multiSceneManager.classifyAndMoveModels();</pre>
+
+    <h3>问题：深度排序仍然错误</h3>
+    <p><strong>原因：</strong>near/far 范围设置不当</p>
+    <p><strong>解决：</strong></p>
+    <pre>// 调整小场景的 near/far
+const manager = window.__multiSceneManager;
+manager.cameras.layer1Small.near = 10;
+manager.cameras.layer1Small.far = 2000;
+manager.cameras.layer1Small.updateProjectionMatrix();</pre>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📚 相关文档</div>
+    <ul>
+      <li><a href="MULTI-SCENE-GUIDE.md" target="_blank">完整使用指南</a></li>
+      <li><a href="multi-scene-manager.js" target="_blank">核心代码</a></li>
+      <li><a href="multi-scene-debug.js" target="_blank">调试工具</a></li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <div class="section-title">💡 提示</div>
+    <ul>
+      <li>确保通过 HTTP 服务器访问页面，不要使用 file:// 协议</li>
+      <li>测试前先保存当前工作，避免意外刷新页面</li>
+      <li>使用浏览器开发者工具的 Console 面板查看详细日志</li>
+      <li>如果出现问题，查看控制台的错误信息</li>
+    </ul>
+  </div>
+
+</body>
+</html>
