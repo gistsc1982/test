@@ -1800,6 +1800,19 @@ export default {
       // 生成面板实例ID
       const panelInstanceId = ++this._panelInstanceCounter;
 
+      // ⭐ 获取屏幕高度
+      const getScreenHeight = () => {
+        const vh = window.innerHeight;
+        if (window.screen && window.screen.availHeight) {
+          return window.screen.availHeight;
+        }
+        if (window.screen && window.screen.height > vh) {
+          return window.screen.height;
+        }
+        return vh;
+      };
+      const actualHeight = getScreenHeight();
+
       // ⭐ 创建容器元素（使用固定容器 ID + 实例编号）
       const baseContainerId = panelConfig.singletonContainerId || panelSingletonManager.getMjsContainerId(panelId);
       const containerId = `${baseContainerId}-${panelInstanceId}`;
@@ -1812,7 +1825,7 @@ export default {
         top: 0;
         left: 0;
         width: 100vw;
-        height: 100vh;
+        height: ${actualHeight}px;
         z-index: ${100000 + panelInstanceId * 100};
         background: transparent;
         pointer-events: auto;
@@ -1822,7 +1835,7 @@ export default {
       const contentWrapper = document.createElement('div');
       contentWrapper.style.cssText = `
         width: 100%;
-        height: 100%;
+        height: ${actualHeight}px;
         position: relative;
         pointer-events: auto;
       `;
@@ -1848,10 +1861,74 @@ export default {
         pointer-events: auto;
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       `;
-      closeBtn.onclick = () => this.destroyMjsMultiInstance(panelId, panelInstanceId, container);
+      closeBtn.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        this.destroyMjsMultiInstance(panelId, panelInstanceId, container);
+      };
 
       // ⭐ 添加容器到 DOM
       document.body.appendChild(container);
+
+      // ⭐ 强制设置容器高度（修复高度被压缩的问题）- 使用多重策略
+      const forceSetHeight = () => {
+        const vh = window.innerHeight;
+        const actualHeight = getScreenHeight();
+
+        container.style.height = `${actualHeight}px`;
+        container.style.minHeight = `${actualHeight}px`;
+        container.style.maxHeight = `${actualHeight}px`;
+        container.style.setProperty('height', `${actualHeight}px`, 'important');
+
+        // 同时设置 contentWrapper 的高度
+        if (contentWrapper) {
+          contentWrapper.style.height = `${actualHeight}px`;
+          contentWrapper.style.minHeight = `${actualHeight}px`;
+          contentWrapper.style.maxHeight = `${actualHeight}px`;
+        }
+
+        console.log(`[CesiumMain] 🔧 强制设置容器高度: ${containerId}`, {
+          windowInnerHeight: vh,
+          screenHeight: window.screen?.height,
+          availHeight: window.screen?.availHeight,
+          actualHeight: actualHeight,
+          containerHeight: container.style.height,
+          computedHeight: window.getComputedStyle(container).height,
+          说明: actualHeight > vh ? '使用屏幕高度（窗口被缩小）' : '使用窗口高度'
+        });
+      };
+
+      // 立即设置一次
+      forceSetHeight();
+
+      // 使用 requestAnimationFrame 确保 DOM 更新后再次设置
+      requestAnimationFrame(forceSetHeight);
+      requestAnimationFrame(() => requestAnimationFrame(forceSetHeight));
+
+      // 监听窗口大小变化
+      window.addEventListener('resize', forceSetHeight);
+
+      // ⭐ 最后确认：确保使用的是屏幕高度而不是100vh
+      // 因为100vh基于window.innerHeight（可能只有398px），导致容器被压缩
+      requestAnimationFrame(() => {
+        const finalHeight = getScreenHeight();
+        container.style.height = `${finalHeight}px`;
+        container.style.minHeight = `${finalHeight}px`;
+        container.style.maxHeight = `${finalHeight}px`;
+        container.style.setProperty('height', `${finalHeight}px`, 'important');
+        if (contentWrapper) {
+          contentWrapper.style.height = `${finalHeight}px`;
+          contentWrapper.style.minHeight = `${finalHeight}px`;
+          contentWrapper.style.maxHeight = `${finalHeight}px`;
+        }
+        console.log(`[CesiumMain] 🔧 最终确认容器高度: ${containerId}`, {
+          height: container.style.height,
+          computedHeight: window.getComputedStyle(container).height,
+          使用值: `${finalHeight}px`,
+          说明: '使用屏幕高度而非100vh，避免被压缩'
+        });
+      });
 
       // ⭐ 关键修复：为多实例容器添加所有鼠标事件监听器，确保能操作Cesium
       // 这些事件与单实例容器(dualCanvasContainer)的事件绑定保持一致
@@ -1863,6 +1940,44 @@ export default {
       console.log(`[CesiumMain] ✅ 已为多实例容器绑定所有鼠标事件: ${containerId}`, {
         事件: ['mousedown', 'mousemove', 'mouseup', 'wheel', 'contextmenu']
       });
+
+      // ⭐ 关键修复：添加CSS覆盖，确保 control-panel 和 coordinate-panel 使用 fixed 定位
+      // 防止它们使用默认流式布局导致容器高度被撑开
+      const styleId = `dual-canvas-override-mjs-${panelInstanceId}`;
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+          #${containerId} .control-panel {
+            position: fixed !important;
+            top: 80px !important;
+            right: 20px !important;
+            left: auto !important;
+            max-height: calc(100vh - 100px) !important;
+            z-index: ${101000 + panelInstanceId * 100} !important;
+            pointer-events: auto !important;
+          }
+          #${containerId} .control-panel * {
+            pointer-events: auto !important;
+          }
+          #${containerId} .coordinate-panel {
+            position: fixed !important;
+            top: 80px !important;
+            left: 20px !important;
+            max-height: calc(100vh - 100px) !important;
+            z-index: ${101000 + panelInstanceId * 100} !important;
+            pointer-events: auto !important;
+          }
+          #${containerId} .coordinate-panel * {
+            pointer-events: auto !important;
+          }
+          #${containerId} .dual-canvas-viewer {
+            overflow: hidden !important;
+          }
+        `;
+        document.head.appendChild(style);
+        console.log(`[CesiumMain] ✅ 已添加 CSS 样式覆盖: ${styleId}`);
+      }
 
       // 动态加载组件
       if (!this.functionPanelComponents[panelId]) {
@@ -1881,6 +1996,76 @@ export default {
       const Vue = await import('vue');
       const app = Vue.createApp(Component);
       const appInstance = app.mount(contentWrapper);
+
+      // ⭐ 调试：检查挂载后的容器高度
+      setTimeout(() => {
+        const dualCanvasViewer = contentWrapper.querySelector('.dual-canvas-viewer');
+        if (dualCanvasViewer) {
+          const containerStyle = window.getComputedStyle(container);
+          const wrapperStyle = window.getComputedStyle(contentWrapper);
+          const viewerStyle = window.getComputedStyle(dualCanvasViewer);
+          const containerRect = container.getBoundingClientRect();
+          const wrapperRect = contentWrapper.getBoundingClientRect();
+          const viewerRect = dualCanvasViewer.getBoundingClientRect();
+
+          console.log(`[CesiumMain] 🔍 挂载后容器高度详细检查:`);
+          console.log(`[CesiumMain] 📦 container (${containerId}):`);
+          console.log(`  - style.height: ${container.style.height}`);
+          console.log(`  - computed.height: ${containerStyle.height}`);
+          console.log(`  - computed.minHeight: ${containerStyle.minHeight}`);
+          console.log(`  - computed.maxHeight: ${containerStyle.maxHeight}`);
+          console.log(`  - rect: ${containerRect.width} x ${containerRect.height}`);
+          console.log(`[CesiumMain] 📦 contentWrapper:`);
+          console.log(`  - style.height: ${contentWrapper.style.height}`);
+          console.log(`  - computed.height: ${wrapperStyle.height}`);
+          console.log(`  - computed.minHeight: ${wrapperStyle.minHeight}`);
+          console.log(`  - computed.maxHeight: ${wrapperStyle.maxHeight}`);
+          console.log(`  - rect: ${wrapperRect.width} x ${wrapperRect.height}`);
+          console.log(`[CesiumMain] 📦 dualCanvasViewer:`);
+          console.log(`  - computed.height: ${viewerStyle.height}`);
+          console.log(`  - computed.minHeight: ${viewerStyle.minHeight}`);
+          console.log(`  - computed.maxHeight: ${viewerStyle.maxHeight}`);
+          console.log(`  - rect: ${viewerRect.width} x ${viewerRect.height}`);
+          console.log(`  - 父元素: ${dualCanvasViewer.parentElement?.className || 'N/A'}`);
+          console.log(`  - 父元素高度: ${dualCanvasViewer.parentElement ? window.getComputedStyle(dualCanvasViewer.parentElement).height : 'N/A'}`);
+          console.log(`[CesiumMain] 🔍 高度异常分析:`);
+          console.log(`  - container高度(${containerRect.height}px) == contentWrapper高度(${wrapperRect.height}px)? ${containerRect.height === wrapperRect.height ? '✓' : '✗'}`);
+          console.log(`  - contentWrapper高度(${wrapperRect.height}px) == dualCanvasViewer高度(${viewerRect.height}px)? ${wrapperRect.height === viewerRect.height ? '✓' : '✗'}`);
+          console.log(`  - 预期高度: ${actualHeight}px`);
+          console.log(`  - 差值: container: ${containerRect.height - actualHeight}px, contentWrapper: ${wrapperRect.height - actualHeight}px, dualCanvasViewer: ${viewerRect.height - actualHeight}px`);
+
+          // ⭐ 关键检查：验证 dualCanvasViewer 是否真的是 contentWrapper 的子元素
+          console.log(`[CesiumMain] 🔍 DOM 结构验证:`);
+          console.log(`  - contentWrapper.contains(dualCanvasViewer)? ${contentWrapper.contains(dualCanvasViewer)}`);
+          console.log(`  - dualCanvasViewer.parentElement === contentWrapper? ${dualCanvasViewer.parentElement === contentWrapper}`);
+          console.log(`  - contentWrapper.children.length: ${contentWrapper.children.length}`);
+          console.log(`  - contentWrapper 的所有子元素:`);
+          Array.from(contentWrapper.children).forEach((child, i) => {
+            console.log(`    [${i + 1}] ${child.tagName || 'Unknown'} (class: ${child.className || '无'}, id: ${child.id || '无'})`);
+            if (child === dualCanvasViewer) {
+              console.log(`        ✓ 这是我们的 dualCanvasViewer 元素`);
+            }
+          });
+
+          // ⭐ 检查是否有内联样式影响高度
+          const viewerInlineHeight = dualCanvasViewer.style.height;
+          if (viewerInlineHeight) {
+            console.log(`  - dualCanvasViewer 内联高度: ${viewerInlineHeight}`);
+          }
+        } else {
+          console.log(`[CesiumMain] ⚠️ 未找到 .dual-canvas-viewer 元素！`);
+          console.log(`  - contentWrapper 的子元素数量: ${contentWrapper.children.length}`);
+          console.log(`  - contentWrapper 的 innerHTML 长度: ${contentWrapper.innerHTML.length}`);
+          if (contentWrapper.innerHTML.length < 500) {
+            console.log(`  - contentWrapper 的 innerHTML: ${contentWrapper.innerHTML}`);
+          }
+        }
+      }, 300);
+
+      // ⭐ 关键修复：保持 Vue 应用实例引用，防止被垃圾回收
+      // 将 app 实例也保存到 Map 中
+      this.mjsMultiInstancesApp = this.mjsMultiInstancesApp || new Map();
+      this.mjsMultiInstancesApp.set(`${panelId}_${panelInstanceId}`, app);
 
       console.log(`[CesiumMain] ✅ mjs 多实例已创建: ${containerId}`);
 
@@ -4004,7 +4189,10 @@ async loadTestSfcComponent(instanceId) {
           closeBtn.style.color = 'rgba(255, 255, 255, 0.7)';
         });
 
-        closeBtn.addEventListener('click', () => {
+        closeBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
           this.destroyTestSfcInstance(instanceId);
         });
 
@@ -4234,7 +4422,12 @@ async loadTestSfcComponent(instanceId) {
         pointer-events: auto;
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       `;
-      closeBtn.onclick = () => this.destroyDualCanvasInstance(instanceId);
+      closeBtn.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        this.destroyDualCanvasInstance(instanceId);
+      };
 
       // ⭐ 添加容器到 DOM（先添加 wrapper，后添加关闭按钮）
       container.appendChild(contentWrapper);
@@ -4785,19 +4978,17 @@ async loadTestSfcComponent(instanceId) {
             threeTargetPosition.z
           );
 
-          // 计算方向向量
-          const direction = new window.THREE.Vector3(
+          // 计算方向向量（使用 camera1 的 THREE 上下文）
+          const direction = dualViewer.camera1.position.clone().set(
             threeTargetPosition.x - threeCameraPosition.x,
             threeTargetPosition.y - threeCameraPosition.y,
             threeTargetPosition.z - threeCameraPosition.z
           );
           direction.normalize();
 
-          const dummyCamera = new window.THREE.Camera();
-          dummyCamera.position.set(0, 0, 0);
-          dummyCamera.up.copy(dualViewer.camera1.up);
-          dummyCamera.lookAt(direction.x, direction.y, direction.z);
-          dualViewer.camera1.quaternion.copy(dummyCamera.quaternion);
+          // 使用 camera1 的 quaternion 来计算方向
+          const currentMatrix = dualViewer.camera1.matrix.clone();
+          dualViewer.camera1.lookAt(threeTargetPosition.x, threeTargetPosition.y, threeTargetPosition.z);
 
           dualViewer.controls1.update();
           dualViewer.camera1.updateMatrixWorld();
@@ -10413,6 +10604,12 @@ body {
   overflow: hidden;
 }
 
+/* 确保 CesiumMainView 的根容器占满父容器 */
+#container {
+  width: 100%;
+  height: 100%;
+}
+
 /* dual-canvas-viewer 覆盖层容器 - 全屏叠加 */
 .dual-canvas-overlay {
   position: fixed !important; /* ⭐ 改为 fixed，确保相对于视口定位 */
@@ -10446,5 +10643,12 @@ body {
   visibility: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
+}
+
+/* ⭐ 强制所有多实例容器全屏显示（针对高度问题） */
+[class*="dual-canvas-overlay-multiple"],
+[id^="dualCanvasContainer-"] {
+  min-height: 100vh !important;
+  height: 100vh !important;
 }
 </style>

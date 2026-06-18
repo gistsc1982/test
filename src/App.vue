@@ -34,7 +34,9 @@ const isComponentView = computed(() => {
     </nav>
 
     <!-- 主内容 -->
-    <router-view />
+    <div class="app-content" :class="{ 'app-content-full': !isComponentView }">
+      <router-view />
+    </div>
 
     <!-- 底部信息栏 (仅在组件视图显示) -->
     <footer v-if="isComponentView" class="app-footer">
@@ -67,6 +69,12 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+/* 当在非导航页面时，让 router-view 占满整个容器 */
+#app:has(:not(.app-nav)) > :not(.app-nav):not(.app-footer) {
+  flex: 1;
+  height: 100%;
 }
 
 .app-nav {
@@ -151,5 +159,17 @@ body {
 /* 当在 GIS iframe 模式时，隐藏导航和页脚 */
 .router-view-gis {
   height: 100vh;
+}
+
+/* 主内容区域 - 使用 flex 占据剩余空间 */
+.app-content {
+  flex: 1 1 auto;
+}
+
+/* 全屏模式 - CesiumMain 等页面 */
+.app-content-full {
+  flex: 1 1 0%;
+  height: 100%;
+  min-height: 100vh;
 }
 </style>
