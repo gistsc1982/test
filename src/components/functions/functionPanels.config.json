@@ -1,0 +1,343 @@
+{
+  "description": "功能面板组件配置文件 - 可手工编辑来控制哪些组件可以被动态加载和默认显示",
+  "version": "1.0.0",
+  "lastUpdated": "2026-06-17",
+  "panels": [
+    {
+      "name": "MultiContentExample",
+      "file": "@cesiumBaseComponentsFunctions/examples/MultiContentExample.vue",
+      "title": "多内容切换示例",
+      "description": "TestPanelModule 动态切换内容示例（单例模式）",
+      "enabled": false,
+      "visible": false,
+      "icon": "🔄",
+      "category": "test",
+      "singleton": true,
+      "singletonContainerId": "contentExample",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "right",
+        "initialY": 280
+      }
+    },
+    {
+      "name": "MultiContentExampleMulti",
+      "file": "@cesiumBaseComponentsFunctions/examples/MultiContentExample.vue",
+      "title": "多内容切换示例（多实例）",
+      "description": "TestPanelModule 动态切换内容示例（多实例）",
+      "enabled": false,
+      "visible": false,
+      "icon": "🔀",
+      "category": "test",
+      "singleton": false,
+      "singletonContainerId": "contentExample",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "center",
+        "initialY": 360
+      }
+    },
+    {
+      "name": "ObliqueHeightAdjustPanel",
+      "file": "@cesiumBaseComponentsFunctions/ObliqueHeightAdjustPanel.vue",
+      "title": "高度调整面板",
+      "description": "倾斜摄影高度偏移调整面板（单例模式）",
+      "enabled": false,
+      "visible": false,
+      "icon": "📏",
+      "category": "tools",
+      "singleton": true,
+      "singletonContainerId": "obliqueHeightAdjustPanel",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "right",
+        "initialY": 100
+      }
+    },
+    {
+      "name": "ObliqueHeightAdjustPanelMulti",
+      "file": "@cesiumBaseComponentsFunctions/ObliqueHeightAdjustPanel.vue",
+      "title": "高度调整面板（多实例）",
+      "description": "倾斜摄影高度偏移调整面板（多实例）",
+      "enabled": false,
+      "visible": false,
+      "icon": "📐",
+      "category": "tools",
+      "singleton": false,
+      "singletonContainerId": "obliqueHeightAdjustPanel",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "right",
+        "initialY": 180
+      }
+    },
+    {
+      "name": "ObliquePhotographyPanel",
+      "file": "@cesiumBaseComponentsFunctions/ObliquePhotographyPanel.vue",
+      "title": "倾斜摄影面板（单例）",
+      "description": "倾斜摄影模型加载和管理面板（单例模式）",
+      "enabled": false,
+      "visible": false,
+      "icon": "📷",
+      "category": "tools",
+      "singleton": true,
+      "singletonContainerId": "obliquePhotographyPanel",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "center",
+        "initialY": 120
+      }
+    },
+    {
+      "name": "ObliquePhotographyPanelMulti",
+      "file": "@cesiumBaseComponentsFunctions/ObliquePhotographyPanel.vue",
+      "title": "倾斜摄影面板（多实例）",
+      "description": "倾斜摄影模型加载和管理面板（多实例）",
+      "enabled": false,
+      "visible": false,
+      "icon": "📷",
+      "category": "tools",
+      "singleton": false,
+      "singletonContainerId": "obliquePhotographyPanel",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "center",
+        "initialY": 200
+      }
+    },
+    {
+      "name": "ObliquePhotographyPanelExample",
+      "file": "@cesiumBaseComponentsFunctions/ObliquePhotographyPanelExample.vue",
+      "title": "继承JsonConfigPanelBase实现ObliquePhotographyPanel",
+      "description": "测试 JsonConfigPanelBase（单例模式）",
+      "enabled": false,
+      "visible": false,
+      "icon": "🧪",
+      "category": "test",
+      "singleton": true,
+      "singletonContainerId": "obliquePhotographyPanelExample",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 150
+      }
+    },
+    {
+      "name": "ObliquePhotographyPanelExampleMulti",
+      "file": "@cesiumBaseComponentsFunctions/ObliquePhotographyPanelExample.vue",
+      "title": "继承JsonConfigPanelBase实现ObliquePhotographyPanel（多实例）",
+      "description": "继承JsonConfigPanelBase实现ObliquePhotographyPanel（多实例）",
+      "enabled": false,
+      "visible": false,
+      "icon": "🧪",
+      "category": "test",
+      "singleton": false,
+      "singletonContainerId": "obliquePhotographyPanelExample",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 150
+      }
+    },
+    {
+      "name": "SetContentExample",
+      "file": "@cesiumBaseComponentsFunctions/examples/SetContentExample.vue",
+      "title": "SetContent 示例",
+      "description": "TestPanelModule setContent 方法使用示例",
+      "enabled": false,
+      "visible": false,
+      "icon": "📦",
+      "category": "test",
+      "singleton": true,
+      "singletonContainerId": "setContentExample",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "right",
+        "initialY": 200
+      }
+    },
+    {
+      "name": "SetContentExampleMulti",
+      "file": "@cesiumBaseComponentsFunctions/examples/SetContentExample.vue",
+      "title": "SetContent 示例（多实例）",
+      "description": "TestPanelModule setContent 方法使用示例（多实例模式）",
+      "enabled": false,
+      "visible": false,
+      "icon": "🧬",
+      "category": "test",
+      "singleton": false,
+      "singletonContainerId": "setContentExample",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "center",
+        "initialY": 150
+      }
+    },
+    {
+      "name": "SlotExample",
+      "file": "@cesiumBaseComponentsFunctions/examples/SlotExample.vue",
+      "title": "插槽示例",
+      "description": "TestPanelModule 插槽使用示例（单例模式）",
+      "enabled": false,
+      "visible": false,
+      "icon": "🎨",
+      "category": "test",
+      "singleton": true,
+      "singletonContainerId": "slotExample",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "right",
+        "initialY": 360
+      }
+    },
+    {
+      "name": "SlotExampleMulti",
+      "file": "@cesiumBaseComponentsFunctions/examples/SlotExample.vue",
+      "title": "插槽示例（多实例）",
+      "description": "TestPanelModule 插槽使用示例（多实例）",
+      "enabled": false,
+      "visible": false,
+      "icon": "🧬",
+      "category": "test",
+      "singleton": false,
+      "singletonContainerId": "slotExample",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "center",
+        "initialY": 200
+      }
+    },
+    {
+      "name": "TestPanel",
+      "file": "@cesiumBaseComponentsFunctions/TestPanel.vue",
+      "title": "TestPanel（单例）",
+      "description": "TestPanel（单例）",
+      "enabled": false,
+      "visible": false,
+      "icon": "🧪",
+      "category": "test",
+      "singleton": true,
+      "singletonContainerId": "testPanel",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 100
+      }
+    },
+    {
+      "name": "TestPanelMulti",
+      "file": "@cesiumBaseComponentsFunctions/TestPanel.vue",
+      "title": "TestPanel（多实例）",
+      "description": "TestPanel（多实例）",
+      "enabled": false,
+      "visible": false,
+      "icon": "🧪",
+      "category": "test",
+      "singleton": false,
+      "singletonContainerId": "testPanel",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 100
+      }
+    },
+    {
+      "name": "TestPanelModule",
+      "file": "@cesiumBaseComponentsFunctions/TestPanelModule.vue",
+      "title": "面板模板",
+      "description": "可复用的面板模板（单例模式）",
+      "enabled": false,
+      "visible": false,
+      "icon": "📦",
+      "category": "test",
+      "singleton": true,
+      "singletonContainerId": "testPanelModule",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 140
+      }
+    },
+    {
+      "name": "TestPanelModuleMulti",
+      "file": "@cesiumBaseComponentsFunctions/TestPanelModule.vue",
+      "title": "面板模板（多实例）",
+      "description": "可复用的面板模板（多实例）",
+      "enabled": false,
+      "visible": false,
+      "icon": "📋",
+      "category": "test",
+      "singleton": false,
+      "singletonContainerId": "testPanelModule",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 220
+      }
+    },
+    {
+      "name": "DualCanvasViewer",
+      "file": "test-sfc/sfcLib/dist/dual-canvas-viewer-sfc/lib/dual-canvas-viewer.mjs",
+      "title": "mjs双画布查看器",
+      "description": "mjs双画布查看器（单实例）- 需要vue3-sfc-loader支持",
+      "enabled": true,
+      "visible": true,
+      "icon": "🧬",
+      "category": "tools",
+      "singleton": true,
+      "singletonContainerId": "dualCanvasContainer",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "center",
+        "initialY": 100
+      }
+    },
+    {
+      "name": "DualCanvasViewerMulti",
+      "file": "test-sfc/sfcLib/dist/dual-canvas-viewer-sfc/lib/dual-canvas-viewer.mjs",
+      "title": "mjs双画布查看器",
+      "description": "双画布查看器（多实例模式）- 需要vue3-sfc-loader支持",
+      "enabled": true,
+      "visible": true,
+      "icon": "🧬",
+      "category": "tools",
+      "singleton": false,
+      "singletonContainerId": "dualCanvasContainer",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "center",
+        "initialY": 100
+      }
+    }
+  ],
+  "categories": {
+    "tools": {
+      "name": "工具",
+      "description": "工具类面板",
+      "icon": "🔧"
+    },
+    "test": {
+      "name": "test",
+      "description": "test 类面板",
+      "icon": "📁"
+    }
+  }
+}

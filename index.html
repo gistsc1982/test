@@ -5,6 +5,12 @@
     <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vite App</title>
+    <!-- ⭐ 引入 Cesium 核心库（来自 update-gis 打包的静态资源） -->
+    <script src="/gis/Cesium/Cesium.js"></script>
+    <!-- ⭐ 引入 Cesium Widgets 样式 -->
+    <link href="/gis/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <!-- ⭐ 引入 vue3-sfc-loader（用于动态加载 .mjs 组件） -->
+    <script src="/gis/libs/vue3-sfc-loader.js"></script>
   </head>
   <body>
     <div id="app"></div>

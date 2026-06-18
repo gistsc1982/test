@@ -1,7 +1,155 @@
-<script setup></script>
+<script setup>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+
+const isComponentView = computed(() => {
+  const showNavRoutes = ['/components', '/']
+  return showNavRoutes.includes(route.path)
+})
+</script>
 
 <template>
-  <router-view />
+  <div id="app">
+    <!-- 导航栏 -->
+    <nav v-if="isComponentView" class="app-nav">
+      <div class="nav-container">
+        <div class="nav-brand">
+          <h1>🌍 GIS Test 项目</h1>
+          <span class="brand-subtitle">CesiumBase 组件集成测试</span>
+        </div>
+        <div class="nav-menu">
+          <router-link to="/components" class="nav-link">
+            📦 组件展示
+          </router-link>
+          <router-link to="/cesium-main" class="nav-link">
+            🗺️ CesiumMain 功能
+          </router-link>
+          <router-link to="/gis" class="nav-link">
+            🌐 GIS iframe 模式
+          </router-link>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 主内容 -->
+    <router-view />
+
+    <!-- 底部信息栏 (仅在组件视图显示) -->
+    <footer v-if="isComponentView" class="app-footer">
+      <div class="footer-content">
+        <p>✅ test 项目已集成 cesiumBase 源码组件</p>
+        <p>🔧 Vite 别名配置: @cesiumBase → ../cesiumBase/src</p>
+      </div>
+    </footer>
+  </div>
 </template>
 
-<style scoped></style>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-nav {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.nav-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.nav-brand h1 {
+  color: white;
+  font-size: 24px;
+  margin: 0;
+}
+
+.brand-subtitle {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  margin-top: 5px;
+  display: block;
+}
+
+.nav-menu {
+  display: flex;
+  gap: 15px;
+}
+
+.nav-link {
+  padding: 10px 20px;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: all 0.3s;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 14px;
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.nav-link.router-link-active {
+  background: white;
+  color: #667eea;
+  font-weight: 600;
+}
+
+.app-footer {
+  background: #2d2d2d;
+  color: white;
+  padding: 20px 30px;
+  margin-top: auto;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.footer-content p {
+  margin: 5px 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+/* 当在 GIS iframe 模式时，隐藏导航和页脚 */
+.router-view-gis {
+  height: 100vh;
+}
+</style>
