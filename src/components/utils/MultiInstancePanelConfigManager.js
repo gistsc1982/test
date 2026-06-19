@@ -63,6 +63,11 @@ class MultiInstancePanelConfigManager {
       }
     };
 
+    // ⭐ 面板实例缓存映射（用于多实例面板的缓存管理）
+    // Map<instanceKey, cacheData>
+    // instanceKey 格式: `${instanceId}_${panelName}_${panelInstanceId}`
+    this.panelInstanceCaches = new Map();
+
     console.log('[MultiInstancePanelConfigManager] 初始化完成');
   }
 
@@ -615,6 +620,95 @@ class MultiInstancePanelConfigManager {
     }
 
     return stats;
+  }
+
+  // ==================== 面板实例缓存管理 ====================
+
+  /**
+   * 保存面板实例缓存
+   * @param {number} instanceId - CesiumMain 实例ID
+   * @param {string} panelName - 面板名称
+   * @param {number} panelInstanceId - 面板实例ID
+   * @param {Object} cacheData - 缓存数据
+   * @param {Object} cacheData.cesiumObjects - Cesium 对象
+   * @param {Array} cacheData.configList - 配置列表
+   * @param {number} cacheData.timestamp - 时间戳
+   */
+  savePanelInstanceCache(instanceId, panelName, panelInstanceId, cacheData) {
+    const instanceKey = this._generateInstanceKey(instanceId, panelName, panelInstanceId);
+    this.panelInstanceCaches.set(instanceKey, {
+      ...cacheData,
+      instanceId,
+      panelName,
+      panelInstanceId,
+      savedAt: Date.now()
+    });
+    console.log(`[MultiInstancePanelConfigManager] 💾 保存面板实例缓存: ${instanceKey}`, {
+      configList: cacheData.configList?.length || 0,
+      timestamp: cacheData.timestamp
+    });
+  }
+
+  /**
+   * 获取面板实例缓存
+   * @param {number} instanceId - CesiumMain 实例ID
+   * @param {string} panelName - 面板名称
+   * @param {number} panelInstanceId - 面板实例ID
+   * @returns {Object|null} 缓存数据
+   */
+  getPanelInstanceCache(instanceId, panelName, panelInstanceId) {
+    const instanceKey = this._generateInstanceKey(instanceId, panelName, panelInstanceId);
+    const cache = this.panelInstanceCaches.get(instanceKey);
+
+    if (!cache) {
+      console.log(`[MultiInstancePanelConfigManager] ⚠️ 未找到面板实例缓存: ${instanceKey}`);
+      return null;
+    }
+
+    console.log(`[MultiInstancePanelConfigManager] 📦 获取面板实例缓存: ${instanceKey}`, {
+      configList: cache.configList?.length || 0,
+      timestamp: cache.timestamp,
+      age: Date.now() - (cache.timestamp || 0)
+    });
+
+    return cache;
+  }
+
+  /**
+   * 清除面板实例缓存
+   * @param {number} instanceId - CesiumMain 实例ID
+   * @param {string} panelName - 面板名称
+   * @param {number} panelInstanceId - 面板实例ID
+   */
+  clearPanelInstanceCache(instanceId, panelName, panelInstanceId) {
+    const instanceKey = this._generateInstanceKey(instanceId, panelName, panelInstanceId);
+    const deleted = this.panelInstanceCaches.delete(instanceKey);
+
+    if (deleted) {
+      console.log(`[MultiInstancePanelConfigManager] 🗑️ 清除面板实例缓存: ${instanceKey}`);
+    } else {
+      console.warn(`[MultiInstancePanelConfigManager] ⚠️ 未找到面板实例缓存: ${instanceKey}`);
+    }
+  }
+
+  /**
+   * 获取所有面板实例缓存
+   * @returns {Array} 缓存列表
+   */
+  getAllPanelInstanceCaches() {
+    return Array.from(this.panelInstanceCaches.entries()).map(([key, cache]) => ({
+      key,
+      ...cache
+    }));
+  }
+
+  /**
+   * 清除所有面板实例缓存
+   */
+  clearAllPanelInstanceCaches() {
+    const count = this.panelInstanceCaches.size;
+    this.panelInstanceCaches.clear();
+    console.log(`[MultiInstancePanelConfigManager] 🗑️ 清除所有面板实例缓存，共 ${count} 条`);
   }
 }
 
