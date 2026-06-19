@@ -8,6 +8,56 @@
 <template>
   <div id="container" class="box">
     <div id="cesiumContainer" ref="cesiumContainer"></div>
+
+    <!-- ⭐ 面板加载进度提示 -->
+    <div v-if="panelLoadingProgress.show" class="panel-loading-overlay">
+      <div class="panel-loading-card">
+        <div class="panel-loading-header">
+          <div class="panel-loading-icon">📦</div>
+          <div class="panel-loading-title">功能面板加载中</div>
+        </div>
+
+        <div class="panel-loading-progress">
+          <div class="progress-info">
+            <span>{{ panelLoadingProgress.currentPanel || '准备中...' }}</span>
+            <span>{{ panelLoadingProgress.currentIndex }}/{{ panelLoadingProgress.total }}</span>
+          </div>
+          <div class="progress-bar">
+            <div
+              class="progress-fill"
+              :style="{ width: (panelLoadingProgress.completedCount / panelLoadingProgress.total * 100) + '%' }"
+            ></div>
+          </div>
+        </div>
+
+        <div class="panel-loading-list">
+          <div
+            v-for="(panel, index) in panelLoadingProgress.panels"
+            :key="panel.name"
+            class="panel-loading-item"
+            :class="{
+              'loading': panel.status === 'loading',
+              'success': panel.status === 'success',
+              'error': panel.status === 'error',
+              'pending': panel.status === 'pending'
+            }"
+          >
+            <div class="panel-status-icon">
+              <span v-if="panel.status === 'loading'" class="loading-spinner">⏳</span>
+              <span v-else-if="panel.status === 'success'">✅</span>
+              <span v-else-if="panel.status === 'error'">❌</span>
+              <span v-else>⭕</span>
+            </div>
+            <div class="panel-info">
+              <div class="panel-name">{{ panel.name }}</div>
+              <div v-if="panel.status === 'success'" class="panel-duration">{{ panel.duration }}ms</div>
+              <div v-else-if="panel.status === 'error'" class="panel-error">{{ panel.error }}</div>
+              <div v-else-if="panel.status === 'loading'" class="panel-loading-text">加载中...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- 缩放比例显示面板 -->
     <div class="scale-panel">
       <div class="scale-title">地图比例</div>
@@ -911,7 +961,20 @@ export default {
       _panelsRefreshCounter: 0,
       // ⭐ visibleFunctionPanels 计算属性缓存（避免每次返回新数组）
       _cachedVisiblePanelsKey: '',
-      _cachedVisiblePanels: null
+      _cachedVisiblePanels: null,
+      // ⭐ 性能数据存储（避免被清理后无法查看）
+      _performanceData: null,
+      // ⭐ 性能监控初始化时间
+      _performanceInitTime: null,
+      // ⭐ 面板加载进度提示
+      panelLoadingProgress: {
+        show: false,
+        currentPanel: '',
+        currentIndex: 0,
+        total: 0,
+        completedCount: 0,
+        panels: [] // { name: 'PanelName', status: 'loading'|'success'|'error', duration: 0, steps: [] }
+      }
     };
   },
   computed: {
@@ -1031,6 +1094,257 @@ export default {
     // 动态组件不再需要在这里声明，由 loadFunctionPanels() 自动加载
   },
   methods: {
+    // ==================== 性能监控 ====================
+    /**
+     * 生成完整的性能监控报告
+     */
+    generatePerformanceReport() {
+      console.log('[性能监控] 📊 ==================== 完整性能报告 ====================');
+
+      try {
+        // 应用初始化总耗时
+        const appMountedMeasure = performance.getEntriesByName('app-mounted-total')[0];
+        if (appMountedMeasure) {
+          console.log('[性能监控] 🎯 应用初始化总耗时:', {
+            总耗时: `${appMountedMeasure.duration.toFixed(2)}ms`,
+            评级: this.getPerformanceRating(appMountedMeasure.duration, 3000)
+          });
+        }
+
+        // Cesium 引擎性能
+        const cesiumInitMeasure = performance.getEntriesByName('cesium-init-total')[0];
+        if (cesiumInitMeasure) {
+          console.log('[性能监控] 🌐 Cesium 引擎性能:', {
+            总初始化耗时: `${cesiumInitMeasure.duration.toFixed(2)}ms`,
+            评级: this.getPerformanceRating(cesiumInitMeasure.duration, 1000)
+          });
+        }
+
+        // 面板加载性能
+        const panelsMeasure = performance.getEntriesByName('panels-preload-total')[0];
+        if (panelsMeasure) {
+          console.log('[性能监控] 📦 面板加载性能:', {
+            总加载耗时: `${panelsMeasure.duration.toFixed(2)}ms`,
+            评级: this.getPerformanceRating(panelsMeasure.duration, 2000)
+          });
+        }
+
+        // SyncManager 性能
+        const syncManagerMeasure = performance.getEntriesByName('sync-manager-init-total')[0];
+        if (syncManagerMeasure) {
+          console.log('[性能监控] 🔄 SyncManager 性能:', {
+            初始化耗时: `${syncManagerMeasure.duration.toFixed(2)}ms`,
+            评级: this.getPerformanceRating(syncManagerMeasure.duration, 500)
+          });
+        }
+
+        // 输出所有性能指标
+        const allMeasures = performance.getEntriesByType('measure');
+        console.log('[性能监控] 📈 所有性能指标:', allMeasures.map(m => ({
+          名称: m.name,
+          耗时: `${m.duration.toFixed(2)}ms`
+        })));
+
+        // 计算总体评分
+        const totalDuration = appMountedMeasure?.duration || 0;
+        const score = this.calculatePerformanceScore(totalDuration);
+        console.log('[性能监控] ⭐ 总体性能评分:', {
+          分数: score,
+          等级: this.getScoreGrade(score),
+          总耗时: `${totalDuration.toFixed(2)}ms`
+        });
+
+        // ⭐ 保存性能数据到组件实例（清理前）
+        this._performanceData = {
+          timestamp: new Date().toISOString(),
+          appMounted: appMountedMeasure ? {
+            总耗时: `${appMountedMeasure.duration.toFixed(2)}ms`,
+            评级: this.getPerformanceRating(appMountedMeasure.duration, 3000),
+            startTime: appMountedMeasure.startTime
+          } : null,
+          cesiumInit: cesiumInitMeasure ? {
+            总初始化耗时: `${cesiumInitMeasure.duration.toFixed(2)}ms`,
+            评级: this.getPerformanceRating(cesiumInitMeasure.duration, 1000)
+          } : null,
+          panelsLoad: panelsMeasure ? {
+            总加载耗时: `${panelsMeasure.duration.toFixed(2)}ms`,
+            评级: this.getPerformanceRating(panelsMeasure.duration, 2000)
+          } : null,
+          syncManager: syncManagerMeasure ? {
+            初始化耗时: `${syncManagerMeasure.duration.toFixed(2)}ms`,
+            评级: this.getPerformanceRating(syncManagerMeasure.duration, 500)
+          } : null,
+          allMeasures: allMeasures.map(m => ({
+            名称: m.name,
+            耗时: `${m.duration.toFixed(2)}ms`,
+            startTime: m.startTime
+          })),
+          totalScore: {
+            分数: score,
+            等级: this.getScoreGrade(score),
+            总耗时: `${totalDuration.toFixed(2)}ms`
+          },
+          performanceInitTime: this._performanceInitTime,
+          reportGenerationTime: performance.now()
+        };
+
+        // 清理性能标记，避免内存泄漏
+        performance.clearMarks();
+        performance.clearMeasures();
+
+        console.log('[性能监控] ✅ 性能报告生成完成');
+        console.log('[性能监控] 💡 性能数据已保存，可随时通过 __showCesiumPerformanceReport__() 查看');
+
+      } catch (error) {
+        console.error('[性能监控] ❌ 生成性能报告时出错:', error);
+      }
+    },
+
+    /**
+     * 获取性能评级
+     */
+    getPerformanceRating(duration, threshold) {
+      if (duration < threshold * 0.5) return '优秀';
+      if (duration < threshold) return '良好';
+      if (duration < threshold * 1.5) return '一般';
+      return '需要优化';
+    },
+
+    /**
+     * 计算性能评分
+     */
+    calculatePerformanceScore(totalDuration) {
+      // 基于总耗时的评分系统（满分100分）
+      // 2秒内完成 = 100分
+      // 每超过1秒扣10分
+      let score = 100;
+      const excessSeconds = (totalDuration - 2000) / 1000;
+      if (excessSeconds > 0) {
+        score -= Math.min(excessSeconds * 10, 50); // 最多扣50分
+      }
+      return Math.max(Math.round(score), 50); // 最低50分
+    },
+
+    /**
+     * 获取评分等级
+     */
+    getScoreGrade(score) {
+      if (score >= 90) return 'A+';
+      if (score >= 80) return 'A';
+      if (score >= 70) return 'B';
+      if (score >= 60) return 'C';
+      return 'D';
+    },
+
+    /**
+     * 启动Cesium性能监控
+     */
+    startCesiumPerformanceMonitoring() {
+      if (!this.cesiumViewer) return;
+
+      console.log('[性能监控] 🔍 启动Cesium实时性能监控');
+
+      // 监控浏览器内存使用（如果支持）
+      if (performance.memory) {
+        setInterval(() => {
+          this.reportMemoryUsage();
+        }, 10000);
+      }
+
+      // 监控帧率
+      let frameCount = 0;
+      let lastTime = performance.now();
+      let fpsUpdateInterval = null;
+
+      const monitorFPS = () => {
+        frameCount++;
+        const currentTime = performance.now();
+
+        if (currentTime - lastTime >= 1000) {
+          const fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
+
+          // 每5秒输出一次FPS报告
+          if (!fpsUpdateInterval) {
+            fpsUpdateInterval = setInterval(() => {
+              this.reportCesiumPerformance();
+            }, 5000);
+          }
+
+          frameCount = 0;
+          lastTime = currentTime;
+        }
+
+        if (this.cesiumViewer && this.cesiumViewer.scene) {
+          requestAnimationFrame(monitorFPS);
+        }
+      };
+
+      // 开始监控
+      requestAnimationFrame(monitorFPS);
+
+      // 监控场景状态
+      this.reportCesiumPerformance();
+    },
+
+    /**
+     * 报告Cesium性能状态
+     */
+    reportCesiumPerformance() {
+      if (!this.cesiumViewer || !this.cesiumViewer.scene) return;
+
+      try {
+        const scene = this.cesiumViewer.scene;
+        const performanceReport = {
+          // 帧率信息
+          帧率: `${this.cesiumViewer._clock?.step ?? 'N/A'}`,
+
+          // 场景统计
+          场景统计: {
+            总图元数: scene.primitives.length,
+            地面图元数: scene.groundPrimitives.length,
+            状态: scene._state?.toString() ?? 'N/A'
+          },
+
+          // 相机信息
+          相机信息: {
+            位置: this.cesiumViewer.camera.position.toString(),
+            高度: `${this.cesiumViewer.camera.positionCartographic.height.toFixed(2)}m`
+          },
+
+          // 内存使用
+          内存使用: {
+            纹理内存: `${(scene.textures?.length ?? 0) * 4}MB` // 估算
+          }
+        };
+
+        console.log('[性能监控] 🌐 Cesium实时状态:', performanceReport);
+
+      } catch (error) {
+        console.warn('[性能监控] ⚠️ Cesium性能监控出错:', error);
+      }
+    },
+
+    /**
+     * 报告内存使用情况
+     */
+    reportMemoryUsage() {
+      if (!performance.memory) return;
+
+      const memoryInfo = {
+        已使用JS堆大小: `${(performance.memory.usedJSHeapSize / 1048576).toFixed(2)}MB`,
+        JS堆总大小: `${(performance.memory.totalJSHeapSize / 1048576).toFixed(2)}MB`,
+        JS堆限制: `${(performance.memory.jsHeapSizeLimit / 1048576).toFixed(2)}MB`,
+        内存使用率: `${((performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100).toFixed(2)}%`
+      };
+
+      console.log('[性能监控] 💾 内存使用情况:', memoryInfo);
+
+      // 内存使用率超过80%时发出警告
+      if (performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit > 0.8) {
+        console.warn('[性能监控] ⚠️ 内存使用率过高，建议优化！');
+      }
+    },
+
     // ==================== 错误处理 ====================
     handleComponentError(error, vm, info) {
       console.error('[CesiumMain] ❌ 组件渲染错误:', error, vm, info);
@@ -1224,23 +1538,74 @@ export default {
      * 在 Cesium 初始化完成后调用，避免组件初始化超时
      */
     async preloadEnabledPanels() {
+      performance.mark('panels-preload-start');
       const instanceId = this.instanceId || 1;
+
+      console.log('[性能监控] 📦 面板预加载开始');
+      const panelLoadMetrics = {};
+
       try {
         const enabledNames = getEnabledPanelNames();
         console.log(`[CesiumMain #${instanceId}] 📦 检测到 ${enabledNames.length} 个启用的面板组件`);
 
+        // ⭐ 初始化加载进度提示
+        this.panelLoadingProgress = {
+          show: true,
+          currentPanel: '',
+          currentIndex: 0,
+          total: enabledNames.length,
+          completedCount: 0,
+          panels: enabledNames.map(name => ({
+            name,
+            status: 'pending',
+            duration: 0,
+            steps: []
+          }))
+        };
+
         // 获取完整的面板配置
         const panelConfigs = getAvailablePanelConfigs();
 
-        // 预加载所有启用的面板
-        for (const name of enabledNames) {
+        // ⭐ 顺序加载面板（便于观察进度）
+        for (let i = 0; i < enabledNames.length; i++) {
+          const name = enabledNames[i];
+
           if (!this.functionPanelComponents[name] && !this.loadingComponents[name]) {
-            console.log(`[CesiumMain #${instanceId}] 📋 预加载面板组件: ${name}`);
+            console.log(`[CesiumMain #${instanceId}] 📋 [${i + 1}/${enabledNames.length}] 加载面板组件: ${name}`);
+
+            // ⭐ 更新进度提示
+            this.panelLoadingProgress.currentPanel = name;
+            this.panelLoadingProgress.currentIndex = i + 1;
+            this.panelLoadingProgress.panels[i].status = 'loading';
+
             // 标记为加载中
             this.loadingComponents[name] = true;
-            // 异步加载（不阻塞）
-            this.loadFunctionPanel(name).then((component) => {
+
+            // ⭐ 详细监控每个步骤的耗时
+            const panelLoadStart = performance.now();
+            const steps = [];
+
+            try {
+              // 步骤1: 开始加载
+              steps.push({ step: '开始加载', time: performance.now() - panelLoadStart });
+
+              const component = await this.loadFunctionPanel(name);
+              steps.push({ step: '组件加载完成', time: performance.now() - panelLoadStart });
+
+              const panelLoadEnd = performance.now();
+              const totalDuration = (panelLoadEnd - panelLoadStart).toFixed(2);
+              panelLoadMetrics[name] = totalDuration;
+
               this.loadingComponents[name] = false;
+
+              // ⭐ 更新面板加载状态
+              this.panelLoadingProgress.completedCount++;
+              this.panelLoadingProgress.panels[i].status = 'success';
+              this.panelLoadingProgress.panels[i].duration = totalDuration;
+              this.panelLoadingProgress.panels[i].steps = steps;
+
+              console.log(`[性能监控] ✅ [${i + 1}/${enabledNames.length}] ${name} 加载成功 (${totalDuration}ms)`);
+              console.log(`[性能监控] 📊 ${name} 详细步骤:`, steps);
 
               // ⭐ 根据 singleton 属性决定从哪个管理器获取配置
               const panelConfig = panelConfigs.find(p => p.name === name);
@@ -1293,15 +1658,85 @@ export default {
                   console.warn(`[CesiumMain #${instanceId}] ⚠️ 多实例面板 ${name} 的实例配置不存在，跳过注册`);
                 }
               }
-            }).catch((error) => {
+
+            } catch (error) {
+              // ⭐ 错误处理
               this.loadingComponents[name] = false;
-              console.error(`[CesiumMain #${instanceId}] ❌ 加载面板组件失败: ${name}`, error);
-            });
+              this.panelLoadingProgress.panels[i].status = 'error';
+              this.panelLoadingProgress.panels[i].error = error.message;
+              console.error(`[CesiumMain #${instanceId}] ❌ [${i + 1}/${enabledNames.length}] 加载面板组件失败: ${name}`, error);
+            }
           }
         }
+
+        // ⭐ 所有面板加载完成，隐藏进度提示
+        this.panelLoadingProgress.show = false;
+
+        console.log(`[性能监控] ✅ 所有面板加载完成，共 ${enabledNames.length} 个面板`);
+
       } catch (error) {
         console.error(`[CesiumMain #${instanceId}] ❌ 预加载面板组件失败:`, error);
+        this.panelLoadingProgress.show = false;
       }
+
+      // 等待所有面板加载完成后输出性能报告
+      setTimeout(() => {
+        performance.mark('panels-preload-end');
+        performance.measure('panels-preload-total', 'panels-preload-start', 'panels-preload-end');
+
+        const panelsMeasure = performance.getEntriesByName('panels-preload-total')[0];
+        console.log('[性能监控] 📊 ==================== 面板加载性能详细报告 ====================');
+        console.log('[性能监控] 📊 总体统计:', {
+          总加载耗时: `${panelsMeasure.duration.toFixed(2)}ms`,
+          面板数量: enabledNames.length,
+          成功加载: this.panelLoadingProgress.completedCount,
+          失败: enabledNames.length - this.panelLoadingProgress.completedCount
+        });
+
+        console.log('[性能监控] 📈 各面板详细耗时:');
+        this.panelLoadingProgress.panels.forEach(panel => {
+          const statusIcon = panel.status === 'success' ? '✅' : panel.status === 'error' ? '❌' : '⏳';
+          console.log(`  ${statusIcon} ${panel.name}: ${panel.duration}ms (${panel.status})`);
+          if (panel.steps && panel.steps.length > 0) {
+            panel.steps.forEach(step => {
+              console.log(`    - ${step.step}: ${step.time.toFixed(2)}ms`);
+            });
+          }
+        });
+
+        console.log('[性能监控] 💡 性能分析建议:');
+        const slowPanels = this.panelLoadingProgress.panels
+          .filter(p => p.status === 'success' && p.duration > 1000)
+          .sort((a, b) => b.duration - a.duration);
+
+        if (slowPanels.length > 0) {
+          console.log('[性能监控] ⚠️ 加载较慢的面板 (>1秒):');
+          slowPanels.forEach(panel => {
+            console.log(`  - ${panel.name}: ${panel.duration}ms`);
+          });
+          console.log('[性能监控] 💡 建议: 考虑对这些面板进行懒加载或代码分割优化');
+        } else {
+          console.log('[性能监控] ✅ 所有面板加载速度良好');
+        }
+
+        // ⭐ 更新性能数据中的面板信息
+        if (this._performanceData) {
+          this._performanceData.panelsLoad = {
+            总加载耗时: `${panelsMeasure.duration.toFixed(2)}ms`,
+            评级: this.getPerformanceRating(panelsMeasure.duration, 2000),
+            面板数量: enabledNames.length,
+            成功加载: this.panelLoadingProgress.completedCount,
+            失败: enabledNames.length - this.panelLoadingProgress.completedCount,
+            各面板详细: this.panelLoadingProgress.panels.map(p => ({
+              name: p.name,
+              duration: `${p.duration}ms`,
+              status: p.status,
+              steps: p.steps
+            }))
+          };
+          console.log('[性能监控] ✅ 面板性能数据已更新到 _performanceData');
+        }
+      }, 2000);
     },
 
     /**
@@ -2673,7 +3108,10 @@ export default {
     },
 
     init() {
+      performance.mark('cesium-init-start');
       const Cesium = this.Cesium;
+
+      console.log('[性能监控] 🌐 Cesium引擎初始化开始');
 
       // 根据环境选择影像服务 URL
       const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -2704,6 +3142,8 @@ export default {
       };
 
       this.cesiumViewer = new Cesium.Viewer("cesiumContainer", config);
+      performance.mark('cesium-viewer-created');
+      console.log('[性能监控] ✅ Cesium Viewer创建完成');
 
       // 🔍 手动更新操作路由器的Cesium对象引用
       console.log('🔍 [修复] Cesium Viewer已创建，手动更新操作路由器的Cesium对象引用');
@@ -2746,11 +3186,28 @@ export default {
         window.viewer = this.cesiumViewer; // 暴露到全局以便调试
 
         // ⭐ 触发 Cesium 就绪事件
+        performance.mark('cesium-ready-trigger');
         const cesiumReadyEvent = new CustomEvent('cesium-ready', {
           detail: { cesium: Cesium }
         });
         window.dispatchEvent(cesiumReadyEvent);
         console.log('[HelloWorld] 📡 触发 cesium-ready 事件');
+
+        performance.mark('cesium-init-end');
+        performance.measure('cesium-init-total', 'cesium-init-start', 'cesium-init-end');
+        performance.measure('cesium-viewer-creation', 'cesium-init-start', 'cesium-viewer-created');
+
+        // 输出Cesium性能报告
+        const cesiumInitMeasure = performance.getEntriesByName('cesium-init-total')[0];
+        const viewerCreationMeasure = performance.getEntriesByName('cesium-viewer-creation')[0];
+        console.log('[性能监控] 📊 Cesium引擎性能报告:', {
+          总初始化耗时: `${cesiumInitMeasure.duration.toFixed(2)}ms`,
+          Viewer创建耗时: `${viewerCreationMeasure.duration.toFixed(2)}ms`,
+          配置耗时: `${(cesiumInitMeasure.duration - viewerCreationMeasure.duration).toFixed(2)}ms`
+        });
+
+        // 启动Cesium性能监控
+        this.startCesiumPerformanceMonitoring();
 
         // ⭐ 天地图扩展插件说明
         // 天地图扩展插件需要 Cesium 1.108，项目使用 1.81，版本不兼容
@@ -3220,6 +3677,8 @@ export default {
     },
 
     initSyncManager() {
+      performance.mark('sync-manager-init-start');
+      console.log('[性能监控] 🔄 SyncManager初始化开始');
       console.log('[HelloWorld] initSyncManager 调用，当前状态:', {
         hasCesium: !!this.Cesium,
         hasCesiumViewer: !!this.cesiumViewer,
@@ -3357,6 +3816,15 @@ export default {
         unifiedProjectionInitialized: this.unifiedProjectionInitialized,
         hasSyncManager: !!this.syncManager,
         globalMode: window.__unifiedProjectionMode__
+      });
+
+      // 性能监控报告
+      performance.mark('sync-manager-init-end');
+      performance.measure('sync-manager-init-total', 'sync-manager-init-start', 'sync-manager-init-end');
+
+      const syncManagerMeasure = performance.getEntriesByName('sync-manager-init-total')[0];
+      console.log('[性能监控] 📊 SyncManager初始化性能报告:', {
+        总初始化耗时: `${syncManagerMeasure.duration.toFixed(2)}ms`
       });
     },
 
@@ -9615,8 +10083,19 @@ async loadTestSfcComponent(instanceId) {
     }
   },
   mounted() {
+    // ==================== 性能监控开始 ====================
+    // ⭐ 记录性能监控初始化时间（用于计算页面运行总时长）
+    this._performanceInitTime = performance.now();
+
+    performance.mark('app-mounted-start');
+    performance.mark('app-init-start');
+    console.log('[性能监控] 🚀 应用初始化性能监控启动');
+
     // ⭐ 初始化多实例配置管理器
+    performance.mark('multi-instance-config-start');
     this.initMultiInstanceConfig();
+    performance.mark('multi-instance-config-end');
+    performance.measure('multi-instance-config', 'multi-instance-config-start', 'multi-instance-config-end');
 
     // 缓存 instanceId 避免重复访问
     const instanceId = this.instanceId || 1;
@@ -9762,6 +10241,65 @@ async loadTestSfcComponent(instanceId) {
       }
     };
     window.addEventListener('mouseup', this.boundHandleGlobalMouseUp);
+
+    // ==================== 性能监控报告 ====================
+    performance.mark('app-mounted-end');
+    performance.measure('app-mounted-total', 'app-mounted-start', 'app-mounted-end');
+
+    // 延迟输出完整性能报告，等待关键初始化完成
+    setTimeout(() => {
+      this.generatePerformanceReport();
+    }, 3000);
+
+    // 注册全局性能报告函数
+    window.__showCesiumPerformanceReport__ = () => {
+      console.log('📊 ==================== CesiumMainView 性能报告 ====================');
+
+      if (this._performanceData) {
+        // 显示保存的性能数据
+        console.log('[性能监控] 📅 报告生成时间:', this._performanceData.timestamp);
+        console.log('[性能监控] 🎯 应用初始化总耗时:', this._performanceData.appMounted);
+        console.log('[性能监控] 🌐 Cesium 引擎性能:', this._performanceData.cesiumInit);
+
+        // ⭐ 智能显示面板加载性能
+        if (this._performanceData.panelsLoad) {
+          console.log('[性能监控] 📦 面板加载性能:', this._performanceData.panelsLoad);
+        } else {
+          // 尝试实时获取面板性能数据
+          const panelsMeasure = performance.getEntriesByName('panels-preload-total')[0];
+          if (panelsMeasure) {
+            console.log('[性能监控] 📦 面板加载性能 (实时获取):', {
+              总加载耗时: `${panelsMeasure.duration.toFixed(2)}ms`,
+              评级: this.getPerformanceRating(panelsMeasure.duration, 2000)
+            });
+          } else {
+            console.log('[性能监控] 📦 面板加载性能: 面板尚未完成加载或数据未生成');
+          }
+        }
+
+        console.log('[性能监控] 🔄 SyncManager 性能:', this._performanceData.syncManager);
+        console.log('[性能监控] 📈 所有性能指标:', this._performanceData.allMeasures);
+        console.log('[性能监控] ⭐ 总体性能评分:', this._performanceData.totalScore);
+
+        // 计算从初始化到现在的总时间
+        if (this._performanceData.performanceInitTime) {
+          const currentTime = performance.now();
+          const totalUptime = currentTime - this._performanceData.performanceInitTime;
+          console.log('[性能监控] ⏱️ 页面运行总时长:', `${(totalUptime / 1000).toFixed(2)}秒`);
+        }
+      } else {
+        console.log('[性能监控] ⚠️ 暂无保存的性能数据，正在生成当前报告...');
+        this.generatePerformanceReport();
+      }
+
+      // 显示当前Cesium状态和内存使用
+      this.reportCesiumPerformance();
+      this.reportMemoryUsage();
+
+      return '性能报告已生成，请查看控制台输出';
+    };
+
+    console.log('[CesiumMain] 💡 提示: 在控制台运行 __showCesiumPerformanceReport__() 来查看性能报告');
   },
   beforeUnmount() {
     // ⭐ 销毁多实例配置
@@ -9836,6 +10374,184 @@ async loadTestSfcComponent(instanceId) {
 .box {
   height: 100%;
   position: relative;
+}
+
+/* ⭐ 面板加载进度提示样式 */
+.panel-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.panel-loading-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.panel-loading-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 16px 16px 0 0;
+}
+
+.panel-loading-icon {
+  font-size: 28px;
+  animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.panel-loading-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.panel-loading-progress {
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #555;
+  font-weight: 500;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.panel-loading-list {
+  padding: 12px;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.panel-loading-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 8px;
+  background: #f8f9fa;
+  transition: all 0.3s ease;
+}
+
+.panel-loading-item:hover {
+  background: #e9ecef;
+  transform: translateX(2px);
+}
+
+.panel-loading-item.loading {
+  background: #e3f2fd;
+  border-left: 3px solid #2196f3;
+}
+
+.panel-loading-item.success {
+  background: #e8f5e9;
+  border-left: 3px solid #4caf50;
+}
+
+.panel-loading-item.error {
+  background: #ffebee;
+  border-left: 3px solid #f44336;
+}
+
+.panel-status-icon {
+  font-size: 20px;
+  margin-right: 12px;
+  min-width: 24px;
+  text-align: center;
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.panel-info {
+  flex: 1;
+}
+
+.panel-name {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.panel-duration {
+  font-size: 12px;
+  color: #666;
+}
+
+.panel-error {
+  font-size: 12px;
+  color: #f44336;
+  margin-top: 2px;
+}
+
+.panel-loading-text {
+  font-size: 12px;
+  color: #2196f3;
+  font-style: italic;
 }
 
 /* 确保Cesium容器在底部可见 */
