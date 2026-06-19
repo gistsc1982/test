@@ -24,7 +24,10 @@ export default defineConfig({
       'cesium': path.resolve(__dirname, './public/gis/Cesium'),
       // ⭐ 本地工具文件别名（位于 components 目录，与 cesiumBase 结构一致）
       '@componentsUtils': path.resolve(__dirname, './src/components/utils'),
-      '@componentsFunctions': path.resolve(__dirname, './src/components/functions')
+      '@componentsFunctions': path.resolve(__dirname, './src/components/functions'),
+      // ⭐ 打包后的组件别名
+      '@componentsLib': path.resolve(__dirname, './src/components/lib'),
+      '@componentsFunctionsLib': path.resolve(__dirname, './src/components/functions/lib')
     },
   },
   // ⭐ 配置服务器选项

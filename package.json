@@ -8,7 +8,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "update-gis": "node update-gis-assets.cjs",
-    "verify-integration": "node verify-integration.cjs"
+    "verify-integration": "node verify-integration.cjs",
+    "build:base-components": "node scripts/build-base-components.cjs",
+    "build:function-panels": "node scripts/build-function-panels.cjs",
+    "build:root-components": "node scripts/build-root-components.cjs",
+    "build:all-panels": "npm run build:base-components && npm run build:function-panels && npm run build:root-components"
   },
   "dependencies": {
     "pinia": "^3.0.4",

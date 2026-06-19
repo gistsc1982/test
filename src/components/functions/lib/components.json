@@ -1,0 +1,46 @@
+{
+  "generated": "2026-06-19T09:21:56.184Z",
+  "count": 5,
+  "components": [
+    {
+      "name": "MultiContentExample",
+      "entry": "examples/MultiContentExample.vue",
+      "subDir": "",
+      "relativePath": "MultiContentExample.vue",
+      "importPath": "@componentsFunctionsLib/examples/MultiContentExample.mjs",
+      "file": "examples/MultiContentExample.mjs"
+    },
+    {
+      "name": "SetContentExample",
+      "entry": "examples/SetContentExample.vue",
+      "subDir": "",
+      "relativePath": "SetContentExample.vue",
+      "importPath": "@componentsFunctionsLib/examples/SetContentExample.mjs",
+      "file": "examples/SetContentExample.mjs"
+    },
+    {
+      "name": "SetContentIifeExampleContent",
+      "entry": "examples/SetContentIifeExampleContent.vue",
+      "subDir": "",
+      "relativePath": "SetContentIifeExampleContent.vue",
+      "importPath": "@componentsFunctionsLib/examples/SetContentIifeExampleContent.mjs",
+      "file": "examples/SetContentIifeExampleContent.mjs"
+    },
+    {
+      "name": "SetContentMjsExampleContent",
+      "entry": "examples/SetContentMjsExampleContent.vue",
+      "subDir": "",
+      "relativePath": "SetContentMjsExampleContent.vue",
+      "importPath": "@componentsFunctionsLib/examples/SetContentMjsExampleContent.mjs",
+      "file": "examples/SetContentMjsExampleContent.mjs"
+    },
+    {
+      "name": "SlotExample",
+      "entry": "examples/SlotExample.vue",
+      "subDir": "",
+      "relativePath": "SlotExample.vue",
+      "importPath": "@componentsFunctionsLib/examples/SlotExample.mjs",
+      "file": "examples/SlotExample.mjs"
+    }
+  ]
+}

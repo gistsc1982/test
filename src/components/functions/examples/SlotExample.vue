@@ -18,7 +18,7 @@
 </template>
 
 <script>
-import TestPanelModule from '../TestPanelModule.vue';
+import TestPanelModule from '@componentsFunctionsLib/TestPanelModule.mjs';
 
 export default {
   name: 'SlotExample',

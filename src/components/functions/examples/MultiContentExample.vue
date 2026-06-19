@@ -17,9 +17,9 @@
 </template>
 
 <script>
-import TestPanelModule from '../TestPanelModule.vue';
-import ObliqueHeightAdjustPanel from '../ObliqueHeightAdjustPanel.vue';
-import ObliquePhotographyPanel from '../ObliquePhotographyPanel.vue';
+import TestPanelModule from '@componentsFunctionsLib/TestPanelModule.mjs';
+import ObliqueHeightAdjustPanel from '@componentsFunctionsLib/ObliqueHeightAdjustPanel.mjs';
+import ObliquePhotographyPanel from '@componentsFunctionsLib/ObliquePhotographyPanel.mjs';
 
 export default {
   name: 'MultiContentExample',

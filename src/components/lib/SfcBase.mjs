@@ -1,0 +1,273 @@
+import { createElementBlock as e, openBlock as t } from "vue";
+var n = new class {
+	constructor() {
+		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
+	}
+	init() {
+		if (!(typeof window > "u")) {
+			if (this.checkCesiumReady()) {
+				this.setReady();
+				return;
+			}
+			this.setupGlobalListener(), this.startPolling();
+		}
+	}
+	checkCesiumReady() {
+		if (typeof window > "u") return !1;
+		let e = window.Cesium !== void 0, t = window.__cesiumViewer__ !== void 0;
+		return e && t;
+	}
+	setupGlobalListener() {
+		window.addEventListener("cesium-ready", this.handleCesiumReady), window.addEventListener("cesium-viewer-ready", this.handleViewerReady);
+	}
+	removeGlobalListener() {
+		typeof window > "u" || (window.removeEventListener("cesium-ready", this.handleCesiumReady), window.removeEventListener("cesium-viewer-ready", this.handleViewerReady));
+	}
+	handleCesiumReady = () => {
+		console.log("[CesiumEventManager] 📡 收到 cesium-ready 事件"), this.cesiumInstance = window.Cesium, window.__cesiumViewer__ && this.setReady();
+	};
+	handleViewerReady = () => {
+		console.log("[CesiumEventManager] 📡 收到 cesium-viewer-ready 事件"), this.viewerInstance = window.__cesiumViewer__, window.Cesium && this.setReady();
+	};
+	startPolling() {
+		this.checkInterval ||= (this.checkAttempts = 0, setInterval(() => {
+			this.checkAttempts++, this.checkCesiumReady() ? (this.setReady(), this.stopPolling()) : this.checkAttempts >= this.maxAttempts && (console.warn("[CesiumEventManager] ⏰ Cesium 初始化检查超时"), this.stopPolling());
+		}, 100));
+	}
+	stopPolling() {
+		this.checkInterval &&= (clearInterval(this.checkInterval), null);
+	}
+	setReady() {
+		this.isReady || (this.isReady = !0, this.cesiumInstance = window.Cesium, this.viewerInstance = window.__cesiumViewer__, console.log("[CesiumEventManager] ✅ Cesium 已就绪"), this.stopPolling(), this.notifyListeners(), this.dispatchGlobalEvent());
+	}
+	notifyListeners() {
+		this.listeners.forEach((e) => {
+			try {
+				e(this.cesiumInstance, this.viewerInstance);
+			} catch (e) {
+				console.error("[CesiumEventManager] ❌ 监听器执行失败:", e);
+			}
+		});
+	}
+	dispatchGlobalEvent() {
+		if (typeof window > "u") return;
+		let e = new CustomEvent("cesium-all-ready", { detail: {
+			cesium: this.cesiumInstance,
+			viewer: this.viewerInstance
+		} });
+		window.dispatchEvent(e);
+	}
+	onReady(e) {
+		if (typeof e != "function") return console.warn("[CesiumEventManager] ⚠️ 监听器必须是函数"), () => {};
+		if (this.isReady) try {
+			e(this.cesiumInstance, this.viewerInstance);
+		} catch (e) {
+			console.error("[CesiumEventManager] ❌ 监听器执行失败:", e);
+		}
+		else this.listeners.add(e);
+		return () => {
+			this.listeners.delete(e);
+		};
+	}
+	async ready() {
+		return new Promise((e) => {
+			let t = this.onReady((n, r) => {
+				t(), e({
+					cesium: n,
+					viewer: r
+				});
+			});
+		});
+	}
+	getCesium() {
+		return this.cesiumInstance;
+	}
+	getViewer() {
+		return this.viewerInstance;
+	}
+	reset() {
+		this.isReady = !1, this.cesiumInstance = null, this.viewerInstance = null, this.listeners.clear(), this.stopPolling();
+	}
+	destroy() {
+		this.stopPolling(), this.removeGlobalListener(), this.listeners.clear(), this.isReady = !1, this.cesiumInstance = null, this.viewerInstance = null;
+	}
+}();
+typeof window < "u" && (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => {
+	n.init();
+}) : n.init(), window.__cesiumEventManager__ = n);
+//#endregion
+//#region \0plugin-vue:export-helper
+var r = (e, t) => {
+	let n = e.__vccOpts || e;
+	for (let [e, r] of t) n[e] = r;
+	return n;
+}, i = {
+	name: "SfcBase",
+	props: {
+		onClose: {
+			type: Function,
+			default: null
+		},
+		panelInstanceId: {
+			type: Number,
+			default: null
+		}
+	},
+	inject: { instanceId: { default: 1 } },
+	data() {
+		return {
+			cesiumReady: !1,
+			componentName: "SfcBase",
+			boundEventHandlers: {},
+			cesiumUnsubscribe: null
+		};
+	},
+	computed: {
+		isSingleton() {
+			return this.panelInstanceId === null || this.panelInstanceId === void 0;
+		},
+		isMultiInstance() {
+			return !this.isSingleton;
+		},
+		panelInstanceKey() {
+			return this.isSingleton ? this.effectiveRegistrationKey || this.componentName : `${this.effectiveRegistrationKey || this.componentName}_${this.panelInstanceId}`;
+		}
+	},
+	methods: {
+		checkCesiumReady() {
+			return typeof window < "u" && window.Cesium !== void 0 && window.__cesiumViewer__ ? (this.cesiumReady = !0, this.$logger?.info?.("[SfcBase] Cesium 已就绪"), !0) : !1;
+		},
+		waitForCesium(e, t = 5e3) {
+			if (this.cesiumUnsubscribe &&= (this.cesiumUnsubscribe(), null), this.checkCesiumReady()) {
+				e && typeof e == "function" && e();
+				return;
+			}
+			let r = null;
+			t > 0 && (r = setTimeout(() => {
+				this.cesiumUnsubscribe &&= (this.cesiumUnsubscribe(), null), this.$logger?.warn?.(`[${this.componentName}] Cesium 初始化超时 (${t}ms)`);
+			}, t)), this.cesiumUnsubscribe = n.onReady((t, n) => {
+				r &&= (clearTimeout(r), null), this.cesiumReady = !0, this.$logger?.info?.(`[${this.componentName}] Cesium 已就绪（事件驱动）`), e && typeof e == "function" && e(t, n);
+			});
+		},
+		getCesiumViewer() {
+			return this.checkCesiumReady() ? window.__cesiumViewer__ : (this.$logger?.warn?.(`[${this.componentName}] Cesium 未就绪，无法获取 Viewer`), null);
+		},
+		getCesium() {
+			return typeof window < "u" && window.Cesium !== void 0 ? window.Cesium : (this.$logger?.warn?.(`[${this.componentName}] Cesium 全局对象不存在`), null);
+		},
+		isValidCoordinate(e, t, n) {
+			return typeof e == "number" && !isNaN(e) && e >= t && e <= n;
+		},
+		validateLonLat(e, t, n = null) {
+			return this.isValidCoordinate(e, -180, 180) ? this.isValidCoordinate(t, -90, 90) ? n !== null && !this.isValidCoordinate(n, -1e3, 1e5) ? {
+				valid: !1,
+				message: "高度必须在合理范围内"
+			} : {
+				valid: !0,
+				message: "坐标有效"
+			} : {
+				valid: !1,
+				message: "纬度必须在 -90 到 90 之间"
+			} : {
+				valid: !1,
+				message: "经度必须在 -180 到 180 之间"
+			};
+		},
+		showMessage(e, t = "info", n = 3e3) {
+			this.$logger?.info?.(`[${this.componentName}] ${t.toUpperCase()}: ${e}`), this.messageContent !== void 0 && (this.messageContent = e), this.messageType !== void 0 && (this.messageType = t), n > 0 && typeof this.clearMessage == "function" && setTimeout(() => this.clearMessage(), n);
+		},
+		clearMessage() {
+			this.messageContent !== void 0 && (this.messageContent = "");
+		},
+		handleClose() {
+			if (typeof window < "u") {
+				let e = new CustomEvent(this.closeEventName, { detail: {
+					componentName: this.componentName,
+					instanceId: this.instanceId
+				} });
+				window.dispatchEvent(e), this.onClose && typeof this.onClose == "function" && this.onClose(), this.$logger?.info?.(`[${this.componentName}] 关闭事件已触发`);
+			}
+		},
+		bindEventHandler(e, t) {
+			if (typeof t != "function") return this.$logger?.warn?.(`[${this.componentName}] 事件处理器必须是函数`), null;
+			let n = t.bind(this);
+			return this.boundEventHandlers[e] = n, n;
+		},
+		getBoundHandler(e) {
+			return this.boundEventHandlers[e] || null;
+		},
+		clearBoundHandlers() {
+			this.boundEventHandlers = {};
+		},
+		flyToPosition(e, t, n, r = {}, i = 2) {
+			return new Promise((a, o) => {
+				let s = this.getCesiumViewer();
+				if (!s) {
+					o(/* @__PURE__ */ Error("Cesium Viewer 不可用"));
+					return;
+				}
+				let c = this.getCesium();
+				if (!c) {
+					o(/* @__PURE__ */ Error("Cesium 全局对象不可用"));
+					return;
+				}
+				try {
+					let l = c.Cartesian3.fromDegrees(e, t, n), u = {
+						heading: c.Math.toRadians(0),
+						pitch: c.Math.toRadians(-45),
+						roll: 0
+					};
+					s.camera.flyTo({
+						destination: l,
+						orientation: {
+							...u,
+							...r
+						},
+						duration: i,
+						complete: () => a(),
+						cancel: () => o(/* @__PURE__ */ Error("飞行操作被取消"))
+					});
+				} catch (e) {
+					o(e);
+				}
+			});
+		},
+		viewGround(e, t, n = 0) {
+			return this.flyToPosition(e, t, n, {
+				heading: 0,
+				pitch: -90,
+				roll: 0
+			}, 1.5);
+		},
+		createLogger() {
+			let e = `[${this.componentName}]`;
+			return {
+				info: (t) => console.log(`${e} ${t}`),
+				warn: (t) => console.warn(`${e} ⚠️ ${t}`),
+				error: (t) => console.error(`${e} ❌ ${t}`),
+				debug: (t) => console.debug(`${e} 🔍 ${t}`)
+			};
+		},
+		initCesium(e) {
+			this.$logger = this.createLogger(), this.$logger?.info?.("组件初始化"), this.checkCesiumReady() ? (this.cesiumReady = !0, e && e()) : (this.$logger?.info?.("等待 Cesium 初始化（事件驱动）..."), this.waitForCesium((t, n) => {
+				this.$logger?.info?.("Cesium 已就绪"), e && e(t, n);
+			}));
+		},
+		cleanup() {
+			this.cesiumUnsubscribe &&= (this.cesiumUnsubscribe(), null), this.clearBoundHandlers(), this.$logger?.info?.("资源已清理");
+		}
+	},
+	mounted() {},
+	beforeUnmount() {
+		this.cleanup();
+	}
+}, a = {
+	class: "sfc-base",
+	style: { display: "none" }
+};
+function o(n, r, i, o, s, c) {
+	return t(), e("div", a);
+}
+var s = /*#__PURE__*/ r(i, [["render", o]]);
+//#endregion
+export { s as default };

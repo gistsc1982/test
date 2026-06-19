@@ -1,4 +1,5 @@
 {
   "permissionMode": "acceptEdits",
-  "dangerouslyAllowAllBashWithoutConfirmation": true
+  "dangerouslyAllowAllBashWithoutConfirmation": true,
+  "dangerouslyAllowAutoApprovingSafeCommands": true
 }

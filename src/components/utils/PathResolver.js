@@ -6,15 +6,18 @@
  */
 
 // ⭐ 路径别名映射 - 与 vite.config.js 中的 resolve.alias 配置保持一致
+// 注意：这些相对路径是相对于 src/components/ 目录的
 const PATH_ALIASES = {
   // CesiumBase 相关别名
   '@cesiumBase': '../../../cesiumBase/src',
   '@cesiumBaseComponents': '../../../cesiumBase/src/components',
   '@cesiumBaseComponentsFunctions': '../../../cesiumBase/src/components/functions',
 
-  // 本地项目别名
+  // 本地项目别名（相对于 src/components/ 目录）
   '@componentsUtils': './utils',
-  '@componentsFunctions': './functions'
+  '@componentsFunctions': './functions',
+  // 完整路径别名（从 src/ 目录开始）
+  '@srcFunctions': '../functions'
 };
 
 /**
@@ -43,10 +46,18 @@ export function resolvePathAlias(importPath, basePath = '') {
   for (const [alias, realPath] of Object.entries(PATH_ALIASES)) {
     if (importPath.startsWith(alias)) {
       // 替换别名为实际路径
-      const resolvedPath = importPath.replace(alias, realPath);
+      let resolvedPath = importPath.replace(alias, realPath);
 
-      // 如果提供了基础路径，可以在这里处理
-      // 但通常情况下，我们只需要返回解析后的相对路径
+      // 对于本地项目路径（@componentsFunctions 和 @componentsUtils），返回绝对路径格式
+      // 对于 CesiumBase 路径，保持相对路径格式
+      if (alias === '@componentsFunctions' || alias === '@componentsUtils') {
+        // 返回从项目根目录开始的绝对路径
+        // ./functions -> /src/components/functions
+        // ./utils -> /src/components/utils
+        resolvedPath = resolvedPath.replace('./functions', '/src/components/functions');
+        resolvedPath = resolvedPath.replace('./utils', '/src/components/utils');
+      }
+
       return resolvedPath;
     }
   }
