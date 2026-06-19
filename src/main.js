@@ -26,4 +26,24 @@ if (typeof window !== 'undefined' && window.Cesium) {
   console.warn('[main] ⚠️ Cesium 未加载，将在组件中动态检查')
 }
 
+// ⭐ 将 THREE 设置为全局属性
+// THREE 通过 load-three-globals.js 加载，挂载到 window.THREE
+if (typeof window !== 'undefined' && window.THREE) {
+  app.config.globalProperties.THREE = window.THREE
+  console.log('[main] ✅ THREE 已设置为全局属性', {
+    hasTHREE: !!window.THREE,
+    hasBox3: !!window.THREE.Box3
+  })
+} else {
+  console.warn('[main] ⚠️ THREE 尚未加载（load-three-globals.js 可能还在加载中），将在组件中动态检查')
+  // 监听 THREE 加载完成事件
+  window.addEventListener('ThreeJSGlobalLoaded', () => {
+    app.config.globalProperties.THREE = window.THREE
+    console.log('[main] ✅ THREE 已设置为全局属性（通过事件监听）', {
+      hasTHREE: !!window.THREE,
+      hasBox3: !!window.THREE.Box3
+    })
+  })
+}
+
 app.mount('#app')

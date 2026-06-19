@@ -11,6 +11,17 @@
     <link href="/gis/Cesium/Widgets/widgets.css" rel="stylesheet">
     <!-- ⭐ 引入 vue3-sfc-loader（用于动态加载 .mjs 组件） -->
     <script src="/gis/libs/vue3-sfc-loader.js"></script>
+    <!-- ⭐ Import Map 配置（用于 load-three-globals.js 解析模块路径） -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "/node_modules/three/build/three.module.js",
+        "three/addons/": "/node_modules/three/examples/jsm/"
+      }
+    }
+    </script>
+    <!-- ⭐ 引入 Three.js 全局加载脚本（将 THREE 加载到 window 对象） -->
+    <script type="module" src="/gis/load-three-globals.js"></script>
   </head>
   <body>
     <div id="app"></div>
