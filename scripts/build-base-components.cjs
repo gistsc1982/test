@@ -74,8 +74,12 @@ async function buildComponent(componentName, outputPath = null) {
   const startTime = Date.now();
 
   try {
-    // 确保输出目录存在
-    const outDir = path.resolve(CONFIG.testRoot, CONFIG.outDir);
+    // 确定输出文件名（将斜杠替换为下划线以避免目录问题）
+    const outputFileName = outputPath || componentName.replace(/\//g, '/') + '.mjs';
+    const outputSubDir = path.dirname(outputFileName);
+
+    // 确保输出目录存在（包括子目录）
+    const outDir = path.resolve(CONFIG.testRoot, CONFIG.outDir, outputSubDir);
     if (!fs.existsSync(outDir)) {
       fs.mkdirSync(outDir, { recursive: true });
     }
@@ -88,8 +92,8 @@ async function buildComponent(componentName, outputPath = null) {
         emptyOutDir: false, // 不清空输出目录
         lib: {
           entry: path.resolve(CONFIG.cesiumBaseRoot, CONFIG.srcDir, `${componentName}.vue`),
-          name: componentName,
-          fileName: outputPath || `${componentName}.mjs`,
+          name: componentName.replace(/\//g, '_'), // 将斜杠替换为下划线作为全局变量名
+          fileName: outputFileName,
           formats: ['es'] // 只生成 ES 模块
         },
         rollupOptions: {
@@ -102,7 +106,7 @@ async function buildComponent(componentName, outputPath = null) {
                     'axios', 'bootstrap', 'bootstrap-icons'],
           output: {
             // 输出文件名
-            entryFileNames: outputPath || `${componentName}.mjs`
+            entryFileNames: outputFileName
           }
         },
         copyPublicDir: false,
@@ -127,6 +131,26 @@ async function buildComponent(componentName, outputPath = null) {
     console.error(error);
     return { success: false, component: componentName, error: error.message };
   }
+}
+
+/**
+ * 拷贝 CSS 文件到 public/test-sfc 目录（已禁用）
+ * CSS 文件现在和 .mjs 文件在同一目录，不需要单独拷贝
+ * @returns {Object} 拷贝结果统计
+ */
+function copyCssFiles() {
+  log('\n=== CSS 文件拷贝已禁用 ===\n', 'yellow');
+  log('CSS 文件现在和 .mjs 文件在同一目录', 'cyan');
+
+  const results = {
+    total: 0,
+    success: 0,
+    failed: 0,
+    details: [],
+    skipped: true
+  };
+
+  return results;
 }
 
 /**
@@ -189,8 +213,12 @@ async function main() {
     });
   }
 
+  // 拷贝 CSS 文件到 public/test-sfc
+  const cssResults = copyCssFiles();
+  log(`\n📊 CSS 文件拷贝结果: 总计 ${cssResults.total}, 成功 ${cssResults.success}, 失败 ${cssResults.failed}`, 'cyan');
+
   // 返回退出码
-  process.exit(results.failed > 0 ? 1 : 0);
+  process.exit(results.failed > 0 || cssResults.failed > 0 ? 1 : 0);
 }
 
 // 错误处理

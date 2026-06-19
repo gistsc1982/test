@@ -16,6 +16,9 @@ const PATH_ALIASES = {
   // 本地项目别名（相对于 src/components/ 目录）
   '@componentsUtils': './utils',
   '@componentsFunctions': './functions',
+  // 打包后的组件别名（使用绝对路径格式）
+  '@componentsLib': '/src/components/lib',
+  '@componentsFunctionsLib': '/src/components/functions/lib',
   // 完整路径别名（从 src/ 目录开始）
   '@srcFunctions': '../functions'
 };
@@ -48,14 +51,17 @@ export function resolvePathAlias(importPath, basePath = '') {
       // 替换别名为实际路径
       let resolvedPath = importPath.replace(alias, realPath);
 
-      // 对于本地项目路径（@componentsFunctions 和 @componentsUtils），返回绝对路径格式
-      // 对于 CesiumBase 路径，保持相对路径格式
+      // 对于本地项目路径，使用绝对路径（从项目根目录 /src/ 开始）
+      // Vite 的动态 import() 需要绝对路径或特殊格式的路径
       if (alias === '@componentsFunctions' || alias === '@componentsUtils') {
-        // 返回从项目根目录开始的绝对路径
-        // ./functions -> /src/components/functions
-        // ./utils -> /src/components/utils
-        resolvedPath = resolvedPath.replace('./functions', '/src/components/functions');
-        resolvedPath = resolvedPath.replace('./utils', '/src/components/utils');
+        // 这些是相对路径（./functions），需要转换为绝对路径
+        // ./functions/test.vue -> /src/components/functions/test.vue
+        resolvedPath = '/src/components/' + resolvedPath.replace(/^\.\//, '');
+        return resolvedPath;
+      }
+      if (alias === '@componentsLib' || alias === '@componentsFunctionsLib') {
+        // 这些已经是绝对路径格式，直接返回
+        return resolvedPath;
       }
 
       return resolvedPath;

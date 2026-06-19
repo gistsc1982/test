@@ -498,6 +498,14 @@ var E = /*#__PURE__*/ S(C, [["render", T]]), D = new class {
 }(), O = {
 	name: "FunctionPanelUIBase",
 	mixins: [E],
+	emits: [
+		"close",
+		"minimize",
+		"expand",
+		"lazy-load",
+		"register-panel",
+		"unregister-panel"
+	],
 	inject: {
 		registerPanelComponent: {
 			type: Function,
@@ -661,6 +669,17 @@ var E = /*#__PURE__*/ S(C, [["render", T]]), D = new class {
 			return { transform: `translate(${this.x + this.width / 2 - 40}px, ${this.y}px)` };
 		}
 	},
+	watch: { isClosed(e, t) {
+		console.log(`[FunctionPanelUIBase] 🔄 isClosed 状态变化: ${this.effectiveRegistrationKey}`, {
+			oldVal: t,
+			newVal: e,
+			panelRefExists: !!this.$refs.panelRef
+		}), t === !0 && e === !1 && (console.log("[FunctionPanelUIBase] ✅ 面板从关闭变为打开，初始化位置"), this.$nextTick(() => {
+			this.$nextTick(() => {
+				this.initPosition();
+			});
+		}));
+	} },
 	mounted() {
 		console.log("[FunctionPanelUIBase] 🔍 接收到的 props:", {
 			panelName: this.componentName || this.effectiveRegistrationKey,
@@ -676,7 +695,7 @@ var E = /*#__PURE__*/ S(C, [["render", T]]), D = new class {
 				effectiveRegistrationKey: this.effectiveRegistrationKey
 			}
 		}), this.autoRegister && this.effectiveRegistrationKey && !this._registryRegistered && this.registerToParent();
-		let e = this.panelInstanceId !== null;
+		let e = this.panelInstanceId != null;
 		if (console.log("[FunctionPanelUIBase] 🔍 多实例面板检查:", {
 			panelName: this.effectiveRegistrationKey,
 			panelInstanceId: this.panelInstanceId,
@@ -693,6 +712,9 @@ var E = /*#__PURE__*/ S(C, [["render", T]]), D = new class {
 					let n = this.isClosed;
 					this.isClosed = t.isClosed, console.log(`[FunctionPanelUIBase] 🔓 从 PanelSingletonManager 同步面板状态: ${e}, isClosed: ${n} -> ${this.isClosed}`);
 				}
+			} else {
+				let t = this.isClosed, n = this.getInstanceConfig(), r = n ? n.visible !== !1 : !0;
+				this.isClosed = !r, console.log(`[FunctionPanelUIBase] 🆕 面板首次创建，根据配置设置 isClosed: ${e}, ${t} -> ${this.isClosed} (visible=${r})`);
 			}
 		}
 		e || (this._panelStateChangeListener = (e) => {
@@ -707,7 +729,9 @@ var E = /*#__PURE__*/ S(C, [["render", T]]), D = new class {
 			console.log("[FunctionPanelUIBase] 📤 发送 lazy-load 事件（初始状态）"), this.$emit("lazy-load", { firstOpen: !0 });
 		})), this.initCesium(() => {
 			this.$nextTick(() => {
-				this.initPosition();
+				this.$nextTick(() => {
+					this.initPosition();
+				});
 			});
 		}), this.boundHandleKeydown = this.handleKeydown.bind(this), document.addEventListener("keydown", this.boundHandleKeydown);
 	},
@@ -784,29 +808,46 @@ var E = /*#__PURE__*/ S(C, [["render", T]]), D = new class {
 			}
 		},
 		initPosition() {
-			console.log(`[FunctionPanelUIBase] 🔧 初始化面板位置: ${this.effectiveRegistrationKey} #${this.panelInstanceId || "singleton"}`, {
+			let e = this.$refs.panelRef, t = !!e, n = this.isClosed;
+			if (console.log(`[FunctionPanelUIBase] 🔧 初始化面板位置: ${this.effectiveRegistrationKey} #${this.panelInstanceId || "singleton"}`, {
 				initialX: this.initialX,
 				initialY: this.initialY,
-				panelRef: !!this.$refs.panelRef,
+				currentX: this.x,
+				currentY: this.y,
+				panelRef: t,
+				panelRefElement: e ? e.tagName : "N/A",
+				isClosed: n,
 				windowInnerWidth: window.innerWidth,
 				windowInnerHeight: window.innerHeight,
 				panelWidth: this.width
-			});
-			let e = this.initialX;
-			if (e === "center") {
-				let t = this.$refs.panelRef, n = t ? t.offsetWidth : this.width;
-				e = Math.round((window.innerWidth - n) / 2), console.log("[FunctionPanelUIBase] 📍 居中计算:", {
-					panelWidth: n,
-					calculatedX: e
+			}), n) {
+				console.log("[FunctionPanelUIBase] ⏸️ 面板已关闭，跳过位置初始化，等待面板打开");
+				return;
+			}
+			if (!t) {
+				console.warn("[FunctionPanelUIBase] ⚠️ panelRef 还不存在，延迟初始化位置"), this.$nextTick(() => {
+					this.initPosition();
 				});
-			} else if (e === "right") {
-				let t = this.$refs.panelRef, n = t ? t.offsetWidth : this.width;
-				e = Math.round(window.innerWidth - n - 20), console.log("[FunctionPanelUIBase] 📍 右侧对齐计算:", {
-					panelWidth: n,
-					calculatedX: e
+				return;
+			}
+			let r = this.initialX;
+			if (r === "center") {
+				let e = this.$refs.panelRef, t = e ? e.offsetWidth : this.width;
+				r = Math.round((window.innerWidth - t) / 2), console.log("[FunctionPanelUIBase] 📍 居中计算:", {
+					panelWidth: t,
+					calculatedX: r
 				});
-			} else typeof e != "number" && (e = 20, console.log("[FunctionPanelUIBase] 📍 使用默认 x 值: 20"));
-			e = Math.max(20, Math.min(e, window.innerWidth - this.width - 20)), this.x = e, this.y = Math.max(20, Math.min(this.initialY, window.innerHeight - 100)), console.log(`[FunctionPanelUIBase] ✅ 面板位置已设置: ${this.effectiveRegistrationKey} #${this.panelInstanceId || "singleton"}`, {
+			} else if (r === "right") {
+				let e = this.$refs.panelRef, t = e ? e.offsetWidth : this.width, n = Math.max(20, t / 2);
+				r = Math.round(window.innerWidth - t - n), console.log("[FunctionPanelUIBase] 📍 右侧对齐计算:", {
+					panelWidth: t,
+					windowInnerWidth: window.innerWidth,
+					rightMargin: n,
+					calculatedX: r
+				});
+			} else typeof r != "number" && (r = 20, console.log("[FunctionPanelUIBase] 📍 使用默认 x 值: 20"));
+			let i = window.innerWidth - this.width - 20;
+			r = Math.max(20, Math.min(r, i)), this.x = r, this.y = Math.max(20, Math.min(this.initialY, window.innerHeight - 100)), console.log(`[FunctionPanelUIBase] ✅ 面板位置已设置: ${this.effectiveRegistrationKey} #${this.panelInstanceId || "singleton"}`, {
 				x: this.x,
 				y: this.y,
 				transform: `translate(${this.x}px, ${this.y}px)`
@@ -999,8 +1040,13 @@ function B(s, c, p, m, g, x) {
 //#region ../cesiumBase/src/components/functions/TestPanelModule.vue
 var V = {
 	name: "TestPanelModule",
-	components: { FunctionPanelUIBase: /* @__PURE__ */ S(O, [["render", B], ["__scopeId", "data-v-934fcccf"]]) },
+	components: { FunctionPanelUIBase: /* @__PURE__ */ S(O, [["render", B], ["__scopeId", "data-v-fa8a4c38"]]) },
 	inheritAttrs: !1,
+	emits: [
+		"close",
+		"minimize",
+		"expand"
+	],
 	props: {
 		initialX: {
 			type: [Number, String],
@@ -1066,6 +1112,10 @@ var V = {
 		},
 		effectiveTitleIcon() {
 			return this.dynamicContent.titleIcon || this.titleIcon;
+		},
+		filteredAttrs() {
+			let { onClose: e, onMinimize: t, onExpand: n, ...r } = this.$attrs;
+			return r;
 		}
 	},
 	methods: {
@@ -1111,7 +1161,7 @@ var V = {
 }, H = { class: "test-panel-content" }, U = { class: "demo-section" }, W = { class: "status-info" }, G = { class: "status-item" }, K = { class: "value" };
 function q(e, t, r, i, o, s) {
 	let l = p("FunctionPanelUIBase");
-	return d(), n(l, c(e.$attrs, {
+	return d(), n(l, c(s.filteredAttrs, {
 		title: s.effectiveTitle,
 		"title-icon": s.effectiveTitleIcon,
 		width: r.width,
@@ -1180,6 +1230,6 @@ function q(e, t, r, i, o, s) {
 		"onExpand"
 	]);
 }
-var J = /*#__PURE__*/ S(V, [["render", q], ["__scopeId", "data-v-38491e14"]]);
+var J = /*#__PURE__*/ S(V, [["render", q], ["__scopeId", "data-v-9092d2be"]]);
 //#endregion
 export { J as default };

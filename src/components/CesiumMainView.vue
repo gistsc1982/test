@@ -71,11 +71,11 @@
     />
 
     <!-- ⭐ 动态渲染自注册的功能面板 -->
+    <!-- 注意：不监听 @close 事件，因为 TestPanelModule 等组件已经通过 inheritAttrs: !1 处理了关闭逻辑 -->
     <template v-for="panel in visibleFunctionPanels" :key="panel.key">
       <component
         :is="panel.component || getFunctionPanelComponent(panel.key)"
         v-bind="panel.props"
-        @close="handlePanelClose($event?.panelKey || panel.key)"
       />
     </template>
 
@@ -304,6 +304,41 @@ const COMPONENT_CACHE = new Map(); // 组件缓存
 const LOADING_PROMISES = new Map(); // 加载中的 Promise，防止重复加载
 
 /**
+ * 加载面板组件的 CSS 文件
+ * @param {string} componentName - 组件名称
+ * @param {Object} panelConfig - 面板配置
+ * @returns {Promise<void>}
+ */
+async function loadPanelCSS(componentName, panelConfig) {
+  // ⭐ 加载通用面板样式（包含 FunctionPanelUIBase 和 TestPanelModule 的样式）
+  // 这个文件在 src/components/functions/lib/ 目录下
+  try {
+    await import('@componentsFunctions/lib/cesiumBase.css');
+    console.log(`[CesiumMain] ✅ CSS 加载成功: cesiumBase.css`);
+  } catch (error) {
+    console.warn(`[CesiumMain] ⚠️ CSS 加载失败: cesiumBase.css`, error);
+  }
+
+  // ⭐ 如果组件有特定的 CSS 文件（如 examples 组件），也加载它
+  if (panelConfig.file && panelConfig.file.includes('/examples/')) {
+    // 构建对应的 CSS 文件路径
+    // 例如：@componentsFunctions/examples/MultiContentExample.vue
+    // 对应：@componentsFunctions/lib/examples/MultiContentExample.mjs.css
+    const cssPath = panelConfig.file
+      .replace('@componentsFunctions/', '@componentsFunctions/lib/')
+      .replace('.vue', '.mjs.css')
+      .replace(/\.mjs$/, '.mjs.css');
+
+    try {
+      await import(cssPath);
+      console.log(`[CesiumMain] ✅ CSS 加载成功: ${cssPath}`);
+    } catch (error) {
+      console.warn(`[CesiumMain] ⚠️ CSS 加载失败: ${cssPath}`, error);
+    }
+  }
+}
+
+/**
  * 动态加载单个功能面板组件
  * @param {string} componentName - 组件名称
  * @returns {Promise<Component>} 组件 Promise
@@ -321,6 +356,9 @@ async function loadFunctionPanel(componentName) {
     console.warn(`[CesiumMain] ⚠️ 面板组件已禁用: ${componentName}`);
     throw new Error(`Panel component is disabled: ${componentName}`);
   }
+
+  // ⭐ 加载面板组件的 CSS 文件
+  await loadPanelCSS(componentName, panelConfig);
 
   // ⭐ 检查是否为 .mjs 类型组件或 IIFE 全局组件（支持所有 mjs/iife 组件的统一处理）
   const isMjsComponent = panelConfig && panelConfig.file && panelConfig.file.endsWith('.mjs');
@@ -355,9 +393,13 @@ async function loadFunctionPanel(componentName) {
         ? panelConfig.file
         : `${FUNCTION_PANELS_DIR}${panelConfig.file}`;
 
+      // ⭐ 检查是否为 mjs 文件，如果是则不需要路径解析
+      const isMjsFile = rawPath.endsWith('.mjs');
+
       // ⭐ 解析路径别名（将 @cesiumBaseComponentsFunctions 等转换为相对路径）
-      const importPath = resolvePathAlias(rawPath);
-      console.log(`[CesiumMain] 🔗 路径解析: ${rawPath} -> ${importPath}`);
+      // 对于 mjs 文件，直接使用别名路径，不进行转换
+      const importPath = isMjsFile ? rawPath : resolvePathAlias(rawPath);
+      console.log(`[CesiumMain] 🔗 路径解析: ${rawPath} -> ${importPath} ${isMjsFile ? '(mjs文件)' : ''}`);
 
       const module = await import(
         /* webpackChunkName: "function-panel-[request]" */
@@ -365,32 +407,35 @@ async function loadFunctionPanel(componentName) {
       );
 
       // ⭐ 调试：检查导入的模块
-      console.log(`[CesiumMain] 🔍 导入的模块 ${componentName}:`, {
-        isModule: module.__esModule,
-        hasDefault: !!module.default,
-        keys: Object.keys(module),
-        defaultKeys: module.default ? Object.keys(module.default) : 'N/A',
-        defaultType: typeof module.default,
-        moduleType: typeof module,
-        // ⭐ 检查模块的属性
-        allProperties: Object.getOwnPropertyNames(module),
-        // ⭐ 检查 Symbol 属性
-        symbolProperties: Object.getOwnPropertySymbols(module),
-        // ⭐ 检查原型
-        protoKeys: Object.keys(Object.getPrototypeOf(module))
-      });
+      console.log(`[CesiumMain] 🔍 导入的模块 ${componentName}, 路径: ${importPath}`);
+      console.log(`[CesiumMain] 🔍 module 值:`, module);
+      console.log(`[CesiumMain] 🔍 module 类型:`, typeof module);
+      console.log(`[CesiumMain] 🔍 module === null:`, module === null);
+      console.log(`[CesiumMain] 🔍 module === undefined:`, module === undefined);
+
+      if (module) {
+        try {
+          console.log(`[CesiumMain] 🔍 module.keys:`, Object.keys(module));
+          console.log(`[CesiumMain] 🔍 module.default:`, module.default);
+          if (module.default) {
+            console.log(`[CesiumMain] 🔍 module.default.keys:`, Object.keys(module.default));
+          }
+        } catch (e) {
+          console.error(`[CesiumMain] ❌ 检查模块时出错:`, e);
+        }
+      }
 
       // ⭐ 如果 module.default 不存在，尝试其他方式获取组件
-      let component = module.default;
+      let component = module?.default;
       if (!component) {
         console.warn(`[CesiumMain] ⚠️ 模块 ${componentName} 没有 .default 属性，尝试其他方式...`);
         // 尝试直接使用模块对象
-        if (Object.keys(module).length > 0) {
+        if (module && Object.keys(module).length > 0) {
           component = module;
           console.log(`[CesiumMain] 🔄 使用模块对象本身作为组件`);
         } else {
-          console.error(`[CesiumMain] ❌ 无法从模块中提取组件:`, module);
-          throw new Error(`Failed to load component: ${componentName}`);
+          console.error(`[CesiumMain] ❌ 无法从模块中提取组件，module 值:`, module);
+          throw new Error(`Failed to load component: ${componentName}, module is ${typeof module}`);
         }
       }
 
@@ -986,6 +1031,14 @@ export default {
     // 动态组件不再需要在这里声明，由 loadFunctionPanels() 自动加载
   },
   methods: {
+    // ==================== 错误处理 ====================
+    handleComponentError(error, vm, info) {
+      console.error('[CesiumMain] ❌ 组件渲染错误:', error, vm, info);
+    },
+    handleVNodeError(error, vm) {
+      console.error('[CesiumMain] ❌ VNode 错误:', error, vm);
+    },
+
     // ==================== 多实例配置管理 ====================
 
     /**
@@ -1189,10 +1242,23 @@ export default {
             this.loadFunctionPanel(name).then((component) => {
               this.loadingComponents[name] = false;
 
-              // ⭐ 从多实例配置管理器获取实例特定的配置
-              const instancePanelConfig = multiInstancePanelConfigManager.getPanelConfig(instanceId, name);
+              // ⭐ 根据 singleton 属性决定从哪个管理器获取配置
+              const panelConfig = panelConfigs.find(p => p.name === name);
+              const isSingleton = panelConfig?.singleton !== false; // 默认为单例
+
+              let instancePanelConfig;
+              if (isSingleton) {
+                // 单例面板：直接使用配置文件中的配置
+                instancePanelConfig = panelConfig;
+                console.log(`[CesiumMain #${instanceId}] 🔍 单例面板 ${name} 使用配置文件`);
+              } else {
+                // 多实例面板：从多实例配置管理器获取实例特定配置
+                instancePanelConfig = multiInstancePanelConfigManager.getPanelConfig(instanceId, name);
+                console.log(`[CesiumMain #${instanceId}] 🔍 多实例面板 ${name} 使用实例配置`);
+              }
 
               console.log(`[CesiumMain #${instanceId}] 🔍 调试面板 ${name}:`, {
+                isSingleton,
                 hasConfig: !!instancePanelConfig,
                 config: instancePanelConfig,
                 visible: instancePanelConfig?.visible,
@@ -1221,7 +1287,11 @@ export default {
                   });
                 }
               } else {
-                console.warn(`[CesiumMain #${instanceId}] ⚠️ 面板 ${name} 的配置不存在，跳过注册`);
+                if (isSingleton) {
+                  console.warn(`[CesiumMain #${instanceId}] ⚠️ 单例面板 ${name} 的配置不存在，跳过注册`);
+                } else {
+                  console.warn(`[CesiumMain #${instanceId}] ⚠️ 多实例面板 ${name} 的实例配置不存在，跳过注册`);
+                }
               }
             }).catch((error) => {
               this.loadingComponents[name] = false;
@@ -1733,6 +1803,17 @@ export default {
 
             this.$nextTick(() => {
               console.log(`[CesiumMain] 🎯 ${panelId} 已注册并设置为可见`);
+
+              // ⭐ 关键修复：组件的 mounted 钩子会使用配置文件的 visible 值
+              // 所以我们需要在组件渲染后强制更新可见性
+              setTimeout(() => {
+                panelSingletonManager.updatePanelVisible(panelId, true);
+                if (this.registeredPanels[panelId]) {
+                  this.registeredPanels[panelId].visible = true;
+                }
+                this._panelsRefreshCounter++;
+                console.log(`[CesiumMain] 🔧 ${panelId} 已强制更新为可见`);
+              }, 100);
             });
           })
           .catch((error) => {

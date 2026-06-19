@@ -167,7 +167,17 @@ async function buildComponent(component) {
             // 保持目录结构
             preserveModules: false,
             // 对于有子目录的组件，输出到对应子目录
-            assetFileNames: '[name][extname]'
+            // ⭐ 关键修改：为每个组件生成单独的 CSS 文件
+            assetFileNames: (assetInfo) => {
+              // 如果是 CSS 文件，将其命名为与对应的 .mjs 文件相同
+              if (assetInfo.name.endsWith('.css')) {
+                if (component.subDir) {
+                  return `examples/${component.subDir}/${component.name}.mjs.css`;
+                }
+                return `examples/${component.name}.mjs.css`;
+              }
+              return '[name][extname]';
+            }
           }
         },
         // 排除不需要的资源
@@ -271,6 +281,26 @@ function generateComponentsList(components) {
 }
 
 /**
+ * 拷贝 CSS 文件到 public/test-sfc 目录（已禁用）
+ * CSS 文件现在和 .mjs 文件在同一目录，不需要单独拷贝
+ * @returns {Object} 拷贝结果统计
+ */
+function copyCssFiles() {
+  log('\n=== CSS 文件拷贝已禁用 ===\n', 'yellow');
+  log('CSS 文件现在和 .mjs 文件在同一目录', 'cyan');
+
+  const results = {
+    total: 0,
+    success: 0,
+    failed: 0,
+    details: [],
+    skipped: true
+  };
+
+  return results;
+}
+
+/**
  * 生成使用示例文件
  * @param {Array} components - 组件列表
  */
@@ -353,8 +383,12 @@ async function main() {
   // 输出文件位置
   log(`\n📁 输出目录: ${path.resolve(CONFIG.testRoot, CONFIG.outDir)}`, 'blue');
 
+  // 拷贝 CSS 文件到 public/test-sfc
+  const cssResults = copyCssFiles();
+  log(`\n📊 CSS 文件拷贝结果: 总计 ${cssResults.total}, 成功 ${cssResults.success}, 失败 ${cssResults.failed}`, 'cyan');
+
   // 返回退出码
-  process.exit(results.failed > 0 ? 1 : 0);
+  process.exit(results.failed > 0 || cssResults.failed > 0 ? 1 : 0);
 }
 
 // 错误处理

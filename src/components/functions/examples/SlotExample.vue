@@ -18,7 +18,7 @@
 </template>
 
 <script>
-import TestPanelModule from '@componentsFunctionsLib/TestPanelModule.mjs';
+import TestPanelModule from '../lib/TestPanelModule.mjs';
 
 export default {
   name: 'SlotExample',

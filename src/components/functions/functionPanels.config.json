@@ -5,11 +5,11 @@
   "panels": [
     {
       "name": "MultiContentExample",
-      "file": "examples/MultiContentExample.vue",
+      "file": "@componentsFunctions/examples/MultiContentExample.vue",
       "title": "多内容切换示例",
       "description": "TestPanelModule 动态切换内容示例（单例模式）",
       "enabled": true,
-      "visible": false,
+      "visible": true,
       "icon": "🔄",
       "category": "test",
       "singleton": true,
@@ -23,10 +23,10 @@
     },
     {
       "name": "MultiContentExampleMulti",
-      "file": "@cesiumBaseComponentsFunctions/examples/MultiContentExample.vue",
+      "file": "@componentsFunctions/examples/MultiContentExample.vue",
       "title": "多内容切换示例（多实例）",
       "description": "TestPanelModule 动态切换内容示例（多实例）",
-      "enabled": false,
+      "enabled": true,
       "visible": false,
       "icon": "🔀",
       "category": "test",
