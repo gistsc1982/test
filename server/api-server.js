@@ -12,17 +12,14 @@
  * - GET  /api/health            - 健康检查
  *
  * 部署：
- * 1. 安装依赖：npm install express cors better-sqlite3 dotenv
+ * 1. 安装依赖：npm install express cors better-sqlite3
  * 2. 配置环境变量或在 server 目录创建 .env 文件
  * 3. 启动服务：npm start 或 npm run start:custom
  * 4. 默认端口：8081
  *
  * @requires
- * npm install express cors better-sqlite3 dotenv
+ * npm install express cors better-sqlite3
  */
-
-// 加载环境变量（支持 .env 文件）
-require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
 const express = require('express');
 const cors = require('cors');
