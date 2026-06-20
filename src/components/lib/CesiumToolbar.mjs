@@ -27,6 +27,10 @@ var u = (e, t) => {
 			type: Boolean,
 			default: !1
 		},
+		lazyLoad: {
+			type: Boolean,
+			default: !1
+		},
 		ariaLabel: {
 			type: String,
 			default: ""
@@ -37,14 +41,22 @@ var u = (e, t) => {
 		buttonClasses() {
 			return ["toolbar-button", {
 				"toolbar-button--active": this.active,
-				"toolbar-button--disabled": this.disabled
+				"toolbar-button--disabled": this.disabled && !this.lazyLoad,
+				"toolbar-button--lazy": this.lazyLoad
 			}];
 		},
 		computedAriaLabel() {
 			return this.ariaLabel ? this.ariaLabel : this.label || this.tooltip || "工具按钮";
+		},
+		computedTooltip() {
+			return this.tooltip;
 		}
 	},
 	methods: { handleClick(e) {
+		if (this.lazyLoad) {
+			console.log(`[CesiumToolbarButton] 懒加载按钮被点击: ${this.label}`), this.$emit("click", e);
+			return;
+		}
 		if (this.disabled) {
 			e.preventDefault();
 			return;
@@ -73,14 +85,14 @@ function g(e, t, n, s, c, u) {
 	}, [
 		i("span", p, l(n.icon), 1),
 		i("span", m, l(n.label), 1),
-		i("span", h, l(n.tooltip), 1)
+		i("span", h, l(u.computedTooltip), 1)
 	], 10, f);
 }
 //#endregion
 //#region ../cesiumBase/src/components/CesiumToolbar.vue
 var _ = {
 	name: "CesiumToolbar",
-	components: { CesiumToolbarButton: /* @__PURE__ */ u(d, [["render", g], ["__scopeId", "data-v-040e4590"]]) },
+	components: { CesiumToolbarButton: /* @__PURE__ */ u(d, [["render", g], ["__scopeId", "data-v-4bd42dcf"]]) },
 	props: {
 		toolbarLabel: {
 			type: String,
@@ -190,17 +202,21 @@ var _ = {
 	computed: {
 		managedButtons() {
 			let e = [];
-			return this.panelConfigs && this.panelConfigs.length > 0 ? (e = this.panelConfigs.filter((e) => e.enabled !== !1).map((e) => ({
-				id: e.name,
-				icon: e.icon || "📄",
-				label: e.title || e.name,
-				tooltip: e.description || e.title,
-				disabled: !1,
-				ariaLabel: e.title || e.name,
-				action: "toggle-panel",
-				panelId: e.name,
-				singleton: e.singleton !== !1
-			})), console.log("[CesiumToolbar] 📋 从配置生成按钮:", e.map((e) => ({
+			return this.panelConfigs && this.panelConfigs.length > 0 ? (e = this.panelConfigs.filter((e) => e.enabled !== !1).map((e) => {
+				let t = e.file && e.file.endsWith(".mjs"), n = e.lazyLoad === !0 && t;
+				return {
+					id: e.name,
+					icon: e.icon || "📄",
+					label: e.title || e.name,
+					tooltip: e.description || e.title,
+					disabled: n,
+					ariaLabel: e.title || e.name,
+					action: "toggle-panel",
+					panelId: e.name,
+					singleton: e.singleton !== !1,
+					lazyLoad: n
+				};
+			}), console.log("[CesiumToolbar] 📋 从配置生成按钮:", e.map((e) => ({
 				id: e.id,
 				singleton: e.singleton
 			})))) : e = [...this.defaultButtons, ...this.customButtons], e.map((e) => {
@@ -289,6 +305,15 @@ var _ = {
 		},
 		toggleCollapse() {
 			this.isCollapsed = !this.isCollapsed, this.$emit("toggle-collapse", this.isCollapsed);
+		},
+		updatePanelButtonState(e, t) {
+			console.log(`[CesiumToolbar] 🔧 更新按钮状态: ${e}`, t);
+			let n = this.defaultButtons.find((t) => t.panelId === e);
+			n ? (t.disabled !== void 0 && (n.disabled = t.disabled), t.loaded !== void 0 && (n.loaded = t.loaded), t.active !== void 0 && (n.active = t.active), console.log(`[CesiumToolbar] ✅ 按钮状态已更新: ${e}`, {
+				disabled: n.disabled,
+				loaded: n.loaded,
+				active: n.active
+			})) : console.warn(`[CesiumToolbar] ⚠️ 未找到面板按钮: ${e}`);
 		}
 	}
 }, v = ["aria-label"], y = {
@@ -331,6 +356,7 @@ function w(l, u, d, f, p, m) {
 			tooltip: e.tooltip,
 			active: e.active,
 			disabled: e.disabled,
+			"lazy-load": e.lazyLoad,
 			"aria-label": e.ariaLabel || e.label,
 			onClick: (t) => m.handleButtonClick(e)
 		}, null, 8, [
@@ -339,6 +365,7 @@ function w(l, u, d, f, p, m) {
 			"tooltip",
 			"active",
 			"disabled",
+			"lazy-load",
 			"aria-label",
 			"onClick"
 		]))), 128))]),
@@ -351,6 +378,6 @@ function w(l, u, d, f, p, m) {
 		}, [(o(), r("svg", x, [p.isCollapsed ? (o(), r("path", C)) : (o(), r("path", S))]))], 8, b)) : n("", !0)
 	], 10, v);
 }
-var T = /*#__PURE__*/ u(_, [["render", w], ["__scopeId", "data-v-3eaa7090"]]);
+var T = /*#__PURE__*/ u(_, [["render", w], ["__scopeId", "data-v-c1e719d7"]]);
 //#endregion
 export { T as default };

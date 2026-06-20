@@ -102,7 +102,7 @@
     <div
       id="dualCanvasContainer"
       ref="dualCanvasContainer"
-      class="dual-canvas-overlay"
+      class="dual-canvas-overlay hidden"
       @mousedown="handleMouseDown"
       @mousemove="handleMouseMove"
       @mouseup="handleMouseUp"
@@ -521,80 +521,22 @@ async function loadFunctionPanel(componentName) {
 async function loadMjsComponent(componentName, panelConfig) {
   const isSingleton = panelConfig.singleton !== false; // 默认为单例
 
-  if (isSingleton) {
-    // ⭐ 单例模式：使用 IIFE 版本（通过 index.html 预加载）
-    // 使用 PanelSingletonManager 的方法获取全局变量名
-    const globalVarName = panelConfig.iifeGlobalVar || panelSingletonManager.getIifeGlobalVarName(componentName);
-    const iifeComponent = window[globalVarName];
+  // ⭐ 直接使用 mjs 加载方式（不依赖 IIFE 版本）
+  console.log(`[CesiumMain] 📦 加载 mjs 组件: ${componentName} (${isSingleton ? '单例' : '多实例'}模式)`);
 
-    if (!iifeComponent) {
-      console.warn(`[CesiumMain] ⚠️ 单例 mjs 组件的 IIFE 版本未加载: ${componentName} (${globalVarName})`);
-      // 回退到多实例模式
-      return await loadMjsMultiInstance(componentName, panelConfig);
-    }
+  // 注册 mjs 容器到 PanelSingletonManager
+  const containerId = panelSingletonManager.getMjsContainerId(componentName);
+  panelSingletonManager.registerMjsContainer(componentName, {
+    containerId,
+    visible: panelConfig.visible !== false,
+    isClosed: panelConfig.visible === false
+  });
 
-    console.log(`[CesiumMain] ✅ 使用 IIFE 全局组件: ${componentName} -> ${globalVarName}`);
+  // 加载组件
+  const component = await loadMjsMultiInstance(componentName, panelConfig);
 
-    // 注册 mjs 容器到 PanelSingletonManager（使用 PanelSingletonManager 的方法获取容器 ID）
-    const containerId = panelSingletonManager.getMjsContainerId(componentName);
-    panelSingletonManager.registerMjsContainer(componentName, {
-      containerId,
-      iifeGlobalVar: globalVarName,
-      visible: panelConfig.visible !== false,
-      isClosed: panelConfig.visible === false
-    });
-
-    // ⭐ 挂载 Vue 应用到容器
-    const container = document.getElementById(containerId);
-    if (!container) {
-      console.error(`[CesiumMain] ❌ 单例容器不存在: ${containerId}`);
-      return null;
-    }
-
-    // 检查是否已经挂载（通过检查容器中是否有 Vue 应用的根元素）
-    const hasVueApp = container.children.length > 0 || container.querySelector('[data-v-app]') || container.__vue_app__;
-    if (hasVueApp) {
-      console.log(`[CesiumMain] ℹ️ 单例容器已挂载 Vue 应用: ${componentName}`);
-    } else {
-      // 导入 Vue 并挂载应用
-      const Vue = await import('vue');
-      const { createApp, h } = Vue;
-
-      // ⭐ 使用与 demo-bundle.html 完全相同的方式
-      // 1. 创建一个空的 Vue 应用
-      const app = createApp({
-        data() {
-          return { loaded: true };
-        }
-      });
-
-      // 2. 注册 DualCanvasViewer 组件（使用组件名，与 demo-bundle.html 一致）
-      const componentTagName = 'dual-canvas-viewer-plugin';
-      app.component(componentTagName, iifeComponent);
-      console.log(`[CesiumMain] ✓ 已注册组件: ${componentTagName}`);
-
-      // 3. 清空容器并添加组件标签
-      container.innerHTML = `<${componentTagName}></${componentTagName}>`;
-
-      // 4. 挂载 Vue 应用
-      app.mount(container);
-      console.log(`[CesiumMain] ✅ 单例 Vue 应用已挂载: ${componentName} -> ${containerId}`);
-    }
-
-    // ⭐ 注册单例 mjs 组件到 panelRegistry（组件为 null，因为使用全局容器）
-    panelSingletonManager.registerPanel(componentName, {
-      component: null,  // 单例 mjs 组件使用全局容器，不需要 Vue 组件
-      props: {},
-      visible: panelConfig.visible !== false,
-      isClosed: panelConfig.visible === false
-    });
-
-    // ⭐ 单例模式返回 null（不通过 Vue 渲染，使用全局容器）
-    return null;
-  } else {
-    // ⭐ 多实例模式：直接返回组件
-    return await loadMjsMultiInstance(componentName, panelConfig);
-  }
+  // ⭐ 总是返回组件（单例和多实例都返回组件，挂载逻辑在外部处理）
+  return component;
 }
 
 /**
@@ -1636,7 +1578,7 @@ export default {
         );
 
         console.log(`[CesiumMain] 📦 注册 ${mjsSingletonPanels.length} 个 mjs 单例容器`, {
-          面板列表: mjsSingletonPanels.map(p => p.name)
+          面板列表: mjsSingletonPanels.map(p => ({ name: p.name, visible: p.visible, lazyLoad: p.lazyLoad }))
         });
 
         for (const config of mjsSingletonPanels) {
@@ -1648,7 +1590,13 @@ export default {
 
           const containerId = config.singletonContainerId;
 
-          // ⭐ 创建 DOM 容器（如果不存在）
+          // ⭐ 检查是否为懒加载面板
+          const isLazyLoad = config.lazyLoad === true;
+
+          // ⭐ 确定初始可见性：懒加载面板始终隐藏，否则使用配置值
+          const shouldHide = isLazyLoad || config.visible === false;
+
+          // ⭐ 获取或创建 DOM 容器
           let container = document.getElementById(containerId);
           if (!container) {
             container = document.createElement('div');
@@ -1665,26 +1613,37 @@ export default {
               pointer-events: auto;
               background: transparent;
             `;
-            // 根据配置设置初始可见性
-            if (config.visible === false) {
-              container.classList.add('hidden');
-            }
             document.body.appendChild(container);
             console.log(`[CesiumMain] ✅ 创建 mjs 容器: ${config.name} -> ${containerId}`);
+          } else {
+            console.log(`[CesiumMain] ℹ️ mjs 容器已存在: ${config.name} -> ${containerId}`);
+          }
+
+          // ⭐ 无论容器是新创建还是已存在，都要设置正确的可见性
+          if (shouldHide) {
+            container.classList.add('hidden');
+            container.style.display = 'none';
+            console.log(`[CesiumMain] 🙈 设置容器为隐藏: ${config.name} -> ${containerId}`);
+          } else {
+            container.classList.remove('hidden');
+            container.style.display = '';
+            console.log(`[CesiumMain] 👁️ 设置容器为可见: ${config.name} -> ${containerId}`);
           }
 
           panelSingletonManager.registerMjsContainer(config.name, {
             containerId,
             iifeGlobalVar: config.iifeGlobalVar,  // 使用配置中的全局变量名
-            visible: config.visible !== false,
-            isClosed: config.visible === false
+            visible: !shouldHide,
+            isClosed: shouldHide
           });
 
-          console.log(`[CesiumMain] ✅ 注册 mjs 容器: ${config.name} -> ${containerId}, visible: ${config.visible !== false}`);
+          console.log(`[CesiumMain] ✅ 注册 mjs 容器: ${config.name} -> ${containerId}, visible: ${!shouldHide}, lazyLoad: ${isLazyLoad}`);
 
-          // ⭐ 挂载 Vue 应用到容器（如果配置中可见）
-          if (config.visible !== false) {
+          // ⭐ 只有非懒加载且配置为可见的面板才挂载 Vue 应用
+          if (!isLazyLoad && config.visible !== false) {
             this.mountMjsSingletonApp(config.name, config);
+          } else {
+            console.log(`[CesiumMain] ⏭️ 跳过挂载 mjs 应用: ${config.name}, 懒加载: ${isLazyLoad}, 配置可见: ${config.visible !== false}`);
           }
         }
       } catch (error) {
@@ -1696,18 +1655,11 @@ export default {
      * 挂载单例 mjs 应用的 Vue 应用到容器
      * @param {string} componentName - 组件名称
      * @param {Object} panelConfig - 面板配置
+     * @param {Object} component - 可选的 Vue 组件（用于懒加载）
      */
-    async mountMjsSingletonApp(componentName, panelConfig) {
+    async mountMjsSingletonApp(componentName, panelConfig, component = null) {
       try {
         console.log(`[CesiumMain] 🔄 开始挂载单例 mjs 应用: ${componentName}`);
-
-        const globalVarName = panelConfig.iifeGlobalVar || panelSingletonManager.getIifeGlobalVarName(componentName);
-        const iifeComponent = window[globalVarName];
-
-        if (!iifeComponent) {
-          console.warn(`[CesiumMain] ⚠️ 单例 mjs 组件的 IIFE 版本未加载: ${componentName} (${globalVarName})`);
-          return;
-        }
 
         const containerId = panelSingletonManager.getMjsContainerId(componentName);
         const container = document.getElementById(containerId);
@@ -1737,18 +1689,23 @@ export default {
           return;
         }
 
+        // ⭐ 如果没有传递组件，需要先加载
+        let componentToMount = component;
+        if (!componentToMount) {
+          console.log(`[CesiumMain] 📦 没有传递组件，开始加载: ${componentName}`);
+          componentToMount = await this.loadFunctionPanel(componentName);
+        }
+
+        if (!componentToMount) {
+          console.error(`[CesiumMain] ❌ 组件加载失败: ${componentName}`);
+          return;
+        }
+
         // 导入 Vue 并挂载应用
         const Vue = await import('vue');
-        const { createApp, h } = Vue;
+        const { createApp } = Vue;
 
-        const app = createApp({
-          data() {
-            return { loaded: true };
-          },
-          render() {
-            return h(iifeComponent);
-          }
-        });
+        const app = createApp(componentToMount);
 
         app.mount(container);
 
@@ -1786,14 +1743,30 @@ export default {
         const enabledNames = getEnabledPanelNames();
         console.log(`[CesiumMain #${instanceId}] 📦 检测到 ${enabledNames.length} 个启用的面板组件`);
 
+        // 获取完整的面板配置
+        const panelConfigs = getAvailablePanelConfigs();
+
+        // ⭐ 过滤出需要立即加载的面板（只排除 .mjs 类型的懒加载面板）
+        const immediateLoadPanels = enabledNames.filter(name => {
+          const config = panelConfigs.find(p => p.name === name);
+          // ⭐ 只有 .mjs 文件类型的面板才需要真正懒加载
+          const isMjsLazyLoad = config?.lazyLoad === true && config?.file?.endsWith('.mjs');
+          if (isMjsLazyLoad) {
+            console.log(`[CesiumMain #${instanceId}] ⏭️ 跳过 .mjs 懒加载面板: ${name}`);
+          }
+          return !isMjsLazyLoad;
+        });
+
+        console.log(`[CesiumMain #${instanceId}] 📦 立即加载 ${immediateLoadPanels.length} 个面板（排除 ${enabledNames.length - immediateLoadPanels.length} 个懒加载面板）`);
+
         // ⭐ 初始化加载进度提示
         this.panelLoadingProgress = {
           show: true,
           currentPanel: '',
           currentIndex: 0,
-          total: enabledNames.length,
+          total: immediateLoadPanels.length,
           completedCount: 0,
-          panels: enabledNames.map(name => ({
+          panels: immediateLoadPanels.map(name => ({
             name,
             status: 'pending',
             duration: 0,
@@ -1801,15 +1774,12 @@ export default {
           }))
         };
 
-        // 获取完整的面板配置
-        const panelConfigs = getAvailablePanelConfigs();
-
         // ⭐ 顺序加载面板（便于观察进度）
-        for (let i = 0; i < enabledNames.length; i++) {
-          const name = enabledNames[i];
+        for (let i = 0; i < immediateLoadPanels.length; i++) {
+          const name = immediateLoadPanels[i];
 
           if (!this.functionPanelComponents[name] && !this.loadingComponents[name]) {
-            console.log(`[CesiumMain #${instanceId}] 📋 [${i + 1}/${enabledNames.length}] 加载面板组件: ${name}`);
+            console.log(`[CesiumMain #${instanceId}] 📋 [${i + 1}/${immediateLoadPanels.length}] 加载面板组件: ${name}`);
 
             // ⭐ 更新进度提示
             this.panelLoadingProgress.currentPanel = name;
@@ -1842,7 +1812,7 @@ export default {
               this.panelLoadingProgress.panels[i].duration = totalDuration;
               this.panelLoadingProgress.panels[i].steps = steps;
 
-              console.log(`[性能监控] ✅ [${i + 1}/${enabledNames.length}] ${name} 加载成功 (${totalDuration}ms)`);
+              console.log(`[性能监控] ✅ [${i + 1}/${immediateLoadPanels.length}] ${name} 加载成功 (${totalDuration}ms)`);
               console.log(`[性能监控] 📊 ${name} 详细步骤:`, steps);
 
               // ⭐ 根据 singleton 属性决定从哪个管理器获取配置
@@ -1875,20 +1845,16 @@ export default {
                 };
                 console.log(`[CesiumMain #${instanceId}] 📋 预注册面板: ${name}, props:`, panelProps);
 
-                // ⭐ 跳过 IIFE 全局组件（已经在 loadMjsComponent 中注册）
-                if (component === null) {
-                  console.log(`[CesiumMain #${instanceId}] ⏭️ 跳过 IIFE 全局组件注册: ${name}`);
-                } else {
-                  // ⭐ 关键修复：预加载时不传递 visible 参数
-                  // 这样 registerPanelComponent 会使用默认逻辑：
-                  // - 如果面板已经存在，保持现有状态
-                  // - 如果面板不存在，使用配置文件的默认值
-                  this.registerPanelComponent(name, {
-                    component,
-                    props: panelProps
-                    // ⭐ 不传递 visible 参数，让 registerPanelComponent 自动处理
-                  });
-                }
+                // ⭐ 注册面板组件（mjs组件现在总是返回组件）
+                // ⭐ 关键修复：预加载时不传递 visible 参数
+                // 这样 registerPanelComponent 会使用默认逻辑：
+                // - 如果面板已经存在，保持现有状态
+                // - 如果面板不存在，使用配置文件的默认值
+                this.registerPanelComponent(name, {
+                  component,
+                  props: panelProps
+                  // ⭐ 不传递 visible 参数，让 registerPanelComponent 自动处理
+                });
               } else {
                 if (isSingleton) {
                   console.warn(`[CesiumMain #${instanceId}] ⚠️ 单例面板 ${name} 的配置不存在，跳过注册`);
@@ -1902,7 +1868,7 @@ export default {
               this.loadingComponents[name] = false;
               this.panelLoadingProgress.panels[i].status = 'error';
               this.panelLoadingProgress.panels[i].error = error.message;
-              console.error(`[CesiumMain #${instanceId}] ❌ [${i + 1}/${enabledNames.length}] 加载面板组件失败: ${name}`, error);
+              console.error(`[CesiumMain #${instanceId}] ❌ [${i + 1}/${immediateLoadPanels.length}] 加载面板组件失败: ${name}`, error);
             }
           }
         }
@@ -1910,7 +1876,7 @@ export default {
         // ⭐ 所有面板加载完成，隐藏进度提示
         this.panelLoadingProgress.show = false;
 
-        console.log(`[性能监控] ✅ 所有面板加载完成，共 ${enabledNames.length} 个面板`);
+        console.log(`[性能监控] ✅ 所有面板加载完成，共 ${immediateLoadPanels.length} 个面板`);
 
       } catch (error) {
         console.error(`[CesiumMain #${instanceId}] ❌ 预加载面板组件失败:`, error);
@@ -2406,12 +2372,94 @@ export default {
       const { panelId, visible, singleton, action } = event;
       console.log(`[CesiumMain] 🔧 工具栏面板切换: ${panelId}, 可见性: ${visible}, 单例: ${singleton}`);
 
+      // ⭐ 获取面板配置（在整个方法中都需要使用）
+      const panelConfig = getPanelConfig(panelId);
+      const isLazyLoad = panelConfig?.lazyLoad === true && panelConfig?.file?.endsWith('.mjs');
+
+      if (isLazyLoad && !this.functionPanelComponents[panelId] && !panelSingletonManager.hasPanel(panelId)) {
+        // 懒加载面板还未加载：先加载组件
+        console.log(`[CesiumMain] 📦 懒加载面板: ${panelId}`);
+
+        // 显示加载提示
+        this.panelLoadingProgress = {
+          show: true,
+          currentPanel: panelId,
+          currentIndex: 1,
+          total: 1,
+          completedCount: 0,
+          panels: [{
+            name: panelId,
+            status: 'loading',
+            duration: 0,
+            steps: []
+          }]
+        };
+
+        const loadStart = performance.now();
+
+        this.loadFunctionPanel(panelId)
+          .then((component) => {
+            const loadEnd = performance.now();
+            const duration = (loadEnd - loadStart).toFixed(2);
+
+            console.log(`[CesiumMain] ✅ 懒加载面板 ${panelId} 加载完成 (${duration}ms)`);
+
+            // 更新加载状态
+            this.panelLoadingProgress.completedCount = 1;
+            this.panelLoadingProgress.panels[0].status = 'success';
+            this.panelLoadingProgress.panels[0].duration = duration;
+            setTimeout(() => {
+              this.panelLoadingProgress.show = false;
+            }, 500);
+
+            // 通知工具栏更新按钮状态（从禁用变为可用）
+            if (this.$refs.toolbar) {
+              console.log(`[CesiumMain] 🔧 通知工具栏更新按钮状态: ${panelId}`);
+              this.$refs.toolbar.updatePanelButtonState(panelId, { disabled: false, loaded: true });
+            }
+
+            // 注册面板组件
+            const panelProps = {
+              ...(panelConfig?.position || {})
+            };
+
+            if (singleton) {
+              // 单例面板：注册到 PanelSingletonManager
+              this.registerPanelComponent(panelId, {
+                component,
+                props: panelProps,
+                visible: true
+              });
+
+              // 对于 mjs 单例组件，需要挂载 Vue 应用
+              if (panelConfig.file?.endsWith('.mjs')) {
+                // 挂载组件到容器
+                console.log(`[CesiumMain] 🔧 挂载单例 mjs 组件到容器: ${panelId}`);
+                this.mountMjsSingletonApp(panelId, panelConfig, component);
+              }
+            } else {
+              // 多实例面板：创建新实例
+              this.createMjsMultiInstance(panelId, panelConfig);
+            }
+          })
+          .catch((error) => {
+            console.error(`[CesiumMain] ❌ 懒加载面板 ${panelId} 加载失败:`, error);
+
+            this.panelLoadingProgress.panels[0].status = 'error';
+            this.panelLoadingProgress.panels[0].error = error.message;
+            setTimeout(() => {
+              this.panelLoadingProgress.show = false;
+            }, 2000);
+          });
+
+        return;
+      }
+
       // ⭐ 多实例模式：每次点击都创建新实例
       if (!singleton && visible) {
         console.log(`[CesiumMain] 🧬 多实例模式：创建新面板实例 - ${panelId}`);
 
         // ⭐ 在创建多实例之前，先隐藏对应的单例面板（如果存在）
-        const panelConfig = getPanelConfig(panelId);
         if (panelConfig?.singletonContainerId) {
           const singletonPanelName = this.findSingletonPanelByContainerId(panelConfig.singletonContainerId);
           console.log(`[CesiumMain] 🔍 查找单例面板: ${singletonPanelName}`);
@@ -2472,8 +2520,7 @@ export default {
           .then((component) => {
             console.log(`[CesiumMain] ✅ ${panelId} 组件加载完成，开始注册...`);
 
-            // ⭐ 获取面板配置
-            const panelConfig = getPanelConfig(panelId);
+            // ⭐ 获取面板配置（使用前面已获取的 panelConfig）
             const panelProps = {
               ...(panelConfig?.position || {})
             };
@@ -3394,6 +3441,90 @@ export default {
       this.cesiumViewer = new Cesium.Viewer("cesiumContainer", config);
       performance.mark('cesium-viewer-created');
       console.log('[性能监控] ✅ Cesium Viewer创建完成');
+
+      // 🔍 立即检查容器状态
+      const cesiumContainer = document.getElementById('cesiumContainer');
+      const dualCanvasContainer = document.getElementById('dualCanvasContainer');
+
+      console.log('[地图调试] Cesium Viewer 创建后容器状态:', {
+        cesiumContainer: cesiumContainer ? {
+          存在: true,
+          offsetWidth: cesiumContainer.offsetWidth,
+          offsetHeight: cesiumContainer.offsetHeight,
+          position: window.getComputedStyle(cesiumContainer).position,
+          display: window.getComputedStyle(cesiumContainer).display,
+          zIndex: window.getComputedStyle(cesiumContainer).zIndex
+        } : { 存在: false },
+        dualCanvasContainer: dualCanvasContainer ? {
+          存在: true,
+          offsetWidth: dualCanvasContainer.offsetWidth,
+          offsetHeight: dualCanvasContainer.offsetHeight,
+          position: window.getComputedStyle(dualCanvasContainer).position,
+          display: window.getComputedStyle(dualCanvasContainer).display,
+          zIndex: window.getComputedStyle(dualCanvasContainer).zIndex,
+          hasHidden: dualCanvasContainer.classList.contains('hidden'),
+          className: dualCanvasContainer.className
+        } : { 存在: false },
+        cesiumCanvas: this.cesiumViewer?.canvas ? {
+          width: this.cesiumViewer.canvas.width,
+          height: this.cesiumViewer.canvas.height,
+          style: this.cesiumViewer.canvas.style.cssText
+        } : null
+      });
+
+      // ⭐ 确保 dualCanvasContainer 是隐藏的
+      if (dualCanvasContainer && !dualCanvasContainer.classList.contains('hidden')) {
+        console.warn('[地图调试] ⚠️ dualCanvasContainer 没有 hidden 类，正在添加...');
+        dualCanvasContainer.classList.add('hidden');
+        dualCanvasContainer.style.display = 'none';
+        dualCanvasContainer.style.visibility = 'hidden';
+      }
+
+      // ⭐ 确保 cesiumContainer 可见
+      if (cesiumContainer) {
+        const computedStyle = window.getComputedStyle(cesiumContainer);
+        if (computedStyle.display === 'none' || computedStyle.visibility === 'hidden' || computedStyle.opacity === '0') {
+          console.error('[地图调试] ❌ cesiumContainer 被隐藏!', {
+            display: computedStyle.display,
+            visibility: computedStyle.visibility,
+            opacity: computedStyle.opacity
+          });
+        }
+      }
+
+
+      // 🔍 调试：检查容器状态
+      setTimeout(() => {
+        const cesiumContainer = document.getElementById('cesiumContainer');
+        const dualCanvasContainer = document.getElementById('dualCanvasContainer');
+        console.log('[调试] 容器状态检查:', {
+          cesiumContainer: cesiumContainer ? {
+            存在: true,
+            offsetWidth: cesiumContainer.offsetWidth,
+            offsetHeight: cesiumContainer.offsetHeight,
+            clientWidth: cesiumContainer.clientWidth,
+            clientHeight: cesiumContainer.clientHeight,
+            style: cesiumContainer.style.cssText,
+            computedDisplay: window.getComputedStyle(cesiumContainer).display,
+            computedZIndex: window.getComputedStyle(cesiumContainer).zIndex,
+            classList: cesiumContainer.className
+          } : { 存在: false },
+          dualCanvasContainer: dualCanvasContainer ? {
+            存在: true,
+            offsetWidth: dualCanvasContainer.offsetWidth,
+            offsetHeight: dualCanvasContainer.offsetHeight,
+            classList: dualCanvasContainer.className,
+            computedDisplay: window.getComputedStyle(dualCanvasContainer).display,
+            computedZIndex: window.getComputedStyle(dualCanvasContainer).zIndex,
+            hasHidden: dualCanvasContainer.classList.contains('hidden')
+          } : { 存在: false },
+          cesiumCanvas: this.cesiumViewer?.canvas ? {
+            width: this.cesiumViewer.canvas.width,
+            height: this.cesiumViewer.canvas.height,
+            style: this.cesiumViewer.canvas.style.cssText
+          } : null
+        });
+      }, 2000);
 
       // 🔍 手动更新操作路由器的Cesium对象引用
       console.log('🔍 [修复] Cesium Viewer已创建，手动更新操作路由器的Cesium对象引用');
@@ -10341,6 +10472,26 @@ async loadTestSfcComponent(instanceId) {
     performance.mark('app-init-start');
     console.log('[性能监控] 🚀 应用初始化性能监控启动');
 
+    // 🔧 立即确保 dualCanvasContainer 是隐藏的（防止遮挡地图）
+    const dualCanvasContainer = document.getElementById('dualCanvasContainer');
+    if (dualCanvasContainer) {
+      console.log('[地图调试] mounted: dualCanvasContainer 存在，当前状态:', {
+        className: dualCanvasContainer.className,
+        display: dualCanvasContainer.style.display,
+        hasHidden: dualCanvasContainer.classList.contains('hidden')
+      });
+
+      // 强制隐藏
+      dualCanvasContainer.classList.add('hidden');
+      dualCanvasContainer.style.display = 'none';
+      dualCanvasContainer.style.visibility = 'hidden';
+      dualCanvasContainer.style.opacity = '0';
+
+      console.log('[地图调试] mounted: 已强制隐藏 dualCanvasContainer');
+    } else {
+      console.log('[地图调试] mounted: dualCanvasContainer 不存在（将在 registerMjsContainers 中创建）');
+    }
+
     // ⭐ 初始化多实例配置管理器
     performance.mark('multi-instance-config-start');
     this.initMultiInstanceConfig();
@@ -10672,12 +10823,17 @@ async loadTestSfcComponent(instanceId) {
 </script>
 
 <style scoped>
+/* ⭐ 合并的 cesiumContainer 和 box 样式 - 避免重复定义 */
 #cesiumContainer {
   width: 100%;
   height: 100%;
   margin: 0;
   padding: 0;
   overflow: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
 }
 
 .box {
@@ -10861,14 +11017,6 @@ async loadTestSfcComponent(instanceId) {
   font-size: 12px;
   color: #2196f3;
   font-style: italic;
-}
-
-/* 确保Cesium容器在底部可见 */
-#cesiumContainer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 1;
 }
 
 /* dual-canvas-viewer 覆盖层容器 - 全屏叠加 */
@@ -11837,7 +11985,7 @@ body {
   overflow: hidden;
 }
 
-/* 确保 CesiumMainView 的根容器占满父容器 */
+/* 确保 #container 有明确高度 */
 #container {
   width: 100%;
   height: 100%;
@@ -11845,18 +11993,18 @@ body {
 
 /* dual-canvas-viewer 覆盖层容器 - 全屏叠加 */
 .dual-canvas-overlay {
-  position: fixed !important; /* ⭐ 改为 fixed，确保相对于视口定位 */
+  position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  z-index: 99995; /* ⭐ 低于工具条和所有面板 */
+  z-index: 99995;
   pointer-events: auto;
   background: transparent !important;
   background-color: transparent !important;
 }
 
-/* ⭐ 针对 #dualCanvasContainer 的具体规则（最高优先级） */
+/* ⭐ 针对 #dualCanvasContainer 的具体规则 */
 #dualCanvasContainer.dual-canvas-overlay {
   position: fixed !important;
   top: 0 !important;
@@ -11869,7 +12017,7 @@ body {
   background-color: transparent !important;
 }
 
-/* ⭐ 隐藏状态 - 使用 !important 确保优先级最高（必须在全局样式中） */
+/* ⭐ 隐藏状态 - 确保容器完全隐藏 */
 #dualCanvasContainer.dual-canvas-overlay.hidden,
 .dual-canvas-overlay.hidden {
   display: none !important;

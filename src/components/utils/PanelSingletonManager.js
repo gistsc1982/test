@@ -521,16 +521,20 @@ class PanelSingletonManager {
     const containerId = containerConfig.containerId || this.getMjsContainerId(panelName);
     const iifeGlobalVar = containerConfig.iifeGlobalVar || this.getIifeGlobalVarName(panelName);
 
+    // ⭐ 修复：正确处理 visible 参数，支持布尔值和 undefined
+    // visible: true 或 undefined -> 显示
+    // visible: false -> 隐藏
+    const visible = containerConfig.visible === false ? false : (containerConfig.visible === true ? true : true);
+
     this.mjsContainers.set(panelName, {
       containerId,
       iifeGlobalVar,
-      visible: containerConfig.visible !== false,
-      isClosed: containerConfig.visible === false
+      visible: visible,
+      isClosed: !visible
     });
-    console.log(`[PanelSingletonManager] ✅ 注册 mjs 容器: ${panelName}`, { containerId, iifeGlobalVar });
+    console.log(`[PanelSingletonManager] ✅ 注册 mjs 容器: ${panelName}`, { containerId, iifeGlobalVar, visible });
 
     // ⭐ 立即应用可见性状态到 DOM
-    const visible = containerConfig.visible !== false;
     this.updateMjsContainerVisible(panelName, visible);
   }
 

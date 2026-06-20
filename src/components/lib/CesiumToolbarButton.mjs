@@ -27,6 +27,10 @@ var a = (e, t) => {
 			type: Boolean,
 			default: !1
 		},
+		lazyLoad: {
+			type: Boolean,
+			default: !1
+		},
 		ariaLabel: {
 			type: String,
 			default: ""
@@ -37,14 +41,22 @@ var a = (e, t) => {
 		buttonClasses() {
 			return ["toolbar-button", {
 				"toolbar-button--active": this.active,
-				"toolbar-button--disabled": this.disabled
+				"toolbar-button--disabled": this.disabled && !this.lazyLoad,
+				"toolbar-button--lazy": this.lazyLoad
 			}];
 		},
 		computedAriaLabel() {
 			return this.ariaLabel ? this.ariaLabel : this.label || this.tooltip || "工具按钮";
+		},
+		computedTooltip() {
+			return this.tooltip;
 		}
 	},
 	methods: { handleClick(e) {
+		if (this.lazyLoad) {
+			console.log(`[CesiumToolbarButton] 懒加载按钮被点击: ${this.label}`), this.$emit("click", e);
+			return;
+		}
 		if (this.disabled) {
 			e.preventDefault();
 			return;
@@ -73,9 +85,9 @@ function d(a, o, d, f, p, m) {
 	}, [
 		t("span", c, i(d.icon), 1),
 		t("span", l, i(d.label), 1),
-		t("span", u, i(d.tooltip), 1)
+		t("span", u, i(m.computedTooltip), 1)
 	], 10, s);
 }
-var f = /*#__PURE__*/ a(o, [["render", d], ["__scopeId", "data-v-040e4590"]]);
+var f = /*#__PURE__*/ a(o, [["render", d], ["__scopeId", "data-v-4bd42dcf"]]);
 //#endregion
 export { f as default };

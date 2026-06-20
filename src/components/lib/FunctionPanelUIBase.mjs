@@ -991,7 +991,7 @@ function F(g, _, v, y, b, x) {
 			a("span", { class: "grip-dot" }),
 			a("span", { class: "grip-dot" }),
 			a("span", { class: "grip-dot" })
-		], -1), u(g.$slots, "header", {}, () => [a("h3", T, d(v.title), 1)], !0)]), a("div", E, [v.allowMinimize ? (l(), i("button", {
+		], -1), u(g.$slots, "header", {}, () => [a("h3", T, d(v.title), 1)], !0)]), u(g.$slots, "toolbar-extra", {}, () => r("", !0), !0), a("div", E, [v.allowMinimize ? (l(), i("button", {
 			key: 0,
 			onClick: _[0] ||= h((...e) => x.toggleMinimize && x.toggleMinimize(...e), ["stop"]),
 			class: "icon-btn minimize-btn",
