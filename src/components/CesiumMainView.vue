@@ -336,6 +336,9 @@ function getTHREE() {
 // ⭐ Vue 3 工具
 import { markRaw } from 'vue';
 
+// ⭐ 性能数据存储
+import '../utils/PerformanceDataStore.js';
+
 // ⭐ 导入功能面板配置文件（使用 ?raw 后缀确保作为文本导入）
 import functionPanelsConfig from '@componentsFunctions/functionPanels.config.json?raw';
 
@@ -966,6 +969,8 @@ export default {
       _performanceData: null,
       // ⭐ 性能监控初始化时间
       _performanceInitTime: null,
+      // ⭐ 待处理的面板性能数据（在 _performanceData 创建前暂存）
+      _pendingPanelsData: null,
       // ⭐ 面板加载进度提示
       panelLoadingProgress: {
         show: false,
@@ -1166,10 +1171,7 @@ export default {
             总初始化耗时: `${cesiumInitMeasure.duration.toFixed(2)}ms`,
             评级: this.getPerformanceRating(cesiumInitMeasure.duration, 1000)
           } : null,
-          panelsLoad: panelsMeasure ? {
-            总加载耗时: `${panelsMeasure.duration.toFixed(2)}ms`,
-            评级: this.getPerformanceRating(panelsMeasure.duration, 2000)
-          } : null,
+          panelsLoad: this._pendingPanelsData || null,  // ⭐ 只使用完整的数据（包含面板数量、成功加载、失败、各面板详细等）
           syncManager: syncManagerMeasure ? {
             初始化耗时: `${syncManagerMeasure.duration.toFixed(2)}ms`,
             评级: this.getPerformanceRating(syncManagerMeasure.duration, 500)
@@ -1188,9 +1190,33 @@ export default {
           reportGenerationTime: performance.now()
         };
 
+        // 清理临时数据
+        if (this._pendingPanelsData) {
+          delete this._pendingPanelsData;
+          console.log('[性能监控] ✅ 已合并待处理的面板数据');
+        }
+
         // 清理性能标记，避免内存泄漏
-        performance.clearMarks();
-        performance.clearMeasures();
+        // ⭐ 注意：不要清理面板加载相关的标记，因为面板可能还在加载中
+        // 只清理已完成的性能标记，保留面板加载标记供后续使用
+        const marks = performance.getEntriesByType('mark');
+        const measures = performance.getEntriesByType('measure');
+
+        marks.forEach(mark => {
+          // 保留面板加载相关的标记
+          if (!mark.name.includes('panels-preload')) {
+            performance.clearMarks(mark.name);
+          }
+        });
+
+        measures.forEach(measure => {
+          // 保留面板加载相关的度量
+          if (!measure.name.includes('panels-preload')) {
+            performance.clearMeasures(measure.name);
+          }
+        });
+
+        console.log('[性能监控] 🧹 已清理性能标记（保留面板加载标记）');
 
         console.log('[性能监控] ✅ 性能报告生成完成');
         console.log('[性能监控] 💡 性能数据已保存，可随时通过 __showCesiumPerformanceReport__() 查看');
@@ -1234,6 +1260,218 @@ export default {
       if (score >= 70) return 'B';
       if (score >= 60) return 'C';
       return 'D';
+    },
+
+    /**
+     * 更新全局性能数据存储
+     * 将性能数据实时共享给 PerformancePage 使用
+     */
+    updateGlobalPerformanceStore() {
+      console.log('[updateGlobalPerformanceStore] 🔍 开始更新性能数据');
+      if (!window.__performanceDataStore__) {
+        console.warn('[updateGlobalPerformanceStore] ⚠️ 性能数据存储不可用');
+        return;
+      }
+
+      const store = window.__performanceDataStore__;
+
+      // 更新实时指标
+      const fps = this.calculateCurrentFPS();
+      const memory = this.getCurrentMemoryUsage();
+      const primitiveCount = this.cesiumViewer?.scene?.primitives?.length ?? 0;
+      const panelCount = Object.keys(this.functionPanelComponents || {}).length;
+
+      store.updateRealtimeMetrics({
+        FPS: fps,
+        '内存使用': memory,
+        'Cesium 图元': primitiveCount,
+        '面板数量': panelCount
+      });
+
+      // 🔧 优先从 _performanceData 获取数据，其次使用性能标记
+      let appInitTime = 0;
+      let cesiumInitTime = 0;
+      let panelsLoadTime = 0;
+
+      // 如果 _performanceData 存在且已初始化，直接使用其中的数据
+      if (this._performanceData) {
+        console.log('[updateGlobalPerformanceStore] 📊 从 _performanceData 获取数据:', this._performanceData);
+        // 从 appMounted 获取应用初始化耗时
+        if (this._performanceData.appMounted) {
+          appInitTime = parseFloat(this._performanceData.appMounted.总耗时?.replace('ms', '') ?? 0);
+        }
+        // 从 cesiumInit 获取 Cesium 初始化耗时
+        if (this._performanceData.cesiumInit) {
+          cesiumInitTime = parseFloat(this._performanceData.cesiumInit.总初始化耗时?.replace('ms', '') ?? 0);
+        }
+        // 从 panelsLoad 获取面板加载耗时
+        if (this._performanceData.panelsLoad) {
+          panelsLoadTime = parseFloat(this._performanceData.panelsLoad.总加载耗时?.replace('ms', '') ?? 0);
+        }
+        console.log('[updateGlobalPerformanceStore] 📊 解析后的耗时:', {
+          appInitTime,
+          cesiumInitTime,
+          panelsLoadTime
+        });
+      } else {
+        // 备用方案：从性能标记获取
+        console.log('[updateGlobalPerformanceStore] 📊 从性能标记获取数据');
+        const appInitMeasure = performance.getEntriesByName('app-mounted-total')[0];
+        const cesiumInitMeasure = performance.getEntriesByName('cesium-init-total')[0];
+        const panelsMeasure = performance.getEntriesByName('panels-preload-total')[0];
+
+        console.log('[updateGlobalPerformanceStore] 📊 性能标记:', {
+          appInit: appInitMeasure?.duration,
+          cesiumInit: cesiumInitMeasure?.duration,
+          panels: panelsMeasure?.duration
+        });
+
+        appInitTime = appInitMeasure?.duration ?? 0;
+        cesiumInitTime = cesiumInitMeasure?.duration ?? 0;
+        panelsLoadTime = panelsMeasure?.duration ?? 0;
+      }
+
+      // 更新初始化耗时
+      store.updateInitTimings(
+        appInitTime.toFixed(0),
+        cesiumInitTime.toFixed(0),
+        panelsLoadTime.toFixed(0)
+      );
+
+      // 更新内存使用情况
+      if (performance.memory) {
+        store.updateMemoryUsage(
+          {
+            used: (performance.memory.usedJSHeapSize / 1048576).toFixed(2),
+            total: (performance.memory.totalJSHeapSize / 1048576).toFixed(2),
+            limit: (performance.memory.jsHeapSizeLimit / 1048576).toFixed(2)
+          },
+          ((performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100).toFixed(2)
+        );
+      }
+
+      // 更新场景统计
+      store.updateSceneStats({
+        totalPrimitives: this.cesiumViewer?.scene?.primitives?.length ?? 0,
+        groundPrimitives: this.cesiumViewer?.scene?.groundPrimitives?.length ?? 0
+      });
+
+      // 更新面板加载详情
+      if (this._performanceData?.panelsLoad) {
+        const panelsDetails = this._performanceData.panelsLoad;
+        console.log('[updateGlobalPerformanceStore] 📦 面板加载详情:', panelsDetails);
+        store.updatePanelsLoadDetails(panelsDetails);
+      }
+
+      // 计算并更新性能评分（使用已解析的时间）
+      // 修复：确保使用已解析的变量，而不是引用不存在的性能标记
+      const totalDuration = parseFloat(appInitTime) + parseFloat(cesiumInitTime) + parseFloat(panelsLoadTime);
+      const score = this.calculatePerformanceScore(totalDuration);
+      const grade = this.getScoreGrade(score);
+      store.updatePerformanceScore(score, grade);
+
+      // 更新性能建议
+      const suggestions = this.generatePerformanceSuggestions(score, store);
+      store.updateSuggestions(suggestions);
+
+      // 调试：输出 _performanceData 的结构
+      if (this._performanceData) {
+        console.log('[updateGlobalPerformanceStore] 📋 _performanceData 结构:', {
+          appMounted: this._performanceData.appMounted,
+          cesiumInit: this._performanceData.cesiumInit,
+          panelsLoad: this._performanceData.panelsLoad
+        });
+      }
+
+      // 添加到历史记录
+      if (store.performanceHistory.length === 0 ||
+          Date.now() - store.performanceHistory[0]?.timestamp > 10000) {
+        store.addToHistory({
+          timestamp: Date.now(),
+          appInit: appInitTime.toFixed(0),
+          cesium: cesiumInitTime.toFixed(0),
+          panels: panelsLoadTime.toFixed(0)
+        });
+      }
+
+      // 设置监控状态
+      store.setMonitoringStatus(true);
+
+      console.log('[updateGlobalPerformanceStore] ✅ 性能数据已更新:', {
+        appInitTime: store.appInitTime,
+        cesiumInitTime: store.cesiumInitTime,
+        panelsLoadTime: store.panelsLoadTime,
+        performanceScore: store.performanceScore,
+        scoreGrade: store.scoreGrade,
+        isMonitoring: store.isMonitoring
+      });
+    },
+
+    /**
+     * 计算当前FPS
+     */
+    calculateCurrentFPS() {
+      // 简化计算，实际应从帧计数器获取
+      return '60'; // TODO: 实现真实的FPS计算
+    },
+
+    /**
+     * 获取当前内存使用情况
+     */
+    getCurrentMemoryUsage() {
+      if (performance.memory) {
+        return (performance.memory.usedJSHeapSize / 1048576).toFixed(1) + 'MB';
+      }
+      return 'N/A';
+    },
+
+    /**
+     * 生成性能建议
+     */
+    generatePerformanceSuggestions(score, store) {
+      const suggestions = [];
+
+      if (score < 70) {
+        suggestions.push({
+          type: 'warning',
+          icon: '⚠️',
+          text: '性能评分较低，建议优化应用启动流程'
+        });
+      }
+
+      if (store.cesiumInitTime > 1500) {
+        suggestions.push({
+          type: 'warning',
+          icon: '🌐',
+          text: 'Cesium 初始化耗时较长，可以减少初始图元数量'
+        });
+      }
+
+      if (store.panelsLoadTime > 2000) {
+        suggestions.push({
+          type: 'warning',
+          icon: '📦',
+          text: '面板加载较慢，建议启用懒加载或减少面板数量'
+        });
+      }
+
+      if (store.memoryUsagePercent > 80) {
+        suggestions.push({
+          type: 'error',
+          icon: '💾',
+          text: '内存使用率过高，请注意内存泄漏'
+        });
+      }
+
+      if (suggestions.length === 0) {
+        suggestions.push({
+          type: 'success',
+          icon: '✅',
+          text: '性能表现良好，继续保持！'
+        });
+      }
+
+      return suggestions;
     },
 
     /**
@@ -1685,12 +1923,13 @@ export default {
         performance.measure('panels-preload-total', 'panels-preload-start', 'panels-preload-end');
 
         const panelsMeasure = performance.getEntriesByName('panels-preload-total')[0];
+        const totalPanels = this.panelLoadingProgress.total;
         console.log('[性能监控] 📊 ==================== 面板加载性能详细报告 ====================');
         console.log('[性能监控] 📊 总体统计:', {
           总加载耗时: `${panelsMeasure.duration.toFixed(2)}ms`,
-          面板数量: enabledNames.length,
+          面板数量: totalPanels,
           成功加载: this.panelLoadingProgress.completedCount,
-          失败: enabledNames.length - this.panelLoadingProgress.completedCount
+          失败: totalPanels - this.panelLoadingProgress.completedCount
         });
 
         console.log('[性能监控] 📈 各面板详细耗时:');
@@ -1720,23 +1959,34 @@ export default {
         }
 
         // ⭐ 更新性能数据中的面板信息
+        const panelsLoadData = {
+          总加载耗时: `${panelsMeasure.duration.toFixed(2)}ms`,
+          评级: this.getPerformanceRating(panelsMeasure.duration, 2000),
+          面板数量: totalPanels,
+          成功加载: this.panelLoadingProgress.completedCount,
+          失败: totalPanels - this.panelLoadingProgress.completedCount,
+          各面板详细: this.panelLoadingProgress.panels.map(p => ({
+            name: p.name,
+            duration: `${p.duration}ms`,
+            status: p.status,
+            steps: p.steps
+          }))
+        };
+
         if (this._performanceData) {
-          this._performanceData.panelsLoad = {
-            总加载耗时: `${panelsMeasure.duration.toFixed(2)}ms`,
-            评级: this.getPerformanceRating(panelsMeasure.duration, 2000),
-            面板数量: enabledNames.length,
-            成功加载: this.panelLoadingProgress.completedCount,
-            失败: enabledNames.length - this.panelLoadingProgress.completedCount,
-            各面板详细: this.panelLoadingProgress.panels.map(p => ({
-              name: p.name,
-              duration: `${p.duration}ms`,
-              status: p.status,
-              steps: p.steps
-            }))
-          };
+          // 如果 _performanceData 已存在，直接更新
+          this._performanceData.panelsLoad = panelsLoadData;
           console.log('[性能监控] ✅ 面板性能数据已更新到 _performanceData');
+          console.log('[性能监控] 💡 现在可以通过 __showCesiumPerformanceReport__() 查看完整的面板加载性能数据');
+        } else {
+          // 如果 _performanceData 还不存在，创建临时存储
+          this._pendingPanelsData = panelsLoadData;
+          console.log('[性能监控] ✅ 面板性能数据已临时保存，等待 _performanceData 创建');
         }
       }, 2000);
+
+      // ⭐ 立即通知用户面板加载已完成（性能数据可能在2秒后才能查看）
+      console.log('[性能监控] ⏳ 面板加载已完成，性能数据将在2秒后准备就绪...');
     },
 
     /**
@@ -10268,12 +10518,21 @@ async loadTestSfcComponent(instanceId) {
           // 尝试实时获取面板性能数据
           const panelsMeasure = performance.getEntriesByName('panels-preload-total')[0];
           if (panelsMeasure) {
+            // ⭐ 如果有性能标记但 _performanceData.panelsLoad 为空，说明数据更新还未完成
             console.log('[性能监控] 📦 面板加载性能 (实时获取):', {
               总加载耗时: `${panelsMeasure.duration.toFixed(2)}ms`,
-              评级: this.getPerformanceRating(panelsMeasure.duration, 2000)
+              评级: this.getPerformanceRating(panelsMeasure.duration, 2000),
+              提示: '完整面板数据（面板数量、成功加载、失败、各面板详细）将在面板加载完成后2秒内更新'
             });
           } else {
-            console.log('[性能监控] 📦 面板加载性能: 面板尚未完成加载或数据未生成');
+            // ⭐ 检查面板加载状态，提供更详细的诊断信息
+            if (this.panelLoadingProgress.show) {
+              console.log('[性能监控] 📦 面板加载性能: 面板正在加载中...');
+            } else if (this._pendingPanelsData) {
+              console.log('[性能监控] 📦 面板加载性能: 数据正在更新到 _performanceData...');
+            } else {
+              console.log('[性能监控] 📦 面板加载性能: 面板尚未完成加载或数据未生成');
+            }
           }
         }
 
@@ -10300,8 +10559,58 @@ async loadTestSfcComponent(instanceId) {
     };
 
     console.log('[CesiumMain] 💡 提示: 在控制台运行 __showCesiumPerformanceReport__() 来查看性能报告');
+
+    // ⭐ 自动启动性能监控，并将数据共享给全局存储
+    if (window.__performanceDataStore__) {
+      console.log('[CesiumMain] 🚀 自动启动性能监控，数据将实时共享到 PerformancePage');
+      // 延迟启动，确保 Cesium 初始化完成
+      setTimeout(() => {
+        this.startCesiumPerformanceMonitoring();
+        this.updateGlobalPerformanceStore();
+        // 设置定时更新
+        this._performanceUpdateInterval = setInterval(() => {
+          this.updateGlobalPerformanceStore();
+        }, 2000);
+      }, 5000); // 等待5秒确保 Cesium 和面板都加载完成
+    }
+  },
+  // ⭐ keep-alive 激活钩子（从缓存中恢复）
+  activated() {
+    console.log('[CesiumMainView] 🔄 组件已激活（从 keep-alive 缓存恢复）');
+    // 组件从缓存中恢复时，确保性能监控仍在运行
+    if (window.__performanceDataStore__) {
+      window.__performanceDataStore__.setMonitoringStatus(true);
+      console.log('[CesiumMainView] ✅ 性能监控状态已设置为 true');
+    }
+  },
+  // ⭐ keep-alive 停用钩子（进入缓存）
+  deactivated() {
+    console.log('[CesiumMainView] ⏸️ 组件已停用（进入 keep-alive 缓存）');
+    console.log('[CesiumMainView] 🔍 性能监控定时器状态:', this._performanceUpdateInterval ? '运行中' : '已停止');
+    // 注意：不停止性能监控！让它在后台继续运行，以便性能页面可以接收数据
+    // 只有在真正卸载组件时（beforeUnmount）才停止性能监控
+    if (window.__performanceDataStore__) {
+      console.log('[CesiumMainView] 📊 当前性能数据存储状态:', {
+        isMonitoring: window.__performanceDataStore__.isMonitoring,
+        appInitTime: window.__performanceDataStore__.appInitTime,
+        cesiumInitTime: window.__performanceDataStore__.cesiumInitTime,
+        panelsLoadTime: window.__performanceDataStore__.panelsLoadTime,
+        performanceScore: window.__performanceDataStore__.performanceScore
+      });
+    }
   },
   beforeUnmount() {
+    // ⭐ 清理性能监控定时器
+    if (this._performanceUpdateInterval) {
+      clearInterval(this._performanceUpdateInterval);
+      this._performanceUpdateInterval = null;
+    }
+
+    // ⭐ 停止全局性能数据存储的监控状态
+    if (window.__performanceDataStore__) {
+      window.__performanceDataStore__.setMonitoringStatus(false);
+    }
+
     // ⭐ 销毁多实例配置
     if (this.instanceId) {
       console.log(`[CesiumMain #${this.instanceId}] 🗑️ 销毁实例配置`);

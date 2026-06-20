@@ -5,15 +5,25 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 
 const isComponentView = computed(() => {
-  const showNavRoutes = ['/components', '/']
+  const showNavRoutes = ['/components', '/', '/cesium-main', '/performance']
   return showNavRoutes.includes(route.path)
+})
+
+// 性能监控页面也显示导航栏，方便切换
+const showNav = computed(() => {
+  return isComponentView.value || route.path === '/performance'
+})
+
+// 🔧 只有 GIS iframe 模式才禁止滚动
+const disableScroll = computed(() => {
+  return route.path === '/gis'
 })
 </script>
 
 <template>
-  <div id="app">
+  <div id="app" :class="{ 'disable-scroll': disableScroll, 'performance-mode': route.name === 'performance' }">
     <!-- 导航栏 -->
-    <nav v-if="isComponentView" class="app-nav">
+    <nav v-if="showNav" class="app-nav">
       <div class="nav-container">
         <div class="nav-brand">
           <h1>🌍 GIS Test 项目</h1>
@@ -26,6 +36,9 @@ const isComponentView = computed(() => {
           <router-link to="/cesium-main" class="nav-link">
             🗺️ CesiumMain 功能
           </router-link>
+          <router-link to="/performance" class="nav-link">
+            🚀 性能监控
+          </router-link>
           <router-link to="/gis" class="nav-link">
             🌐 GIS iframe 模式
           </router-link>
@@ -34,8 +47,13 @@ const isComponentView = computed(() => {
     </nav>
 
     <!-- 主内容 -->
-    <div class="app-content" :class="{ 'app-content-full': !isComponentView }">
-      <router-view />
+    <div class="app-content" :class="{ 'app-content-full': !showNav, 'performance-page-mode': route.name === 'performance' }">
+      <!-- 使用 keep-alive 保持 CesiumMain 存活，以便持续更新性能数据 -->
+      <router-view v-slot="{ Component }">
+        <keep-alive include="CesiumMain">
+          <component :is="Component" :key="route.name" />
+        </keep-alive>
+      </router-view>
     </div>
 
     <!-- 底部信息栏 (仅在组件视图显示) -->
@@ -58,23 +76,49 @@ const isComponentView = computed(() => {
 html,
 body {
   width: 100%;
-  height: 100%;
+  min-height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  /* 🔧 移除全局的 overflow: hidden，让页面可以滚动 */
 }
 
 #app {
   width: 100%;
-  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
+}
+
+/* 🔧 性能页面特殊处理 - 完全禁用 flex 高度限制 */
+#app.performance-mode {
+  display: block;
+  height: auto;
+  min-height: auto;
+}
+
+#app.performance-mode .app-content {
+  height: auto;
+  min-height: 100vh;
+  flex: none;
+}
+
+/* 🔧 只有在需要禁止滚动的页面才应用 overflow: hidden */
+#app.disable-scroll {
+  height: 100vh;
+  overflow: hidden;
+}
+
+#app.disable-scroll html,
+#app.disable-scroll body {
+  overflow: hidden;
+  height: 100%;
 }
 
 /* 当在非导航页面时，让 router-view 占满整个容器 */
 #app:has(:not(.app-nav)) > :not(.app-nav):not(.app-footer) {
   flex: 1;
-  height: 100%;
+  /* 🔧 移除 height: 100%，允许内容滚动 */
+  min-height: 100%;
 }
 
 .app-nav {
@@ -164,12 +208,27 @@ body {
 /* 主内容区域 - 使用 flex 占据剩余空间 */
 .app-content {
   flex: 1 1 auto;
+  /* 🔧 允许内容滚动 */
+  overflow-y: auto;
 }
 
 /* 全屏模式 - CesiumMain 等页面 */
 .app-content-full {
   flex: 1 1 0%;
-  height: 100%;
+  /* 🔧 移除 height: 100%，改为 min-height */
   min-height: 100vh;
+}
+
+/* 🔧 性能页面特殊处理 - 允许滚动 */
+.app-content.performance-page-mode {
+  overflow-y: auto !important;
+  height: auto !important;
+  min-height: 100vh;
+  max-height: none !important;
+}
+
+/* 🔧 确保性能页面的内容可以滚动 */
+.app-content.performance-page-mode > * {
+  flex-shrink: 0;
 }
 </style>

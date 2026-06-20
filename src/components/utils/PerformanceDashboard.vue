@@ -123,13 +123,18 @@ export default {
   },
 
   mounted() {
+    // 🔧 修复：作为路由页面访问时，自动显示仪表板
+    // 当用户通过路由直接访问 /performance 页面时，应该自动显示内容
+    this.isVisible = true;
+    this.startMonitoring();
+
     // 暴露到全局，方便其他组件调用
     if (typeof window !== 'undefined') {
       window.__showPerformanceDashboard__ = () => {
         this.isVisible = true;
         this.startMonitoring();
       };
-      console.log('[PerformanceDashboard] 💡 提示: 在控制台运行 __showPerformanceDashboard__() 来显示仪表板');
+      console.log('[PerformanceDashboard] 💡 提示: 仪表板已自动加载，也可通过 __showPerformanceDashboard__() 手动显示');
     }
   },
 
@@ -153,126 +158,37 @@ export default {
     },
 
     refreshData() {
-      this.updateRealtimeMetrics();
-      this.updateMemoryUsage();
-      this.calculateScore();
-      this.generateSuggestions();
-    },
+      // 🔧 修复：从 PerformanceDataStore 获取数据，而不是 PerformanceMonitor
+      if (window.__performanceDataStore__) {
+        const store = window.__performanceDataStore__;
 
-    updateRealtimeMetrics() {
-      // 从 PerformanceMonitor 获取数据
-      if (window.__performanceMonitor__) {
-        const report = window.__performanceMonitor__.generateReport();
-        this.realtimeMetrics = {
-          FPS: this.calculateFPS(),
-          '内存使用': this.formatMemory(),
-          'Cesium 图元': this.getCesiumPrimitiveCount(),
-          '面板数量': this.getPanelCount()
-        };
-      }
-    },
+        // 更新实时指标
+        this.realtimeMetrics = { ...store.realtimeMetrics };
 
-    updateMemoryUsage() {
-      if (performance.memory) {
-        this.memoryUsage = {
-          used: (performance.memory.usedJSHeapSize / 1048576).toFixed(2),
-          total: (performance.memory.totalJSHeapSize / 1048576).toFixed(2),
-          limit: (performance.memory.jsHeapSizeLimit / 1048576).toFixed(2)
-        };
-        this.memoryUsagePercent = ((performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100).toFixed(2);
-      }
-    },
+        // 更新性能评分
+        this.performanceScore = store.performanceScore;
+        this.scoreGrade = store.scoreGrade;
+        this.appInitTime = store.appInitTime;
+        this.cesiumInitTime = store.cesiumInitTime;
+        this.panelsLoadTime = store.panelsLoadTime;
 
-    calculateScore() {
-      // 从性能标记中计算分数
-      const entries = performance.getEntriesByType('measure');
+        // 更新内存使用
+        this.memoryUsage = store.memoryUsage;
+        this.memoryUsagePercent = store.memoryUsagePercent;
 
-      entries.forEach(entry => {
-        if (entry.name.includes('app-init')) {
-          this.appInitTime = entry.duration.toFixed(0);
-        } else if (entry.name.includes('cesium-init')) {
-          this.cesiumInitTime = entry.duration.toFixed(0);
-        } else if (entry.name.includes('panels-preload')) {
-          this.panelsLoadTime = entry.duration.toFixed(0);
-        }
-      });
+        // 更新历史记录
+        this.performanceHistory = [...store.performanceHistory];
 
-      // 计算总分
-      const totalDuration = parseFloat(this.appInitTime) || 0;
-      let score = 100;
-      const excessSeconds = (totalDuration - 2000) / 1000;
-      if (excessSeconds > 0) {
-        score -= Math.min(excessSeconds * 10, 50);
-      }
-      this.performanceScore = Math.max(Math.round(score), 50);
+        // 更新建议
+        this.suggestions = [...store.suggestions];
 
-      // 确定等级
-      if (this.performanceScore >= 90) this.scoreGrade = 'A+';
-      else if (this.performanceScore >= 80) this.scoreGrade = 'A';
-      else if (this.performanceScore >= 70) this.scoreGrade = 'B';
-      else if (this.performanceScore >= 60) this.scoreGrade = 'C';
-      else this.scoreGrade = 'D';
-
-      // 添加到历史记录
-      this.addToHistory();
-    },
-
-    addToHistory() {
-      this.performanceHistory.unshift({
-        timestamp: Date.now(),
-        appInit: this.appInitTime,
-        cesium: this.cesiumInitTime,
-        panels: this.panelsLoadTime
-      });
-
-      // 只保留最近10条记录
-      if (this.performanceHistory.length > 10) {
-        this.performanceHistory = this.performanceHistory.slice(0, 10);
-      }
-    },
-
-    generateSuggestions() {
-      this.suggestions = [];
-
-      // 基于性能评分生成建议
-      if (this.performanceScore < 70) {
-        this.suggestions.push({
-          type: 'warning',
-          icon: '⚠️',
-          text: '性能评分较低，建议优化应用启动流程'
+        console.log('[PerformanceDashboard] ✅ 从 PerformanceDataStore 加载数据:', {
+          appInitTime: this.appInitTime,
+          cesiumInitTime: this.cesiumInitTime,
+          panelsLoadTime: this.panelsLoadTime
         });
-      }
-
-      if (this.cesiumInitTime > 1500) {
-        this.suggestions.push({
-          type: 'warning',
-          icon: '🌐',
-          text: 'Cesium 初始化耗时较长，可以减少初始图元数量'
-        });
-      }
-
-      if (this.panelsLoadTime > 2000) {
-        this.suggestions.push({
-          type: 'warning',
-          icon: '📦',
-          text: '面板加载较慢，建议启用懒加载或减少面板数量'
-        });
-      }
-
-      if (this.memoryUsagePercent > 80) {
-        this.suggestions.push({
-          type: 'error',
-          icon: '💾',
-          text: '内存使用率过高，请注意内存泄漏'
-        });
-      }
-
-      if (this.suggestions.length === 0) {
-        this.suggestions.push({
-          type: 'success',
-          icon: '✅',
-          text: '性能表现良好，继续保持！'
-        });
+      } else {
+        console.warn('[PerformanceDashboard] ⚠️ PerformanceDataStore 不可用');
       }
     },
 
