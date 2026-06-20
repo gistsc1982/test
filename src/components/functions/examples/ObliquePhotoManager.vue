@@ -93,7 +93,7 @@
 
 <script>
 import JsonConfigPanelBase from '@cesiumBaseComponents/JsonConfigPanelBase.vue';
-import ObliqueHeightAdjustPanel from '@cesiumBaseComponentsFunctions/ObliqueHeightAdjustPanel.vue';
+import ObliqueHeightAdjustPanel from './ObliqueHeightAdjustPanel.vue';
 
 export default {
   name: 'ObliquePhotoManager',
