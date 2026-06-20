@@ -1,5 +1,5 @@
 <template>
-  <TestPanelModule
+  <MultiContentPanel
     ref="panel"
     title="多内容面板"
     :auto-register="autoRegister !== undefined ? autoRegister : true"
@@ -11,22 +11,22 @@
     @vue:mounted="onTestPanelMounted"
     @vue:updated="onTestPanelUpdated"
   >
-    <template #toolbar-extra>
-      <button @click="switchToHeightPanel">高度调整</button>
-      <button @click="switchToPhotoPanel">倾斜摄影</button>
+    <template #toolbar>
+      <button class="toolbar-btn" @click="switchToHeightPanel">高度调整</button>
+      <button class="toolbar-btn" @click="switchToPhotoPanel">倾斜摄影</button>
     </template>
-  </TestPanelModule>
+  </MultiContentPanel>
 </template>
 
 <script>
-import TestPanelModule from '../lib/TestPanelModule.mjs';
+import MultiContentPanel from './MultiContentPanelExample.vue';
 import ObliqueHeightAdjustPanel from '../lib/ObliqueHeightAdjustPanel.mjs';
 import ObliquePhotographyPanel from '../lib/ObliquePhotographyPanel.mjs';
 
 export default {
   name: 'MultiContentExample',
   components: {
-    TestPanelModule
+    MultiContentPanel
   },
   props: {
     // ⭐ 接收多实例面板的属性

@@ -1048,16 +1048,36 @@ var H = /*#__PURE__*/ C(k, [["render", V], ["__scopeId", "data-v-fa8a4c38"]]), U
 			category: "gis"
 		}]]), this.serverConfig = {
 			baseURL: this.detectServerURL(),
-			apiPort: 8081,
+			apiPort: this.getApiPort(),
 			dataAPI: "api/data",
 			syncAPI: "api/sync",
 			timeout: 3e4
 		}, console.log("[DataManager] 初始化完成"), console.log("[DataManager] 服务器配置:", this.serverConfig);
 	}
 	detectServerURL() {
-		if (typeof window > "u") return "http://192.168.31.146:8080";
-		let e = window.location.href, t = new URL(e);
-		return t.hostname === "localhost" || t.hostname === "127.0.0.1" ? "http://192.168.31.146:8080" : `${t.protocol}//${t.hostname}:${t.port || 80}`;
+		// 优先使用环境变量
+		if (typeof process !== 'undefined' && process.env && process.env.VUE_APP_SERVER_BASE_URL) {
+			return process.env.VUE_APP_SERVER_BASE_URL;
+		}
+		// 浏览器环境下使用 window.ENV 或直接使用
+		if (typeof window !== 'undefined') {
+			const envBaseURL = window.ENV?.VUE_APP_SERVER_BASE_URL || window.VUE_APP_SERVER_BASE_URL;
+			if (envBaseURL) return envBaseURL;
+		}
+		// 默认值
+		return "http://localhost:8080";
+	}
+
+	getApiPort() {
+		// 优先使用环境变量
+		if (typeof process !== 'undefined' && process.env && process.env.VUE_APP_API_PORT) {
+			return parseInt(process.env.VUE_APP_API_PORT, 10);
+		}
+		if (typeof window !== 'undefined') {
+			const envPort = window.ENV?.VUE_APP_API_PORT || window.VUE_APP_API_PORT;
+			if (envPort) return parseInt(envPort, 10);
+		}
+		return 8081;
 	}
 	setServerConfig(e) {
 		this.serverConfig = {

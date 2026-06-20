@@ -14,7 +14,7 @@
       "category": "test",
       "singleton": true,
       "singletonContainerId": "contentExample",
-      "lazyLoad": true,
+      "lazyLoad": false,
       "permissions": [],
       "position": {
         "initialX": "right",
@@ -32,7 +32,7 @@
       "category": "test",
       "singleton": false,
       "singletonContainerId": "contentExample",
-      "lazyLoad": true,
+      "lazyLoad": false,
       "permissions": [],
       "position": {
         "initialX": "center",
@@ -315,7 +315,7 @@
       "title": "mjs双画布查看器",
       "description": "双画布查看器（多实例模式）- 需要vue3-sfc-loader支持",
       "enabled": true,
-      "visible": true,
+      "visible": false,
       "icon": "🧬",
       "category": "tools",
       "singleton": false,
@@ -325,6 +325,42 @@
       "position": {
         "initialX": "center",
         "initialY": 100
+      }
+    },
+    {
+      "name": "ObliquePhotoManager",
+      "file": "@componentsFunctions/examples/ObliquePhotoManager.vue",
+      "title": "倾斜摄影图层管理",
+      "description": "通过配置读取倾斜摄影URL并控制显示Cesium地图的倾斜摄影图层（单例模式）",
+      "enabled": true,
+      "visible": true,
+      "icon": "📷",
+      "category": "tools",
+      "singleton": true,
+      "singletonContainerId": "obliquePhotoManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 120
+      }
+    },
+    {
+      "name": "ObliquePhotoManagerMulti",
+      "file": "@componentsFunctions/examples/ObliquePhotoManager.vue",
+      "title": "倾斜摄影图层管理（多实例）",
+      "description": "通过配置读取倾斜摄影URL并控制显示Cesium地图的倾斜摄影图层（多实例）",
+      "enabled": true,
+      "visible": false,
+      "icon": "📸",
+      "category": "tools",
+      "singleton": false,
+      "singletonContainerId": "obliquePhotoManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 200
       }
     }
   ],
