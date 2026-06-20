@@ -76,15 +76,15 @@ const disableScroll = computed(() => {
 html,
 body {
   width: 100%;
-  min-height: 100%;
+  height: 100%;
   margin: 0;
   padding: 0;
-  /* 🔧 移除全局的 overflow: hidden，让页面可以滚动 */
+  overflow: hidden;
 }
 
 #app {
   width: 100%;
-  min-height: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -108,17 +108,10 @@ body {
   overflow: hidden;
 }
 
-#app.disable-scroll html,
-#app.disable-scroll body {
-  overflow: hidden;
-  height: 100%;
-}
-
 /* 当在非导航页面时，让 router-view 占满整个容器 */
 #app:has(:not(.app-nav)) > :not(.app-nav):not(.app-footer) {
   flex: 1;
-  /* 🔧 移除 height: 100%，允许内容滚动 */
-  min-height: 100%;
+  height: 100%;
 }
 
 .app-nav {
@@ -215,7 +208,7 @@ body {
 /* 全屏模式 - CesiumMain 等页面 */
 .app-content-full {
   flex: 1 1 0%;
-  /* 🔧 移除 height: 100%，改为 min-height */
+  height: 100%;
   min-height: 100vh;
 }
 
@@ -225,10 +218,5 @@ body {
   height: auto !important;
   min-height: 100vh;
   max-height: none !important;
-}
-
-/* 🔧 确保性能页面的内容可以滚动 */
-.app-content.performance-page-mode > * {
-  flex-shrink: 0;
 }
 </style>
