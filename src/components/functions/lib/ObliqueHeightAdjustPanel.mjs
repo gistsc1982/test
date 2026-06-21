@@ -1,5 +1,6 @@
 import { Fragment as e, Teleport as t, Transition as n, createBlock as r, createCommentVNode as i, createElementBlock as a, createElementVNode as o, createTextVNode as s, createVNode as c, normalizeClass as l, normalizeStyle as u, openBlock as d, renderList as f, renderSlot as p, resolveComponent as ee, toDisplayString as m, vShow as h, withCtx as g, withDirectives as _, withModifiers as v } from "vue";
-var y = new class {
+//#region ../cesiumBase/src/utils/CesiumEventManager.js
+var y = class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
 	}
@@ -91,17 +92,17 @@ var y = new class {
 	destroy() {
 		this.stopPolling(), this.removeGlobalListener(), this.listeners.clear(), this.isReady = !1, this.cesiumInstance = null, this.viewerInstance = null;
 	}
-}();
-typeof window < "u" && (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => {
-	y.init();
-}) : y.init(), window.__cesiumEventManager__ = y);
+}, b = typeof window < "u" && window.__cesiumEventManager__, x = b || new y();
+!b && typeof window < "u" && (window.__cesiumEventManager__ = x, document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => {
+	x.init();
+}) : x.init());
 //#endregion
 //#region \0plugin-vue:export-helper
-var b = (e, t) => {
+var S = (e, t) => {
 	let n = e.__vccOpts || e;
 	for (let [e, r] of t) n[e] = r;
 	return n;
-}, x = {
+}, C = {
 	name: "SfcBase",
 	props: {
 		onClose: {
@@ -145,7 +146,7 @@ var b = (e, t) => {
 			let n = null;
 			t > 0 && (n = setTimeout(() => {
 				this.cesiumUnsubscribe &&= (this.cesiumUnsubscribe(), null), this.$logger?.warn?.(`[${this.componentName}] Cesium 初始化超时 (${t}ms)`);
-			}, t)), this.cesiumUnsubscribe = y.onReady((t, r) => {
+			}, t)), this.cesiumUnsubscribe = x.onReady((t, r) => {
 				n &&= (clearTimeout(n), null), this.cesiumReady = !0, this.$logger?.info?.(`[${this.componentName}] Cesium 已就绪（事件驱动）`), e && typeof e == "function" && e(t, r);
 			});
 		},
@@ -261,14 +262,14 @@ var b = (e, t) => {
 	beforeUnmount() {
 		this.cleanup();
 	}
-}, S = {
+}, w = {
 	class: "sfc-base",
 	style: { display: "none" }
 };
-function C(e, t, n, r, i, o) {
-	return d(), a("div", S);
+function T(e, t, n, r, i, o) {
+	return d(), a("div", w);
 }
-var w = /*#__PURE__*/ b(x, [["render", C]]), T = class {
+var E = /*#__PURE__*/ S(C, [["render", T]]), D = class {
 	constructor() {
 		this.panelStates = /* @__PURE__ */ new Map(), this.cesiumObjects = /* @__PURE__ */ new Map(), this.panelVisibility = /* @__PURE__ */ new Map(), this.panelRegistry = /* @__PURE__ */ new Map(), this.eventListeners = /* @__PURE__ */ new Map(), this.mjsContainers = /* @__PURE__ */ new Map(), console.log("[PanelSingletonManager] 初始化完成");
 	}
@@ -281,7 +282,7 @@ var w = /*#__PURE__*/ b(x, [["render", C]]), T = class {
 			configList: n.configList?.length || 0,
 			cesiumObjects: n.cesiumObjects ? "存在" : "不存在",
 			时间: new Date(n.timestamp).toLocaleTimeString()
-		}), typeof window < "u" && (window.__panelSingletonManager__ || (window.__panelSingletonManager__ = this));
+		}), typeof window < "u" && (window.__panelSingletonManager__ || (window.__panelSingletonManager__ = this), window.panelSingletonManager || (window.panelSingletonManager = this));
 	}
 	getPanelState(e) {
 		let t = this.panelStates.get(e);
@@ -489,13 +490,13 @@ var w = /*#__PURE__*/ b(x, [["render", C]]), T = class {
 			}
 		});
 	}
-}, E = typeof window < "u" && window.__panelSingletonManager__, D = E || new T();
-!E && typeof window < "u" && (window.__panelSingletonManager__ = D);
+}, O = typeof window < "u" && (window.__panelSingletonManager__ || window.panelSingletonManager), k = O || new D();
+!O && typeof window < "u" && (window.__panelSingletonManager__ = k, window.panelSingletonManager = k);
 //#endregion
 //#region ../cesiumBase/src/components/FunctionPanelUIBase.vue
-var O = typeof window < "u" && window.__panelSingletonManager__ || D, k = {
+var A = typeof window < "u" && window.__panelSingletonManager__ || k, j = {
 	name: "FunctionPanelUIBase",
-	mixins: [w],
+	mixins: [E],
 	emits: [
 		"close",
 		"minimize",
@@ -704,8 +705,8 @@ var O = typeof window < "u" && window.__panelSingletonManager__ || D, k = {
 			this.isClosed = !1, console.log(`[FunctionPanelUIBase] ✅ 多实例面板默认显示: ${this.effectiveRegistrationKey} #${this.panelInstanceId}, isClosed: ${e} -> ${this.isClosed}`);
 		} else {
 			let e = this.effectiveRegistrationKey;
-			if (O.hasPanel(e)) {
-				let t = O.getPanel(e);
+			if (A.hasPanel(e)) {
+				let t = A.getPanel(e);
 				if (t) {
 					let n = this.isClosed;
 					this.isClosed = t.isClosed, console.log(`[FunctionPanelUIBase] 🔓 从 PanelSingletonManager 同步面板状态: ${e}, isClosed: ${n} -> ${this.isClosed}`), t.visible && this.isClosed && (console.log(`[FunctionPanelUIBase] ⚠️ 发现状态不一致: visible=${t.visible} 但 isClosed=${this.isClosed}，强制修正`), this.isClosed = !1, console.log("[FunctionPanelUIBase] ✅ 强制修正 isClosed: true -> false"));
@@ -723,7 +724,7 @@ var O = typeof window < "u" && window.__panelSingletonManager__ || D, k = {
 					console.log("[FunctionPanelUIBase] 📤 发送 lazy-load 事件"), this.$emit("lazy-load", { firstOpen: !0 });
 				})) : console.log(`[FunctionPanelUIBase] ⏭️ 跳过延迟加载: lazyLoad=${this.lazyLoad}, _contentLoaded=${this._contentLoaded}`)) : console.log("[FunctionPanelUIBase] ⏭️ 不触发延迟加载: 状态不是从关闭变为打开");
 			}
-		}, O.addEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener)), !this.isClosed && this.lazyLoad && !this._contentLoaded && (console.log(`[FunctionPanelUIBase] 🔍 面板初始状态为打开，触发延迟加载: ${this.effectiveRegistrationKey}`), this._contentLoaded = !0, this.$nextTick(() => {
+		}, A.addEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener)), !this.isClosed && this.lazyLoad && !this._contentLoaded && (console.log(`[FunctionPanelUIBase] 🔍 面板初始状态为打开，触发延迟加载: ${this.effectiveRegistrationKey}`), this._contentLoaded = !0, this.$nextTick(() => {
 			console.log("[FunctionPanelUIBase] 📤 发送 lazy-load 事件（初始状态）"), this.$emit("lazy-load", { firstOpen: !0 });
 		})), this.initCesium(() => {
 			this.$nextTick(() => {
@@ -734,7 +735,7 @@ var O = typeof window < "u" && window.__panelSingletonManager__ || D, k = {
 		}), this.boundHandleKeydown = this.handleKeydown.bind(this), document.addEventListener("keydown", this.boundHandleKeydown);
 	},
 	beforeUnmount() {
-		this.autoRegister && this.effectiveRegistrationKey && this.unregisterFromParent(), this.boundMouseMove && (document.removeEventListener("mousemove", this.boundMouseMove), document.removeEventListener("mouseup", this.boundHandleMouseUp)), this.boundHandleKeydown && document.removeEventListener("keydown", this.boundHandleKeydown), this.panelInstanceId === null && this._panelStateChangeListener && O.removeEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener), this.cleanup();
+		this.autoRegister && this.effectiveRegistrationKey && this.unregisterFromParent(), this.boundMouseMove && (document.removeEventListener("mousemove", this.boundMouseMove), document.removeEventListener("mouseup", this.boundHandleMouseUp)), this.boundHandleKeydown && document.removeEventListener("keydown", this.boundHandleKeydown), this.panelInstanceId === null && this._panelStateChangeListener && A.removeEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener), this.cleanup();
 	},
 	methods: {
 		getInstanceConfig() {
@@ -773,8 +774,8 @@ var O = typeof window < "u" && window.__panelSingletonManager__ || D, k = {
 					...this.$props,
 					...e?.position || {}
 				}, n = !1;
-				if (O) {
-					let t = O.getPanel(this.effectiveRegistrationKey);
+				if (A) {
+					let t = A.getPanel(this.effectiveRegistrationKey);
 					console.log(`[FunctionPanelUIBase] 🔍 检查面板 ${this.effectiveRegistrationKey}:`, {
 						existingPanel: t ? {
 							visible: t.visible,
@@ -893,7 +894,7 @@ var O = typeof window < "u" && window.__panelSingletonManager__ || D, k = {
 		close() {
 			let e = this.panelInstanceId || null, t = this.autoRegister && this.registrationKey && !e, n = !t && e !== null;
 			if (t) {
-				if (console.log(`[FunctionPanelUIBase] 🔄 面板假关闭（单例模式）: ${this.effectiveRegistrationKey}`), this.isClosed = !0, this.cleanup && typeof this.cleanup == "function" && this.cleanup(), O.updatePanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已通过 PanelSingletonManager 更新面板 ${this.effectiveRegistrationKey} 可见性为 false`), this.setPanelVisible && typeof this.setPanelVisible == "function") this.setPanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false`);
+				if (console.log(`[FunctionPanelUIBase] 🔄 面板假关闭（单例模式）: ${this.effectiveRegistrationKey}`), this.isClosed = !0, this.cleanup && typeof this.cleanup == "function" && this.cleanup(), A.updatePanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已通过 PanelSingletonManager 更新面板 ${this.effectiveRegistrationKey} 可见性为 false`), this.setPanelVisible && typeof this.setPanelVisible == "function") this.setPanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false`);
 				else if (this.getRegisteredPanels && typeof this.getRegisteredPanels == "function") {
 					let e = this.getRegisteredPanels();
 					e && e[this.effectiveRegistrationKey] && (e[this.effectiveRegistrationKey].visible = !1, console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false（直接修改）`));
@@ -957,24 +958,24 @@ var O = typeof window < "u" && window.__panelSingletonManager__ || D, k = {
 			e.key === "Escape" && this.close();
 		}
 	}
-}, A = { class: "header-left" }, j = { class: "panel-title" }, M = { class: "header-controls" }, N = ["aria-label"], P = {
+}, M = { class: "header-left" }, N = { class: "panel-title" }, P = { class: "header-controls" }, F = ["aria-label"], I = {
 	width: "14",
 	height: "14",
 	viewBox: "0 0 14 14",
 	fill: "none"
-}, F = {
+}, L = {
 	key: 0,
 	d: "M2 7H12",
 	stroke: "currentColor",
 	"stroke-width": "2",
 	"stroke-linecap": "round"
-}, I = {
+}, R = {
 	key: 1,
 	d: "M7 2V12M2 7H12",
 	stroke: "currentColor",
 	"stroke-width": "2",
 	"stroke-linecap": "round"
-}, L = ["aria-label"], R = ["title"], z = { class: "fab-icon" }, B = { class: "fab-text" };
+}, z = ["aria-label"], B = ["title"], V = { class: "fab-icon" }, H = { class: "fab-text" };
 function te(e, s, f, ee, y, b) {
 	return d(), r(t, { to: "body" }, [c(n, { name: "panel-fade" }, {
 		default: g(() => [y.isClosed ? i("", !0) : (d(), a("div", {
@@ -990,17 +991,17 @@ function te(e, s, f, ee, y, b) {
 		}, [o("div", {
 			class: "panel-header",
 			onMousedown: s[2] ||= (...e) => b.onHeaderMouseDown && b.onHeaderMouseDown(...e)
-		}, [o("div", A, [s[5] ||= o("div", { class: "drag-indicator" }, [
+		}, [o("div", M, [s[5] ||= o("div", { class: "drag-indicator" }, [
 			o("span", { class: "grip-dot" }),
 			o("span", { class: "grip-dot" }),
 			o("span", { class: "grip-dot" })
-		], -1), p(e.$slots, "header", {}, () => [o("h3", j, m(f.title), 1)], !0)]), o("div", M, [f.allowMinimize ? (d(), a("button", {
+		], -1), p(e.$slots, "header", {}, () => [o("h3", N, m(f.title), 1)], !0)]), o("div", P, [f.allowMinimize ? (d(), a("button", {
 			key: 0,
 			onClick: s[0] ||= v((...e) => b.toggleMinimize && b.toggleMinimize(...e), ["stop"]),
 			class: "icon-btn minimize-btn",
 			type: "button",
 			"aria-label": y.isMinimized ? "展开" : "最小化"
-		}, [(d(), a("svg", P, [y.isMinimized ? (d(), a("path", I)) : (d(), a("path", F))]))], 8, N)) : i("", !0), o("button", {
+		}, [(d(), a("svg", I, [y.isMinimized ? (d(), a("path", R)) : (d(), a("path", L))]))], 8, F)) : i("", !0), o("button", {
 			onClick: s[1] ||= v((...e) => b.close && b.close(...e), ["stop"]),
 			class: "icon-btn close-btn",
 			type: "button",
@@ -1015,7 +1016,7 @@ function te(e, s, f, ee, y, b) {
 			stroke: "currentColor",
 			"stroke-width": "2",
 			"stroke-linecap": "round"
-		})], -1)]], 8, L)])], 32), c(n, { name: "content-slide" }, {
+		})], -1)]], 8, z)])], 32), c(n, { name: "content-slide" }, {
 			default: g(() => [_(o("div", {
 				class: "panel-body",
 				style: u(b.bodyStyles)
@@ -1035,16 +1036,16 @@ function te(e, s, f, ee, y, b) {
 			style: u(b.fabStyles),
 			onClick: s[4] ||= (...e) => b.toggleMinimize && b.toggleMinimize(...e),
 			title: f.title
-		}, [o("span", z, m(f.titleIcon || "⚙️"), 1), o("span", B, m(f.title), 1)], 12, R)) : i("", !0)]),
+		}, [o("span", V, m(f.titleIcon || "⚙️"), 1), o("span", H, m(f.title), 1)], 12, B)) : i("", !0)]),
 		_: 1
 	})]);
 }
 //#endregion
 //#region ../cesiumBase/src/components/functions/ObliqueHeightAdjustPanel.vue
-var V = {
+var U = {
 	name: "ObliqueHeightAdjustPanel",
-	components: { FunctionPanelUIBase: /* @__PURE__ */ b(k, [["render", te], ["__scopeId", "data-v-2ca14fbb"]]) },
-	mixins: [w],
+	components: { FunctionPanelUIBase: /* @__PURE__ */ S(j, [["render", te], ["__scopeId", "data-v-2ca14fbb"]]) },
+	mixins: [E],
 	props: {
 		registrationKey: {
 			type: String,
@@ -1164,14 +1165,14 @@ var V = {
 			});
 		}
 	}
-}, H = {
+}, W = {
 	key: 0,
 	class: "recommended-offset-banner"
-}, U = { class: "banner-content" }, W = { class: "banner-text" }, G = { class: "banner-suggestion" }, K = { class: "highlight" }, q = ["disabled"], J = { class: "current-height-card" }, Y = { class: "height-value" }, X = { class: "value" }, Z = { class: "adjustment-section" }, Q = { class: "slider-container" }, ne = ["value"], re = { class: "precise-input-section" }, ie = { class: "input-group" }, ae = ["value"], oe = { class: "preset-section" }, $ = { class: "preset-grid" }, se = ["onClick"], ce = {
+}, G = { class: "banner-content" }, K = { class: "banner-text" }, q = { class: "banner-suggestion" }, J = { class: "highlight" }, Y = ["disabled"], X = { class: "current-height-card" }, Z = { class: "height-value" }, Q = { class: "value" }, ne = { class: "adjustment-section" }, re = { class: "slider-container" }, ie = ["value"], ae = { class: "precise-input-section" }, oe = { class: "input-group" }, $ = ["value"], se = { class: "preset-section" }, ce = { class: "preset-grid" }, le = ["onClick"], ue = {
 	key: 1,
 	class: "empty-state"
 };
-function le(t, n, c, u, p, h) {
+function de(t, n, c, u, p, h) {
 	let _ = ee("FunctionPanelUIBase");
 	return d(), r(_, {
 		title: h.panelTitle,
@@ -1190,7 +1191,7 @@ function le(t, n, c, u, p, h) {
 		onExpand: h.handleExpand
 	}, {
 		default: g(() => [c.selectedLayer ? (d(), a(e, { key: 0 }, [
-			c.selectedLayer.loaded && c.selectedLayer.recommendedOffset !== void 0 && c.selectedLayer.recommendedOffset !== null ? (d(), a("div", H, [o("div", U, [
+			c.selectedLayer.loaded && c.selectedLayer.recommendedOffset !== void 0 && c.selectedLayer.recommendedOffset !== null ? (d(), a("div", W, [o("div", G, [
 				n[8] ||= o("svg", {
 					class: "banner-icon",
 					viewBox: "0 0 24 24",
@@ -1202,18 +1203,18 @@ function le(t, n, c, u, p, h) {
 					"stroke-linecap": "round",
 					"stroke-linejoin": "round"
 				})], -1),
-				o("div", W, [n[7] ||= o("div", { class: "banner-main" }, "检测到倾斜摄影地形高度较低", -1), o("div", G, [
+				o("div", K, [n[7] ||= o("div", { class: "banner-main" }, "检测到倾斜摄影地形高度较低", -1), o("div", q, [
 					n[5] ||= s(" 建议向上偏移 ", -1),
-					o("span", K, m(c.selectedLayer.recommendedOffset.toFixed(1)) + " 米", 1),
+					o("span", J, m(c.selectedLayer.recommendedOffset.toFixed(1)) + " 米", 1),
 					n[6] ||= s(" 以与大坐标模型底部对齐 ", -1)
 				])]),
 				o("button", {
 					onClick: n[0] ||= (...e) => h.applyRecommendedOffset && h.applyRecommendedOffset(...e),
 					class: "apply-recommended-btn",
 					disabled: Math.abs(c.selectedLayer.heightOffset - c.selectedLayer.recommendedOffset) < .1
-				}, m(Math.abs(c.selectedLayer.heightOffset - c.selectedLayer.recommendedOffset) < .1 ? "已应用" : "应用推荐值"), 9, q)
+				}, m(Math.abs(c.selectedLayer.heightOffset - c.selectedLayer.recommendedOffset) < .1 ? "已应用" : "应用推荐值"), 9, Y)
 			])])) : i("", !0),
-			o("div", J, [n[10] ||= o("div", { class: "card-header" }, [o("h4", { class: "card-title" }, "当前高度偏移"), o("span", {
+			o("div", X, [n[10] ||= o("div", { class: "card-header" }, [o("h4", { class: "card-title" }, "当前高度偏移"), o("span", {
 				class: "hint-icon",
 				title: "调整倾斜摄影的整体高度，正值向上，负值向下"
 			}, [o("svg", {
@@ -1228,10 +1229,10 @@ function le(t, n, c, u, p, h) {
 			}), o("path", {
 				d: "M12 16v-4M12 8h.01",
 				"stroke-linecap": "round"
-			})])])], -1), o("div", Y, [o("span", X, m((c.selectedLayer.heightOffset || 0).toFixed(2)), 1), n[9] ||= o("span", { class: "unit" }, "米", -1)])]),
-			o("div", Z, [
+			})])])], -1), o("div", Z, [o("span", Q, m((c.selectedLayer.heightOffset || 0).toFixed(2)), 1), n[9] ||= o("span", { class: "unit" }, "米", -1)])]),
+			o("div", ne, [
 				n[12] ||= o("div", { class: "section-label" }, [o("span", null, "调整偏移"), o("span", { class: "range-hint" }, "-2000m ~ +2000m")], -1),
-				o("div", Q, [o("input", {
+				o("div", re, [o("input", {
 					type: "range",
 					min: "-2000",
 					max: "2000",
@@ -1240,16 +1241,16 @@ function le(t, n, c, u, p, h) {
 					onInput: n[1] ||= (...e) => h.onHeightSliderInput && h.onHeightSliderInput(...e),
 					onChange: n[2] ||= (...e) => h.onHeightSliderChange && h.onHeightSliderChange(...e),
 					class: "height-slider"
-				}, null, 40, ne), n[11] ||= o("div", { class: "slider-track-fill" }, null, -1)]),
+				}, null, 40, ie), n[11] ||= o("div", { class: "slider-track-fill" }, null, -1)]),
 				n[13] ||= o("div", { class: "usage-hint" }, "调整后使倾斜摄影与大坐标模型高度对齐", -1)
 			]),
-			o("div", re, [n[15] ||= o("label", { class: "input-label" }, "精确设置偏移（米）", -1), o("div", ie, [o("input", {
+			o("div", ae, [n[15] ||= o("label", { class: "input-label" }, "精确设置偏移（米）", -1), o("div", oe, [o("input", {
 				type: "number",
 				value: c.selectedLayer.heightOffset || 0,
 				onChange: n[3] ||= (...e) => h.onHeightInputChange && h.onHeightInputChange(...e),
 				class: "number-input",
 				step: "0.1"
-			}, null, 40, ae), o("button", {
+			}, null, 40, $), o("button", {
 				onClick: n[4] ||= (...e) => h.resetToZero && h.resetToZero(...e),
 				class: "reset-btn",
 				title: "重置为0"
@@ -1263,12 +1264,12 @@ function le(t, n, c, u, p, h) {
 				"stroke-linecap": "round",
 				"stroke-linejoin": "round"
 			})], -1), s(" 重置 ", -1)]])])]),
-			o("div", oe, [n[16] ||= o("div", { class: "section-label" }, "快捷预设", -1), o("div", $, [(d(!0), a(e, null, f(p.presets, (e) => (d(), a("button", {
+			o("div", se, [n[16] ||= o("div", { class: "section-label" }, "快捷预设", -1), o("div", ce, [(d(!0), a(e, null, f(p.presets, (e) => (d(), a("button", {
 				key: e.value,
 				onClick: (t) => h.applyPreset(e.value),
 				class: l(["preset-btn", { active: Math.abs(c.selectedLayer.heightOffset - e.value) < .1 }])
-			}, m(e.label), 11, se))), 128))])])
-		], 64)) : (d(), a("div", ce, [...n[17] ||= [o("svg", {
+			}, m(e.label), 11, le))), 128))])])
+		], 64)) : (d(), a("div", ue, [...n[17] ||= [o("svg", {
 			class: "empty-icon",
 			viewBox: "0 0 24 24",
 			fill: "none",
@@ -1292,6 +1293,6 @@ function le(t, n, c, u, p, h) {
 		"onExpand"
 	]);
 }
-var ue = /*#__PURE__*/ b(V, [["render", le], ["__scopeId", "data-v-80456ab5"]]);
+var fe = /*#__PURE__*/ S(U, [["render", de], ["__scopeId", "data-v-80456ab5"]]);
 //#endregion
-export { ue as default };
+export { fe as default };

@@ -1,5 +1,6 @@
 import { Teleport as e, Transition as t, createBlock as n, createCommentVNode as r, createElementBlock as i, createElementVNode as a, createVNode as o, normalizeClass as s, normalizeStyle as c, openBlock as l, renderSlot as u, resolveComponent as d, toDisplayString as f, vShow as p, withCtx as m, withDirectives as h, withModifiers as g } from "vue";
-var _ = new class {
+//#region ../cesiumBase/src/utils/CesiumEventManager.js
+var _ = class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
 	}
@@ -91,17 +92,17 @@ var _ = new class {
 	destroy() {
 		this.stopPolling(), this.removeGlobalListener(), this.listeners.clear(), this.isReady = !1, this.cesiumInstance = null, this.viewerInstance = null;
 	}
-}();
-typeof window < "u" && (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => {
-	_.init();
-}) : _.init(), window.__cesiumEventManager__ = _);
+}, v = typeof window < "u" && window.__cesiumEventManager__, y = v || new _();
+!v && typeof window < "u" && (window.__cesiumEventManager__ = y, document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => {
+	y.init();
+}) : y.init());
 //#endregion
 //#region \0plugin-vue:export-helper
-var v = (e, t) => {
+var b = (e, t) => {
 	let n = e.__vccOpts || e;
 	for (let [e, r] of t) n[e] = r;
 	return n;
-}, y = {
+}, x = {
 	name: "SfcBase",
 	props: {
 		onClose: {
@@ -145,7 +146,7 @@ var v = (e, t) => {
 			let n = null;
 			t > 0 && (n = setTimeout(() => {
 				this.cesiumUnsubscribe &&= (this.cesiumUnsubscribe(), null), this.$logger?.warn?.(`[${this.componentName}] Cesium 初始化超时 (${t}ms)`);
-			}, t)), this.cesiumUnsubscribe = _.onReady((t, r) => {
+			}, t)), this.cesiumUnsubscribe = y.onReady((t, r) => {
 				n &&= (clearTimeout(n), null), this.cesiumReady = !0, this.$logger?.info?.(`[${this.componentName}] Cesium 已就绪（事件驱动）`), e && typeof e == "function" && e(t, r);
 			});
 		},
@@ -261,14 +262,14 @@ var v = (e, t) => {
 	beforeUnmount() {
 		this.cleanup();
 	}
-}, b = {
+}, S = {
 	class: "sfc-base",
 	style: { display: "none" }
 };
-function x(e, t, n, r, a, o) {
-	return l(), i("div", b);
+function C(e, t, n, r, a, o) {
+	return l(), i("div", S);
 }
-var S = /*#__PURE__*/ v(y, [["render", x]]), C = class {
+var w = /*#__PURE__*/ b(x, [["render", C]]), T = class {
 	constructor() {
 		this.panelStates = /* @__PURE__ */ new Map(), this.cesiumObjects = /* @__PURE__ */ new Map(), this.panelVisibility = /* @__PURE__ */ new Map(), this.panelRegistry = /* @__PURE__ */ new Map(), this.eventListeners = /* @__PURE__ */ new Map(), this.mjsContainers = /* @__PURE__ */ new Map(), console.log("[PanelSingletonManager] 初始化完成");
 	}
@@ -281,7 +282,7 @@ var S = /*#__PURE__*/ v(y, [["render", x]]), C = class {
 			configList: n.configList?.length || 0,
 			cesiumObjects: n.cesiumObjects ? "存在" : "不存在",
 			时间: new Date(n.timestamp).toLocaleTimeString()
-		}), typeof window < "u" && (window.__panelSingletonManager__ || (window.__panelSingletonManager__ = this));
+		}), typeof window < "u" && (window.__panelSingletonManager__ || (window.__panelSingletonManager__ = this), window.panelSingletonManager || (window.panelSingletonManager = this));
 	}
 	getPanelState(e) {
 		let t = this.panelStates.get(e);
@@ -489,13 +490,13 @@ var S = /*#__PURE__*/ v(y, [["render", x]]), C = class {
 			}
 		});
 	}
-}, w = typeof window < "u" && window.__panelSingletonManager__, T = w || new C();
-!w && typeof window < "u" && (window.__panelSingletonManager__ = T);
+}, E = typeof window < "u" && (window.__panelSingletonManager__ || window.panelSingletonManager), D = E || new T();
+!E && typeof window < "u" && (window.__panelSingletonManager__ = D, window.panelSingletonManager = D);
 //#endregion
 //#region ../cesiumBase/src/components/FunctionPanelUIBase.vue
-var E = typeof window < "u" && window.__panelSingletonManager__ || T, D = {
+var O = typeof window < "u" && window.__panelSingletonManager__ || D, k = {
 	name: "FunctionPanelUIBase",
-	mixins: [S],
+	mixins: [w],
 	emits: [
 		"close",
 		"minimize",
@@ -704,8 +705,8 @@ var E = typeof window < "u" && window.__panelSingletonManager__ || T, D = {
 			this.isClosed = !1, console.log(`[FunctionPanelUIBase] ✅ 多实例面板默认显示: ${this.effectiveRegistrationKey} #${this.panelInstanceId}, isClosed: ${e} -> ${this.isClosed}`);
 		} else {
 			let e = this.effectiveRegistrationKey;
-			if (E.hasPanel(e)) {
-				let t = E.getPanel(e);
+			if (O.hasPanel(e)) {
+				let t = O.getPanel(e);
 				if (t) {
 					let n = this.isClosed;
 					this.isClosed = t.isClosed, console.log(`[FunctionPanelUIBase] 🔓 从 PanelSingletonManager 同步面板状态: ${e}, isClosed: ${n} -> ${this.isClosed}`), t.visible && this.isClosed && (console.log(`[FunctionPanelUIBase] ⚠️ 发现状态不一致: visible=${t.visible} 但 isClosed=${this.isClosed}，强制修正`), this.isClosed = !1, console.log("[FunctionPanelUIBase] ✅ 强制修正 isClosed: true -> false"));
@@ -723,7 +724,7 @@ var E = typeof window < "u" && window.__panelSingletonManager__ || T, D = {
 					console.log("[FunctionPanelUIBase] 📤 发送 lazy-load 事件"), this.$emit("lazy-load", { firstOpen: !0 });
 				})) : console.log(`[FunctionPanelUIBase] ⏭️ 跳过延迟加载: lazyLoad=${this.lazyLoad}, _contentLoaded=${this._contentLoaded}`)) : console.log("[FunctionPanelUIBase] ⏭️ 不触发延迟加载: 状态不是从关闭变为打开");
 			}
-		}, E.addEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener)), !this.isClosed && this.lazyLoad && !this._contentLoaded && (console.log(`[FunctionPanelUIBase] 🔍 面板初始状态为打开，触发延迟加载: ${this.effectiveRegistrationKey}`), this._contentLoaded = !0, this.$nextTick(() => {
+		}, O.addEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener)), !this.isClosed && this.lazyLoad && !this._contentLoaded && (console.log(`[FunctionPanelUIBase] 🔍 面板初始状态为打开，触发延迟加载: ${this.effectiveRegistrationKey}`), this._contentLoaded = !0, this.$nextTick(() => {
 			console.log("[FunctionPanelUIBase] 📤 发送 lazy-load 事件（初始状态）"), this.$emit("lazy-load", { firstOpen: !0 });
 		})), this.initCesium(() => {
 			this.$nextTick(() => {
@@ -734,7 +735,7 @@ var E = typeof window < "u" && window.__panelSingletonManager__ || T, D = {
 		}), this.boundHandleKeydown = this.handleKeydown.bind(this), document.addEventListener("keydown", this.boundHandleKeydown);
 	},
 	beforeUnmount() {
-		this.autoRegister && this.effectiveRegistrationKey && this.unregisterFromParent(), this.boundMouseMove && (document.removeEventListener("mousemove", this.boundMouseMove), document.removeEventListener("mouseup", this.boundHandleMouseUp)), this.boundHandleKeydown && document.removeEventListener("keydown", this.boundHandleKeydown), this.panelInstanceId === null && this._panelStateChangeListener && E.removeEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener), this.cleanup();
+		this.autoRegister && this.effectiveRegistrationKey && this.unregisterFromParent(), this.boundMouseMove && (document.removeEventListener("mousemove", this.boundMouseMove), document.removeEventListener("mouseup", this.boundHandleMouseUp)), this.boundHandleKeydown && document.removeEventListener("keydown", this.boundHandleKeydown), this.panelInstanceId === null && this._panelStateChangeListener && O.removeEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener), this.cleanup();
 	},
 	methods: {
 		getInstanceConfig() {
@@ -773,8 +774,8 @@ var E = typeof window < "u" && window.__panelSingletonManager__ || T, D = {
 					...this.$props,
 					...e?.position || {}
 				}, n = !1;
-				if (E) {
-					let t = E.getPanel(this.effectiveRegistrationKey);
+				if (O) {
+					let t = O.getPanel(this.effectiveRegistrationKey);
 					console.log(`[FunctionPanelUIBase] 🔍 检查面板 ${this.effectiveRegistrationKey}:`, {
 						existingPanel: t ? {
 							visible: t.visible,
@@ -893,7 +894,7 @@ var E = typeof window < "u" && window.__panelSingletonManager__ || T, D = {
 		close() {
 			let e = this.panelInstanceId || null, t = this.autoRegister && this.registrationKey && !e, n = !t && e !== null;
 			if (t) {
-				if (console.log(`[FunctionPanelUIBase] 🔄 面板假关闭（单例模式）: ${this.effectiveRegistrationKey}`), this.isClosed = !0, this.cleanup && typeof this.cleanup == "function" && this.cleanup(), E.updatePanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已通过 PanelSingletonManager 更新面板 ${this.effectiveRegistrationKey} 可见性为 false`), this.setPanelVisible && typeof this.setPanelVisible == "function") this.setPanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false`);
+				if (console.log(`[FunctionPanelUIBase] 🔄 面板假关闭（单例模式）: ${this.effectiveRegistrationKey}`), this.isClosed = !0, this.cleanup && typeof this.cleanup == "function" && this.cleanup(), O.updatePanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已通过 PanelSingletonManager 更新面板 ${this.effectiveRegistrationKey} 可见性为 false`), this.setPanelVisible && typeof this.setPanelVisible == "function") this.setPanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false`);
 				else if (this.getRegisteredPanels && typeof this.getRegisteredPanels == "function") {
 					let e = this.getRegisteredPanels();
 					e && e[this.effectiveRegistrationKey] && (e[this.effectiveRegistrationKey].visible = !1, console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false（直接修改）`));
@@ -957,25 +958,25 @@ var E = typeof window < "u" && window.__panelSingletonManager__ || T, D = {
 			e.key === "Escape" && this.close();
 		}
 	}
-}, O = { class: "header-left" }, k = { class: "panel-title" }, A = { class: "header-controls" }, j = ["aria-label"], M = {
+}, A = { class: "header-left" }, j = { class: "panel-title" }, M = { class: "header-controls" }, N = ["aria-label"], P = {
 	width: "14",
 	height: "14",
 	viewBox: "0 0 14 14",
 	fill: "none"
-}, N = {
+}, F = {
 	key: 0,
 	d: "M2 7H12",
 	stroke: "currentColor",
 	"stroke-width": "2",
 	"stroke-linecap": "round"
-}, P = {
+}, I = {
 	key: 1,
 	d: "M7 2V12M2 7H12",
 	stroke: "currentColor",
 	"stroke-width": "2",
 	"stroke-linecap": "round"
-}, F = ["aria-label"], I = ["title"], L = { class: "fab-icon" }, R = { class: "fab-text" };
-function z(d, _, v, y, b, x) {
+}, L = ["aria-label"], R = ["title"], z = { class: "fab-icon" }, B = { class: "fab-text" };
+function V(d, _, v, y, b, x) {
 	return l(), n(e, { to: "body" }, [o(t, { name: "panel-fade" }, {
 		default: m(() => [b.isClosed ? r("", !0) : (l(), i("div", {
 			key: 0,
@@ -990,17 +991,17 @@ function z(d, _, v, y, b, x) {
 		}, [a("div", {
 			class: "panel-header",
 			onMousedown: _[2] ||= (...e) => x.onHeaderMouseDown && x.onHeaderMouseDown(...e)
-		}, [a("div", O, [_[5] ||= a("div", { class: "drag-indicator" }, [
+		}, [a("div", A, [_[5] ||= a("div", { class: "drag-indicator" }, [
 			a("span", { class: "grip-dot" }),
 			a("span", { class: "grip-dot" }),
 			a("span", { class: "grip-dot" })
-		], -1), u(d.$slots, "header", {}, () => [a("h3", k, f(v.title), 1)], !0)]), a("div", A, [v.allowMinimize ? (l(), i("button", {
+		], -1), u(d.$slots, "header", {}, () => [a("h3", j, f(v.title), 1)], !0)]), a("div", M, [v.allowMinimize ? (l(), i("button", {
 			key: 0,
 			onClick: _[0] ||= g((...e) => x.toggleMinimize && x.toggleMinimize(...e), ["stop"]),
 			class: "icon-btn minimize-btn",
 			type: "button",
 			"aria-label": b.isMinimized ? "展开" : "最小化"
-		}, [(l(), i("svg", M, [b.isMinimized ? (l(), i("path", P)) : (l(), i("path", N))]))], 8, j)) : r("", !0), a("button", {
+		}, [(l(), i("svg", P, [b.isMinimized ? (l(), i("path", I)) : (l(), i("path", F))]))], 8, N)) : r("", !0), a("button", {
 			onClick: _[1] ||= g((...e) => x.close && x.close(...e), ["stop"]),
 			class: "icon-btn close-btn",
 			type: "button",
@@ -1015,7 +1016,7 @@ function z(d, _, v, y, b, x) {
 			stroke: "currentColor",
 			"stroke-width": "2",
 			"stroke-linecap": "round"
-		})], -1)]], 8, F)])], 32), o(t, { name: "content-slide" }, {
+		})], -1)]], 8, L)])], 32), o(t, { name: "content-slide" }, {
 			default: m(() => [h(a("div", {
 				class: "panel-body",
 				style: c(x.bodyStyles)
@@ -1035,15 +1036,15 @@ function z(d, _, v, y, b, x) {
 			style: c(x.fabStyles),
 			onClick: _[4] ||= (...e) => x.toggleMinimize && x.toggleMinimize(...e),
 			title: v.title
-		}, [a("span", L, f(v.titleIcon || "⚙️"), 1), a("span", R, f(v.title), 1)], 12, I)) : r("", !0)]),
+		}, [a("span", z, f(v.titleIcon || "⚙️"), 1), a("span", B, f(v.title), 1)], 12, R)) : r("", !0)]),
 		_: 1
 	})]);
 }
 //#endregion
 //#region ../cesiumBase/src/components/functions/TestPanel.vue
-var B = {
+var H = {
 	name: "TestPanel",
-	components: { FunctionPanelUIBase: /* @__PURE__ */ v(D, [["render", z], ["__scopeId", "data-v-2ca14fbb"]]) },
+	components: { FunctionPanelUIBase: /* @__PURE__ */ b(k, [["render", V], ["__scopeId", "data-v-2ca14fbb"]]) },
 	props: {
 		initialX: {
 			type: [Number, String],
@@ -1089,8 +1090,8 @@ var B = {
 			this.count++;
 		}
 	}
-}, V = { class: "test-panel-content" }, H = { class: "demo-section" }, U = { class: "status-info" }, W = { class: "status-item" }, G = { class: "value" };
-function K(e, t, r, i, o, s) {
+}, U = { class: "test-panel-content" }, W = { class: "demo-section" }, G = { class: "status-info" }, K = { class: "status-item" }, q = { class: "value" };
+function J(e, t, r, i, o, s) {
 	let c = d("FunctionPanelUIBase");
 	return l(), n(c, {
 		title: "测试面板",
@@ -1107,7 +1108,7 @@ function K(e, t, r, i, o, s) {
 		onMinimize: s.handleMinimize,
 		onExpand: s.handleExpand
 	}, {
-		default: m(() => [a("div", V, [
+		default: m(() => [a("div", U, [
 			t[6] ||= a("div", { class: "section-title" }, "🎉 自动加载测试", -1),
 			t[7] ||= a("p", { class: "hint-text" }, " 这个面板是通过以下方式自动加载的： ", -1),
 			t[8] ||= a("ul", { class: "feature-list" }, [
@@ -1116,7 +1117,7 @@ function K(e, t, r, i, o, s) {
 				a("li", null, "✅ 设置 registration-key=\"TestPanel\""),
 				a("li", null, "✅ CesiumMain 自动导入并渲染")
 			], -1),
-			a("div", H, [
+			a("div", W, [
 				t[2] ||= a("div", { class: "section-label" }, "演示功能", -1),
 				a("button", {
 					onClick: t[0] ||= (...e) => s.showAlert && s.showAlert(...e),
@@ -1127,8 +1128,8 @@ function K(e, t, r, i, o, s) {
 					class: "demo-btn"
 				}, " 📊 计数器: " + f(o.count), 1)
 			]),
-			a("div", U, [
-				a("div", W, [t[3] ||= a("span", { class: "label" }, "组件名称:", -1), a("span", G, f(o.componentName), 1)]),
+			a("div", G, [
+				a("div", K, [t[3] ||= a("span", { class: "label" }, "组件名称:", -1), a("span", q, f(o.componentName), 1)]),
 				t[4] ||= a("div", { class: "status-item" }, [a("span", { class: "label" }, "注册状态:"), a("span", { class: "value success" }, "已注册 ✓")], -1),
 				t[5] ||= a("div", { class: "status-item" }, [a("span", { class: "label" }, "渲染方式:"), a("span", { class: "value" }, "动态组件")], -1)
 			])
@@ -1144,6 +1145,6 @@ function K(e, t, r, i, o, s) {
 		"onExpand"
 	]);
 }
-var q = /*#__PURE__*/ v(B, [["render", K], ["__scopeId", "data-v-46efa2f7"]]);
+var Y = /*#__PURE__*/ b(H, [["render", J], ["__scopeId", "data-v-46efa2f7"]]);
 //#endregion
-export { q as default };
+export { Y as default };

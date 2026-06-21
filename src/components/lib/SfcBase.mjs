@@ -1,5 +1,6 @@
 import { createElementBlock as e, openBlock as t } from "vue";
-var n = new class {
+//#region ../cesiumBase/src/utils/CesiumEventManager.js
+var n = class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
 	}
@@ -91,17 +92,17 @@ var n = new class {
 	destroy() {
 		this.stopPolling(), this.removeGlobalListener(), this.listeners.clear(), this.isReady = !1, this.cesiumInstance = null, this.viewerInstance = null;
 	}
-}();
-typeof window < "u" && (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => {
-	n.init();
-}) : n.init(), window.__cesiumEventManager__ = n);
+}, r = typeof window < "u" && window.__cesiumEventManager__, i = r || new n();
+!r && typeof window < "u" && (window.__cesiumEventManager__ = i, document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => {
+	i.init();
+}) : i.init());
 //#endregion
 //#region \0plugin-vue:export-helper
-var r = (e, t) => {
+var a = (e, t) => {
 	let n = e.__vccOpts || e;
 	for (let [e, r] of t) n[e] = r;
 	return n;
-}, i = {
+}, o = {
 	name: "SfcBase",
 	props: {
 		onClose: {
@@ -142,11 +143,11 @@ var r = (e, t) => {
 				e && typeof e == "function" && e();
 				return;
 			}
-			let r = null;
-			t > 0 && (r = setTimeout(() => {
+			let n = null;
+			t > 0 && (n = setTimeout(() => {
 				this.cesiumUnsubscribe &&= (this.cesiumUnsubscribe(), null), this.$logger?.warn?.(`[${this.componentName}] Cesium 初始化超时 (${t}ms)`);
-			}, t)), this.cesiumUnsubscribe = n.onReady((t, n) => {
-				r &&= (clearTimeout(r), null), this.cesiumReady = !0, this.$logger?.info?.(`[${this.componentName}] Cesium 已就绪（事件驱动）`), e && typeof e == "function" && e(t, n);
+			}, t)), this.cesiumUnsubscribe = i.onReady((t, r) => {
+				n &&= (clearTimeout(n), null), this.cesiumReady = !0, this.$logger?.info?.(`[${this.componentName}] Cesium 已就绪（事件驱动）`), e && typeof e == "function" && e(t, r);
 			});
 		},
 		getCesiumViewer() {
@@ -261,13 +262,13 @@ var r = (e, t) => {
 	beforeUnmount() {
 		this.cleanup();
 	}
-}, a = {
+}, s = {
 	class: "sfc-base",
 	style: { display: "none" }
 };
-function o(n, r, i, o, s, c) {
-	return t(), e("div", a);
+function c(n, r, i, a, o, c) {
+	return t(), e("div", s);
 }
-var s = /*#__PURE__*/ r(i, [["render", o]]);
+var l = /*#__PURE__*/ a(o, [["render", c]]);
 //#endregion
-export { s as default };
+export { l as default };

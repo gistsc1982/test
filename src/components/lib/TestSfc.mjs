@@ -1,5 +1,6 @@
 import { createCommentVNode as e, createElementBlock as t, createElementVNode as n, normalizeClass as r, normalizeStyle as i, openBlock as a, toDisplayString as o, vModelText as s, withDirectives as c } from "vue";
-var l = new class {
+//#region ../cesiumBase/src/utils/CesiumEventManager.js
+var l = class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
 	}
@@ -91,17 +92,17 @@ var l = new class {
 	destroy() {
 		this.stopPolling(), this.removeGlobalListener(), this.listeners.clear(), this.isReady = !1, this.cesiumInstance = null, this.viewerInstance = null;
 	}
-}();
-typeof window < "u" && (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => {
-	l.init();
-}) : l.init(), window.__cesiumEventManager__ = l);
+}, u = typeof window < "u" && window.__cesiumEventManager__, d = u || new l();
+!u && typeof window < "u" && (window.__cesiumEventManager__ = d, document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => {
+	d.init();
+}) : d.init());
 //#endregion
 //#region \0plugin-vue:export-helper
-var u = (e, t) => {
+var f = (e, t) => {
 	let n = e.__vccOpts || e;
 	for (let [e, r] of t) n[e] = r;
 	return n;
-}, d = {
+}, p = {
 	name: "SfcBase",
 	props: {
 		onClose: {
@@ -145,7 +146,7 @@ var u = (e, t) => {
 			let n = null;
 			t > 0 && (n = setTimeout(() => {
 				this.cesiumUnsubscribe &&= (this.cesiumUnsubscribe(), null), this.$logger?.warn?.(`[${this.componentName}] Cesium 初始化超时 (${t}ms)`);
-			}, t)), this.cesiumUnsubscribe = l.onReady((t, r) => {
+			}, t)), this.cesiumUnsubscribe = d.onReady((t, r) => {
 				n &&= (clearTimeout(n), null), this.cesiumReady = !0, this.$logger?.info?.(`[${this.componentName}] Cesium 已就绪（事件驱动）`), e && typeof e == "function" && e(t, r);
 			});
 		},
@@ -261,18 +262,18 @@ var u = (e, t) => {
 	beforeUnmount() {
 		this.cleanup();
 	}
-}, f = {
+}, m = {
 	class: "sfc-base",
 	style: { display: "none" }
 };
-function p(e, n, r, i, o, s) {
-	return a(), t("div", f);
+function h(e, n, r, i, o, s) {
+	return a(), t("div", m);
 }
 //#endregion
 //#region ../cesiumBase/src/components/TestSfc.vue
-var m = {
+var g = {
 	name: "TestSfc",
-	mixins: [/* @__PURE__ */ u(d, [["render", p]])],
+	mixins: [/* @__PURE__ */ f(p, [["render", h]])],
 	props: { onClose: {
 		type: Function,
 		default: null
@@ -390,8 +391,8 @@ var m = {
 	beforeUnmount() {
 		this.isDragging && (this.boundOnDrag && document.removeEventListener("mousemove", this.boundOnDrag), this.boundStopDrag && document.removeEventListener("mouseup", this.boundStopDrag)), this.cleanup();
 	}
-}, h = { class: "test-sfc-body" }, g = { class: "location-form" }, _ = { class: "form-group" }, v = { class: "form-group" }, y = { class: "form-group" }, b = { class: "form-group" };
-function x(l, u, d, f, p, m) {
+}, _ = { class: "test-sfc-body" }, v = { class: "location-form" }, y = { class: "form-group" }, b = { class: "form-group" }, x = { class: "form-group" }, S = { class: "form-group" };
+function C(l, u, d, f, p, m) {
 	return a(), t("div", {
 		class: r(["test-sfc-modal", { "is-dragging": p.isDragging }]),
 		style: i({
@@ -406,8 +407,8 @@ function x(l, u, d, f, p, m) {
 	}, [u[7] ||= n("h3", null, "🧪 TestSfc 测试组件", -1), n("button", {
 		onClick: u[0] ||= (...e) => m.handleClose && m.handleClose(...e),
 		class: "close-btn"
-	}, "×")], 34), n("div", h, [n("div", g, [
-		n("div", _, [u[8] ||= n("label", { class: "form-label" }, [n("span", { class: "label-icon" }, "📍"), n("span", null, "经度")], -1), c(n("input", {
+	}, "×")], 34), n("div", _, [n("div", v, [
+		n("div", y, [u[8] ||= n("label", { class: "form-label" }, [n("span", { class: "label-icon" }, "📍"), n("span", null, "经度")], -1), c(n("input", {
 			"onUpdate:modelValue": u[2] ||= (e) => p.longitude = e,
 			type: "number",
 			step: "0.000001",
@@ -421,7 +422,7 @@ function x(l, u, d, f, p, m) {
 			void 0,
 			{ number: !0 }
 		]])]),
-		n("div", v, [u[9] ||= n("label", { class: "form-label" }, [n("span", { class: "label-icon" }, "🌐"), n("span", null, "纬度")], -1), c(n("input", {
+		n("div", b, [u[9] ||= n("label", { class: "form-label" }, [n("span", { class: "label-icon" }, "🌐"), n("span", null, "纬度")], -1), c(n("input", {
 			"onUpdate:modelValue": u[3] ||= (e) => p.latitude = e,
 			type: "number",
 			step: "0.000001",
@@ -435,7 +436,7 @@ function x(l, u, d, f, p, m) {
 			void 0,
 			{ number: !0 }
 		]])]),
-		n("div", y, [u[10] ||= n("label", { class: "form-label" }, [n("span", { class: "label-icon" }, "🔭"), n("span", null, "高度")], -1), c(n("input", {
+		n("div", x, [u[10] ||= n("label", { class: "form-label" }, [n("span", { class: "label-icon" }, "🔭"), n("span", null, "高度")], -1), c(n("input", {
 			"onUpdate:modelValue": u[4] ||= (e) => p.height = e,
 			type: "number",
 			step: "0.1",
@@ -447,7 +448,7 @@ function x(l, u, d, f, p, m) {
 			void 0,
 			{ number: !0 }
 		]])]),
-		n("div", b, [u[11] ||= n("label", { class: "form-label" }, [n("span", { class: "label-icon" }, "⤵"), n("span", null, "俯仰角")], -1), c(n("input", {
+		n("div", S, [u[11] ||= n("label", { class: "form-label" }, [n("span", { class: "label-icon" }, "⤵"), n("span", null, "俯仰角")], -1), c(n("input", {
 			"onUpdate:modelValue": u[5] ||= (e) => p.pitch = e,
 			type: "number",
 			step: "0.1",
@@ -471,6 +472,6 @@ function x(l, u, d, f, p, m) {
 		}, o(p.locateMessage), 3)) : e("", !0)
 	])])], 6);
 }
-var S = /*#__PURE__*/ u(m, [["render", x]]);
+var w = /*#__PURE__*/ f(g, [["render", C]]);
 //#endregion
-export { S as default };
+export { w as default };
