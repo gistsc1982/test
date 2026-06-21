@@ -1,5 +1,5 @@
-import { Fragment as e, Teleport as t, Transition as n, createBlock as r, createCommentVNode as i, createElementBlock as a, createElementVNode as o, createTextVNode as s, createVNode as c, normalizeClass as l, normalizeStyle as u, openBlock as d, renderList as f, renderSlot as p, resolveComponent as m, toDisplayString as h, vShow as g, withCtx as _, withDirectives as v, withModifiers as y } from "vue";
-var b = new class {
+import { Fragment as e, Teleport as t, Transition as n, createBlock as r, createCommentVNode as i, createElementBlock as a, createElementVNode as o, createTextVNode as s, createVNode as c, normalizeClass as l, normalizeStyle as u, openBlock as d, renderList as f, renderSlot as p, resolveComponent as ee, toDisplayString as m, vShow as h, withCtx as g, withDirectives as _, withModifiers as v } from "vue";
+var y = new class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
 	}
@@ -93,15 +93,15 @@ var b = new class {
 	}
 }();
 typeof window < "u" && (document.readyState === "loading" ? document.addEventListener("DOMContentLoaded", () => {
-	b.init();
-}) : b.init(), window.__cesiumEventManager__ = b);
+	y.init();
+}) : y.init(), window.__cesiumEventManager__ = y);
 //#endregion
 //#region \0plugin-vue:export-helper
-var x = (e, t) => {
+var b = (e, t) => {
 	let n = e.__vccOpts || e;
 	for (let [e, r] of t) n[e] = r;
 	return n;
-}, S = {
+}, x = {
 	name: "SfcBase",
 	props: {
 		onClose: {
@@ -145,7 +145,7 @@ var x = (e, t) => {
 			let n = null;
 			t > 0 && (n = setTimeout(() => {
 				this.cesiumUnsubscribe &&= (this.cesiumUnsubscribe(), null), this.$logger?.warn?.(`[${this.componentName}] Cesium 初始化超时 (${t}ms)`);
-			}, t)), this.cesiumUnsubscribe = b.onReady((t, r) => {
+			}, t)), this.cesiumUnsubscribe = y.onReady((t, r) => {
 				n &&= (clearTimeout(n), null), this.cesiumReady = !0, this.$logger?.info?.(`[${this.componentName}] Cesium 已就绪（事件驱动）`), e && typeof e == "function" && e(t, r);
 			});
 		},
@@ -261,14 +261,14 @@ var x = (e, t) => {
 	beforeUnmount() {
 		this.cleanup();
 	}
-}, C = {
+}, S = {
 	class: "sfc-base",
 	style: { display: "none" }
 };
-function w(e, t, n, r, i, o) {
-	return d(), a("div", C);
+function C(e, t, n, r, i, o) {
+	return d(), a("div", S);
 }
-var T = /*#__PURE__*/ x(S, [["render", w]]), E = new class {
+var w = /*#__PURE__*/ b(x, [["render", C]]), T = class {
 	constructor() {
 		this.panelStates = /* @__PURE__ */ new Map(), this.cesiumObjects = /* @__PURE__ */ new Map(), this.panelVisibility = /* @__PURE__ */ new Map(), this.panelRegistry = /* @__PURE__ */ new Map(), this.eventListeners = /* @__PURE__ */ new Map(), this.mjsContainers = /* @__PURE__ */ new Map(), console.log("[PanelSingletonManager] 初始化完成");
 	}
@@ -382,18 +382,12 @@ var T = /*#__PURE__*/ x(S, [["render", w]]), E = new class {
 			return;
 		}
 		let n = this.panelRegistry.get(e);
-		if (n) {
-			if (n.visible = t, n._visibilityExplicitlySet = !0, t ? n.isClosed = !1 : n.isClosed = !0, console.log(`[PanelSingletonManager] 🔄 更新面板可见性: ${e} = ${t}, isClosed = ${n.isClosed}`), n.component && typeof n.component == "object") {
-				let t = n.component.isClosed;
-				n.component.isClosed = n.isClosed, console.log(`[PanelSingletonManager] 🔧 直接更新组件 isClosed: ${t} -> ${n.component.isClosed}`), n.component.$forceUpdate && typeof n.component.$forceUpdate == "function" && (n.component.$forceUpdate(), console.log(`[PanelSingletonManager] ✅ 强制重新渲染面板组件: ${e}`));
-			}
-			this.emitEvent(e, {
-				type: "visibleChange",
-				panelName: e,
-				visible: t,
-				isClosed: n.isClosed
-			});
-		} else console.warn(`[PanelSingletonManager] ⚠️ 面板 ${e} 未注册，无法更新可见性`);
+		n ? (n.visible = t, n._visibilityExplicitlySet = !0, t ? n.isClosed = !1 : n.isClosed = !0, console.log(`[PanelSingletonManager] 🔄 更新面板可见性: ${e} = ${t}, isClosed = ${n.isClosed}`), this.emitEvent(e, {
+			type: "visibleChange",
+			panelName: e,
+			visible: t,
+			isClosed: n.isClosed
+		})) : console.warn(`[PanelSingletonManager] ⚠️ 面板 ${e} 未注册，无法更新可见性`);
 	}
 	getPanelVisible(e) {
 		let t = this.panelRegistry.get(e);
@@ -495,9 +489,13 @@ var T = /*#__PURE__*/ x(S, [["render", w]]), E = new class {
 			}
 		});
 	}
-}(), D = {
+}, E = typeof window < "u" && window.__panelSingletonManager__, D = E || new T();
+!E && typeof window < "u" && (window.__panelSingletonManager__ = D);
+//#endregion
+//#region ../cesiumBase/src/components/FunctionPanelUIBase.vue
+var O = typeof window < "u" && window.__panelSingletonManager__ || D, k = {
 	name: "FunctionPanelUIBase",
-	mixins: [T],
+	mixins: [w],
 	emits: [
 		"close",
 		"minimize",
@@ -706,11 +704,11 @@ var T = /*#__PURE__*/ x(S, [["render", w]]), E = new class {
 			this.isClosed = !1, console.log(`[FunctionPanelUIBase] ✅ 多实例面板默认显示: ${this.effectiveRegistrationKey} #${this.panelInstanceId}, isClosed: ${e} -> ${this.isClosed}`);
 		} else {
 			let e = this.effectiveRegistrationKey;
-			if (E.hasPanel(e)) {
-				let t = E.getPanel(e);
+			if (O.hasPanel(e)) {
+				let t = O.getPanel(e);
 				if (t) {
 					let n = this.isClosed;
-					this.isClosed = t.isClosed, console.log(`[FunctionPanelUIBase] 🔓 从 PanelSingletonManager 同步面板状态: ${e}, isClosed: ${n} -> ${this.isClosed}`);
+					this.isClosed = t.isClosed, console.log(`[FunctionPanelUIBase] 🔓 从 PanelSingletonManager 同步面板状态: ${e}, isClosed: ${n} -> ${this.isClosed}`), t.visible && this.isClosed && (console.log(`[FunctionPanelUIBase] ⚠️ 发现状态不一致: visible=${t.visible} 但 isClosed=${this.isClosed}，强制修正`), this.isClosed = !1, console.log("[FunctionPanelUIBase] ✅ 强制修正 isClosed: true -> false"));
 				}
 			} else {
 				let t = this.isClosed, n = this.getInstanceConfig(), r = n ? n.visible !== !1 : !0;
@@ -725,7 +723,7 @@ var T = /*#__PURE__*/ x(S, [["render", w]]), E = new class {
 					console.log("[FunctionPanelUIBase] 📤 发送 lazy-load 事件"), this.$emit("lazy-load", { firstOpen: !0 });
 				})) : console.log(`[FunctionPanelUIBase] ⏭️ 跳过延迟加载: lazyLoad=${this.lazyLoad}, _contentLoaded=${this._contentLoaded}`)) : console.log("[FunctionPanelUIBase] ⏭️ 不触发延迟加载: 状态不是从关闭变为打开");
 			}
-		}, E.addEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener)), !this.isClosed && this.lazyLoad && !this._contentLoaded && (console.log(`[FunctionPanelUIBase] 🔍 面板初始状态为打开，触发延迟加载: ${this.effectiveRegistrationKey}`), this._contentLoaded = !0, this.$nextTick(() => {
+		}, O.addEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener)), !this.isClosed && this.lazyLoad && !this._contentLoaded && (console.log(`[FunctionPanelUIBase] 🔍 面板初始状态为打开，触发延迟加载: ${this.effectiveRegistrationKey}`), this._contentLoaded = !0, this.$nextTick(() => {
 			console.log("[FunctionPanelUIBase] 📤 发送 lazy-load 事件（初始状态）"), this.$emit("lazy-load", { firstOpen: !0 });
 		})), this.initCesium(() => {
 			this.$nextTick(() => {
@@ -736,7 +734,7 @@ var T = /*#__PURE__*/ x(S, [["render", w]]), E = new class {
 		}), this.boundHandleKeydown = this.handleKeydown.bind(this), document.addEventListener("keydown", this.boundHandleKeydown);
 	},
 	beforeUnmount() {
-		this.autoRegister && this.effectiveRegistrationKey && this.unregisterFromParent(), this.boundMouseMove && (document.removeEventListener("mousemove", this.boundMouseMove), document.removeEventListener("mouseup", this.boundHandleMouseUp)), this.boundHandleKeydown && document.removeEventListener("keydown", this.boundHandleKeydown), this.panelInstanceId === null && this._panelStateChangeListener && E.removeEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener), this.cleanup();
+		this.autoRegister && this.effectiveRegistrationKey && this.unregisterFromParent(), this.boundMouseMove && (document.removeEventListener("mousemove", this.boundMouseMove), document.removeEventListener("mouseup", this.boundHandleMouseUp)), this.boundHandleKeydown && document.removeEventListener("keydown", this.boundHandleKeydown), this.panelInstanceId === null && this._panelStateChangeListener && O.removeEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener), this.cleanup();
 	},
 	methods: {
 		getInstanceConfig() {
@@ -774,9 +772,9 @@ var T = /*#__PURE__*/ x(S, [["render", w]]), E = new class {
 				let e = this.getInstanceConfig(), t = {
 					...this.$props,
 					...e?.position || {}
-				}, n = !1, r = window.panelSingletonManager || window.__panelSingletonManager__;
-				if (r) {
-					let t = r.getPanel(this.effectiveRegistrationKey);
+				}, n = !1;
+				if (O) {
+					let t = O.getPanel(this.effectiveRegistrationKey);
 					console.log(`[FunctionPanelUIBase] 🔍 检查面板 ${this.effectiveRegistrationKey}:`, {
 						existingPanel: t ? {
 							visible: t.visible,
@@ -807,47 +805,52 @@ var T = /*#__PURE__*/ x(S, [["render", w]]), E = new class {
 				this.$emit("unregister-panel", { key: this.effectiveRegistrationKey }), console.log(`[FunctionPanelUIBase] ${this.effectiveRegistrationKey} 已通过事件注销`);
 			}
 		},
-		initPosition() {
-			let e = this.$refs.panelRef, t = !!e, n = this.isClosed;
+		initPosition(e = 0) {
+			let t = this.$refs.panelRef, n = !!t, r = this.isClosed;
 			if (console.log(`[FunctionPanelUIBase] 🔧 初始化面板位置: ${this.effectiveRegistrationKey} #${this.panelInstanceId || "singleton"}`, {
 				initialX: this.initialX,
 				initialY: this.initialY,
 				currentX: this.x,
 				currentY: this.y,
-				panelRef: t,
-				panelRefElement: e ? e.tagName : "N/A",
-				isClosed: n,
+				panelRef: n,
+				panelRefElement: t ? t.tagName : "N/A",
+				isClosed: r,
 				windowInnerWidth: window.innerWidth,
 				windowInnerHeight: window.innerHeight,
-				panelWidth: this.width
-			}), n) {
+				panelWidth: this.width,
+				retryCount: e
+			}), r) {
 				console.log("[FunctionPanelUIBase] ⏸️ 面板已关闭，跳过位置初始化，等待面板打开");
 				return;
 			}
-			if (!t) {
-				console.warn("[FunctionPanelUIBase] ⚠️ panelRef 还不存在，延迟初始化位置"), this.$nextTick(() => {
-					this.initPosition();
-				});
+			if (!n) {
+				if (e >= 10) {
+					console.error(`[FunctionPanelUIBase] ❌ panelRef 初始化超时，放弃初始化位置: ${this.effectiveRegistrationKey}`);
+					return;
+				}
+				console.warn(`[FunctionPanelUIBase] ⚠️ panelRef 还不存在，延迟初始化位置（重试 ${e + 1}/10）`), setTimeout(() => {
+					this.initPosition(e + 1);
+				}, 100);
 				return;
 			}
-			let r = this.initialX;
-			if (r === "center") {
+			let i = this.initialX;
+			if (i === "center") {
 				let e = this.$refs.panelRef, t = e ? e.offsetWidth : this.width;
-				r = Math.round((window.innerWidth - t) / 2), console.log("[FunctionPanelUIBase] 📍 居中计算:", {
+				i = Math.round((window.innerWidth - t) / 2), console.log("[FunctionPanelUIBase] 📍 居中计算:", {
 					panelWidth: t,
-					calculatedX: r
+					calculatedX: i
 				});
-			} else if (r === "right") {
+			} else if (i === "right") {
 				let e = this.$refs.panelRef, t = e ? e.offsetWidth : this.width, n = Math.max(20, t / 2);
-				r = Math.round(window.innerWidth - t - n), console.log("[FunctionPanelUIBase] 📍 右侧对齐计算:", {
+				i = Math.round(window.innerWidth - t - n), console.log("[FunctionPanelUIBase] 📍 右侧对齐计算:", {
 					panelWidth: t,
 					windowInnerWidth: window.innerWidth,
 					rightMargin: n,
-					calculatedX: r
+					calculatedX: i
 				});
-			} else typeof r != "number" && (r = 20, console.log("[FunctionPanelUIBase] 📍 使用默认 x 值: 20"));
-			let i = window.innerWidth - this.width - 20;
-			r = Math.max(20, Math.min(r, i)), this.x = r, this.y = Math.max(20, Math.min(this.initialY, window.innerHeight - 100)), console.log(`[FunctionPanelUIBase] ✅ 面板位置已设置: ${this.effectiveRegistrationKey} #${this.panelInstanceId || "singleton"}`, {
+			} else typeof i != "number" && (i = 20, console.log("[FunctionPanelUIBase] 📍 使用默认 x 值: 20"));
+			let a = window.innerWidth - this.width - 20;
+			i = Math.max(20, Math.min(i, a)), this.x = i, this.y = Math.max(20, Math.min(this.initialY, window.innerHeight - 100)), console.log(`[FunctionPanelUIBase] ✅ 面板位置已设置: ${this.effectiveRegistrationKey} #${this.panelInstanceId || "singleton"}`, {
 				x: this.x,
 				y: this.y,
 				transform: `translate(${this.x}px, ${this.y}px)`
@@ -890,7 +893,7 @@ var T = /*#__PURE__*/ x(S, [["render", w]]), E = new class {
 		close() {
 			let e = this.panelInstanceId || null, t = this.autoRegister && this.registrationKey && !e, n = !t && e !== null;
 			if (t) {
-				if (console.log(`[FunctionPanelUIBase] 🔄 面板假关闭（单例模式）: ${this.effectiveRegistrationKey}`), this.isClosed = !0, this.cleanup && typeof this.cleanup == "function" && this.cleanup(), E.updatePanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已通过 PanelSingletonManager 更新面板 ${this.effectiveRegistrationKey} 可见性为 false`), this.setPanelVisible && typeof this.setPanelVisible == "function") this.setPanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false`);
+				if (console.log(`[FunctionPanelUIBase] 🔄 面板假关闭（单例模式）: ${this.effectiveRegistrationKey}`), this.isClosed = !0, this.cleanup && typeof this.cleanup == "function" && this.cleanup(), O.updatePanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已通过 PanelSingletonManager 更新面板 ${this.effectiveRegistrationKey} 可见性为 false`), this.setPanelVisible && typeof this.setPanelVisible == "function") this.setPanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false`);
 				else if (this.getRegisteredPanels && typeof this.getRegisteredPanels == "function") {
 					let e = this.getRegisteredPanels();
 					e && e[this.effectiveRegistrationKey] && (e[this.effectiveRegistrationKey].visible = !1, console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false（直接修改）`));
@@ -954,51 +957,51 @@ var T = /*#__PURE__*/ x(S, [["render", w]]), E = new class {
 			e.key === "Escape" && this.close();
 		}
 	}
-}, O = { class: "header-left" }, k = { class: "panel-title" }, A = { class: "header-controls" }, j = ["aria-label"], M = {
+}, A = { class: "header-left" }, j = { class: "panel-title" }, M = { class: "header-controls" }, N = ["aria-label"], P = {
 	width: "14",
 	height: "14",
 	viewBox: "0 0 14 14",
 	fill: "none"
-}, N = {
+}, F = {
 	key: 0,
 	d: "M2 7H12",
 	stroke: "currentColor",
 	"stroke-width": "2",
 	"stroke-linecap": "round"
-}, P = {
+}, I = {
 	key: 1,
 	d: "M7 2V12M2 7H12",
 	stroke: "currentColor",
 	"stroke-width": "2",
 	"stroke-linecap": "round"
-}, F = ["aria-label"], I = ["title"], L = { class: "fab-icon" }, R = { class: "fab-text" };
-function z(e, s, f, m, b, x) {
+}, L = ["aria-label"], R = ["title"], z = { class: "fab-icon" }, B = { class: "fab-text" };
+function te(e, s, f, ee, y, b) {
 	return d(), r(t, { to: "body" }, [c(n, { name: "panel-fade" }, {
-		default: _(() => [b.isClosed ? i("", !0) : (d(), a("div", {
+		default: g(() => [y.isClosed ? i("", !0) : (d(), a("div", {
 			key: 0,
 			class: l(["function-panel", {
-				"is-dragging": b.isDragging,
-				"is-minimized": b.isMinimized,
+				"is-dragging": y.isDragging,
+				"is-minimized": y.isMinimized,
 				"blur-enabled": f.enableBackdropFilter && f.enableBlur
 			}]),
-			style: u(x.panelStyles),
+			style: u(b.panelStyles),
 			ref: "panelRef",
-			onMousedown: s[3] ||= (...e) => x.onPanelMouseDown && x.onPanelMouseDown(...e)
+			onMousedown: s[3] ||= (...e) => b.onPanelMouseDown && b.onPanelMouseDown(...e)
 		}, [o("div", {
 			class: "panel-header",
-			onMousedown: s[2] ||= (...e) => x.onHeaderMouseDown && x.onHeaderMouseDown(...e)
-		}, [o("div", O, [s[5] ||= o("div", { class: "drag-indicator" }, [
+			onMousedown: s[2] ||= (...e) => b.onHeaderMouseDown && b.onHeaderMouseDown(...e)
+		}, [o("div", A, [s[5] ||= o("div", { class: "drag-indicator" }, [
 			o("span", { class: "grip-dot" }),
 			o("span", { class: "grip-dot" }),
 			o("span", { class: "grip-dot" })
-		], -1), p(e.$slots, "header", {}, () => [o("h3", k, h(f.title), 1)], !0)]), o("div", A, [f.allowMinimize ? (d(), a("button", {
+		], -1), p(e.$slots, "header", {}, () => [o("h3", j, m(f.title), 1)], !0)]), o("div", M, [f.allowMinimize ? (d(), a("button", {
 			key: 0,
-			onClick: s[0] ||= y((...e) => x.toggleMinimize && x.toggleMinimize(...e), ["stop"]),
+			onClick: s[0] ||= v((...e) => b.toggleMinimize && b.toggleMinimize(...e), ["stop"]),
 			class: "icon-btn minimize-btn",
 			type: "button",
-			"aria-label": b.isMinimized ? "展开" : "最小化"
-		}, [(d(), a("svg", M, [b.isMinimized ? (d(), a("path", P)) : (d(), a("path", N))]))], 8, j)) : i("", !0), o("button", {
-			onClick: s[1] ||= y((...e) => x.close && x.close(...e), ["stop"]),
+			"aria-label": y.isMinimized ? "展开" : "最小化"
+		}, [(d(), a("svg", P, [y.isMinimized ? (d(), a("path", I)) : (d(), a("path", F))]))], 8, N)) : i("", !0), o("button", {
+			onClick: s[1] ||= v((...e) => b.close && b.close(...e), ["stop"]),
 			class: "icon-btn close-btn",
 			type: "button",
 			"aria-label": f.closeTooltip
@@ -1012,36 +1015,36 @@ function z(e, s, f, m, b, x) {
 			stroke: "currentColor",
 			"stroke-width": "2",
 			"stroke-linecap": "round"
-		})], -1)]], 8, F)])], 32), c(n, { name: "content-slide" }, {
-			default: _(() => [v(o("div", {
+		})], -1)]], 8, L)])], 32), c(n, { name: "content-slide" }, {
+			default: g(() => [_(o("div", {
 				class: "panel-body",
-				style: u(x.bodyStyles)
+				style: u(b.bodyStyles)
 			}, [p(e.$slots, "default", {
-				isClosed: b.isClosed,
+				isClosed: y.isClosed,
 				panelInstanceId: f.panelInstanceId,
-				isSingleton: x.isSingletonByConfig
-			}, void 0, !0)], 4), [[g, !b.isMinimized]])]),
+				isSingleton: b.isSingletonByConfig
+			}, void 0, !0)], 4), [[h, !y.isMinimized]])]),
 			_: 3
 		})], 38))]),
 		_: 3
 	}), c(n, { name: "fab-fade" }, {
-		default: _(() => [!b.isClosed && b.isMinimized ? (d(), a("button", {
+		default: g(() => [!y.isClosed && y.isMinimized ? (d(), a("button", {
 			key: 0,
 			class: "panel-fab",
 			type: "button",
-			style: u(x.fabStyles),
-			onClick: s[4] ||= (...e) => x.toggleMinimize && x.toggleMinimize(...e),
+			style: u(b.fabStyles),
+			onClick: s[4] ||= (...e) => b.toggleMinimize && b.toggleMinimize(...e),
 			title: f.title
-		}, [o("span", L, h(f.titleIcon || "⚙️"), 1), o("span", R, h(f.title), 1)], 12, I)) : i("", !0)]),
+		}, [o("span", z, m(f.titleIcon || "⚙️"), 1), o("span", B, m(f.title), 1)], 12, R)) : i("", !0)]),
 		_: 1
 	})]);
 }
 //#endregion
 //#region ../cesiumBase/src/components/functions/ObliqueHeightAdjustPanel.vue
-var ee = {
+var V = {
 	name: "ObliqueHeightAdjustPanel",
-	components: { FunctionPanelUIBase: /* @__PURE__ */ x(D, [["render", z], ["__scopeId", "data-v-fa8a4c38"]]) },
-	mixins: [T],
+	components: { FunctionPanelUIBase: /* @__PURE__ */ b(k, [["render", te], ["__scopeId", "data-v-2ca14fbb"]]) },
+	mixins: [w],
 	props: {
 		registrationKey: {
 			type: String,
@@ -1161,17 +1164,17 @@ var ee = {
 			});
 		}
 	}
-}, B = {
+}, H = {
 	key: 0,
 	class: "recommended-offset-banner"
-}, V = { class: "banner-content" }, H = { class: "banner-text" }, U = { class: "banner-suggestion" }, W = { class: "highlight" }, G = ["disabled"], K = { class: "current-height-card" }, q = { class: "height-value" }, J = { class: "value" }, Y = { class: "adjustment-section" }, X = { class: "slider-container" }, Z = ["value"], Q = { class: "precise-input-section" }, $ = { class: "input-group" }, te = ["value"], ne = { class: "preset-section" }, re = { class: "preset-grid" }, ie = ["onClick"], ae = {
+}, U = { class: "banner-content" }, W = { class: "banner-text" }, G = { class: "banner-suggestion" }, K = { class: "highlight" }, q = ["disabled"], J = { class: "current-height-card" }, Y = { class: "height-value" }, X = { class: "value" }, Z = { class: "adjustment-section" }, Q = { class: "slider-container" }, ne = ["value"], re = { class: "precise-input-section" }, ie = { class: "input-group" }, ae = ["value"], oe = { class: "preset-section" }, $ = { class: "preset-grid" }, se = ["onClick"], ce = {
 	key: 1,
 	class: "empty-state"
 };
-function oe(t, n, c, u, p, g) {
-	let v = m("FunctionPanelUIBase");
-	return d(), r(v, {
-		title: g.panelTitle,
+function le(t, n, c, u, p, h) {
+	let _ = ee("FunctionPanelUIBase");
+	return d(), r(_, {
+		title: h.panelTitle,
 		"title-icon": "🌏",
 		width: 360,
 		"max-height": "70vh",
@@ -1182,12 +1185,12 @@ function oe(t, n, c, u, p, g) {
 		"auto-register": c.autoRegister === void 0 ? !1 : c.autoRegister,
 		"registration-key": c.registrationKey || "ObliqueHeightAdjustPanel",
 		"panel-instance-id": c.panelInstanceId,
-		onClose: g.handleClose,
-		onMinimize: g.handleMinimize,
-		onExpand: g.handleExpand
+		onClose: h.handleClose,
+		onMinimize: h.handleMinimize,
+		onExpand: h.handleExpand
 	}, {
-		default: _(() => [c.selectedLayer ? (d(), a(e, { key: 0 }, [
-			c.selectedLayer.loaded && c.selectedLayer.recommendedOffset !== void 0 && c.selectedLayer.recommendedOffset !== null ? (d(), a("div", B, [o("div", V, [
+		default: g(() => [c.selectedLayer ? (d(), a(e, { key: 0 }, [
+			c.selectedLayer.loaded && c.selectedLayer.recommendedOffset !== void 0 && c.selectedLayer.recommendedOffset !== null ? (d(), a("div", H, [o("div", U, [
 				n[8] ||= o("svg", {
 					class: "banner-icon",
 					viewBox: "0 0 24 24",
@@ -1199,18 +1202,18 @@ function oe(t, n, c, u, p, g) {
 					"stroke-linecap": "round",
 					"stroke-linejoin": "round"
 				})], -1),
-				o("div", H, [n[7] ||= o("div", { class: "banner-main" }, "检测到倾斜摄影地形高度较低", -1), o("div", U, [
+				o("div", W, [n[7] ||= o("div", { class: "banner-main" }, "检测到倾斜摄影地形高度较低", -1), o("div", G, [
 					n[5] ||= s(" 建议向上偏移 ", -1),
-					o("span", W, h(c.selectedLayer.recommendedOffset.toFixed(1)) + " 米", 1),
+					o("span", K, m(c.selectedLayer.recommendedOffset.toFixed(1)) + " 米", 1),
 					n[6] ||= s(" 以与大坐标模型底部对齐 ", -1)
 				])]),
 				o("button", {
-					onClick: n[0] ||= (...e) => g.applyRecommendedOffset && g.applyRecommendedOffset(...e),
+					onClick: n[0] ||= (...e) => h.applyRecommendedOffset && h.applyRecommendedOffset(...e),
 					class: "apply-recommended-btn",
 					disabled: Math.abs(c.selectedLayer.heightOffset - c.selectedLayer.recommendedOffset) < .1
-				}, h(Math.abs(c.selectedLayer.heightOffset - c.selectedLayer.recommendedOffset) < .1 ? "已应用" : "应用推荐值"), 9, G)
+				}, m(Math.abs(c.selectedLayer.heightOffset - c.selectedLayer.recommendedOffset) < .1 ? "已应用" : "应用推荐值"), 9, q)
 			])])) : i("", !0),
-			o("div", K, [n[10] ||= o("div", { class: "card-header" }, [o("h4", { class: "card-title" }, "当前高度偏移"), o("span", {
+			o("div", J, [n[10] ||= o("div", { class: "card-header" }, [o("h4", { class: "card-title" }, "当前高度偏移"), o("span", {
 				class: "hint-icon",
 				title: "调整倾斜摄影的整体高度，正值向上，负值向下"
 			}, [o("svg", {
@@ -1225,29 +1228,29 @@ function oe(t, n, c, u, p, g) {
 			}), o("path", {
 				d: "M12 16v-4M12 8h.01",
 				"stroke-linecap": "round"
-			})])])], -1), o("div", q, [o("span", J, h((c.selectedLayer.heightOffset || 0).toFixed(2)), 1), n[9] ||= o("span", { class: "unit" }, "米", -1)])]),
-			o("div", Y, [
+			})])])], -1), o("div", Y, [o("span", X, m((c.selectedLayer.heightOffset || 0).toFixed(2)), 1), n[9] ||= o("span", { class: "unit" }, "米", -1)])]),
+			o("div", Z, [
 				n[12] ||= o("div", { class: "section-label" }, [o("span", null, "调整偏移"), o("span", { class: "range-hint" }, "-2000m ~ +2000m")], -1),
-				o("div", X, [o("input", {
+				o("div", Q, [o("input", {
 					type: "range",
 					min: "-2000",
 					max: "2000",
 					step: "1",
 					value: c.selectedLayer.heightOffset || 0,
-					onInput: n[1] ||= (...e) => g.onHeightSliderInput && g.onHeightSliderInput(...e),
-					onChange: n[2] ||= (...e) => g.onHeightSliderChange && g.onHeightSliderChange(...e),
+					onInput: n[1] ||= (...e) => h.onHeightSliderInput && h.onHeightSliderInput(...e),
+					onChange: n[2] ||= (...e) => h.onHeightSliderChange && h.onHeightSliderChange(...e),
 					class: "height-slider"
-				}, null, 40, Z), n[11] ||= o("div", { class: "slider-track-fill" }, null, -1)]),
+				}, null, 40, ne), n[11] ||= o("div", { class: "slider-track-fill" }, null, -1)]),
 				n[13] ||= o("div", { class: "usage-hint" }, "调整后使倾斜摄影与大坐标模型高度对齐", -1)
 			]),
-			o("div", Q, [n[15] ||= o("label", { class: "input-label" }, "精确设置偏移（米）", -1), o("div", $, [o("input", {
+			o("div", re, [n[15] ||= o("label", { class: "input-label" }, "精确设置偏移（米）", -1), o("div", ie, [o("input", {
 				type: "number",
 				value: c.selectedLayer.heightOffset || 0,
-				onChange: n[3] ||= (...e) => g.onHeightInputChange && g.onHeightInputChange(...e),
+				onChange: n[3] ||= (...e) => h.onHeightInputChange && h.onHeightInputChange(...e),
 				class: "number-input",
 				step: "0.1"
-			}, null, 40, te), o("button", {
-				onClick: n[4] ||= (...e) => g.resetToZero && g.resetToZero(...e),
+			}, null, 40, ae), o("button", {
+				onClick: n[4] ||= (...e) => h.resetToZero && h.resetToZero(...e),
 				class: "reset-btn",
 				title: "重置为0"
 			}, [...n[14] ||= [o("svg", {
@@ -1260,12 +1263,12 @@ function oe(t, n, c, u, p, g) {
 				"stroke-linecap": "round",
 				"stroke-linejoin": "round"
 			})], -1), s(" 重置 ", -1)]])])]),
-			o("div", ne, [n[16] ||= o("div", { class: "section-label" }, "快捷预设", -1), o("div", re, [(d(!0), a(e, null, f(p.presets, (e) => (d(), a("button", {
+			o("div", oe, [n[16] ||= o("div", { class: "section-label" }, "快捷预设", -1), o("div", $, [(d(!0), a(e, null, f(p.presets, (e) => (d(), a("button", {
 				key: e.value,
-				onClick: (t) => g.applyPreset(e.value),
+				onClick: (t) => h.applyPreset(e.value),
 				class: l(["preset-btn", { active: Math.abs(c.selectedLayer.heightOffset - e.value) < .1 }])
-			}, h(e.label), 11, ie))), 128))])])
-		], 64)) : (d(), a("div", ae, [...n[17] ||= [o("svg", {
+			}, m(e.label), 11, se))), 128))])])
+		], 64)) : (d(), a("div", ce, [...n[17] ||= [o("svg", {
 			class: "empty-icon",
 			viewBox: "0 0 24 24",
 			fill: "none",
@@ -1289,6 +1292,6 @@ function oe(t, n, c, u, p, g) {
 		"onExpand"
 	]);
 }
-var se = /*#__PURE__*/ x(ee, [["render", oe], ["__scopeId", "data-v-80456ab5"]]);
+var ue = /*#__PURE__*/ b(V, [["render", le], ["__scopeId", "data-v-80456ab5"]]);
 //#endregion
-export { se as default };
+export { ue as default };

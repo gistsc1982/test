@@ -265,10 +265,10 @@ var E = (e, t) => {
 	class: "sfc-base",
 	style: { display: "none" }
 };
-function D(e, t, n, r, i, o) {
+function ne(e, t, n, r, i, o) {
 	return p(), a("div", te);
 }
-var O = /*#__PURE__*/ E(ee, [["render", D]]), k = new class {
+var D = /*#__PURE__*/ E(ee, [["render", ne]]), O = class {
 	constructor() {
 		this.panelStates = /* @__PURE__ */ new Map(), this.cesiumObjects = /* @__PURE__ */ new Map(), this.panelVisibility = /* @__PURE__ */ new Map(), this.panelRegistry = /* @__PURE__ */ new Map(), this.eventListeners = /* @__PURE__ */ new Map(), this.mjsContainers = /* @__PURE__ */ new Map(), console.log("[PanelSingletonManager] 初始化完成");
 	}
@@ -382,18 +382,12 @@ var O = /*#__PURE__*/ E(ee, [["render", D]]), k = new class {
 			return;
 		}
 		let n = this.panelRegistry.get(e);
-		if (n) {
-			if (n.visible = t, n._visibilityExplicitlySet = !0, t ? n.isClosed = !1 : n.isClosed = !0, console.log(`[PanelSingletonManager] 🔄 更新面板可见性: ${e} = ${t}, isClosed = ${n.isClosed}`), n.component && typeof n.component == "object") {
-				let t = n.component.isClosed;
-				n.component.isClosed = n.isClosed, console.log(`[PanelSingletonManager] 🔧 直接更新组件 isClosed: ${t} -> ${n.component.isClosed}`), n.component.$forceUpdate && typeof n.component.$forceUpdate == "function" && (n.component.$forceUpdate(), console.log(`[PanelSingletonManager] ✅ 强制重新渲染面板组件: ${e}`));
-			}
-			this.emitEvent(e, {
-				type: "visibleChange",
-				panelName: e,
-				visible: t,
-				isClosed: n.isClosed
-			});
-		} else console.warn(`[PanelSingletonManager] ⚠️ 面板 ${e} 未注册，无法更新可见性`);
+		n ? (n.visible = t, n._visibilityExplicitlySet = !0, t ? n.isClosed = !1 : n.isClosed = !0, console.log(`[PanelSingletonManager] 🔄 更新面板可见性: ${e} = ${t}, isClosed = ${n.isClosed}`), this.emitEvent(e, {
+			type: "visibleChange",
+			panelName: e,
+			visible: t,
+			isClosed: n.isClosed
+		})) : console.warn(`[PanelSingletonManager] ⚠️ 面板 ${e} 未注册，无法更新可见性`);
 	}
 	getPanelVisible(e) {
 		let t = this.panelRegistry.get(e);
@@ -495,9 +489,13 @@ var O = /*#__PURE__*/ E(ee, [["render", D]]), k = new class {
 			}
 		});
 	}
-}(), ne = {
+}, k = typeof window < "u" && window.__panelSingletonManager__, A = k || new O();
+!k && typeof window < "u" && (window.__panelSingletonManager__ = A);
+//#endregion
+//#region ../cesiumBase/src/components/FunctionPanelUIBase.vue
+var j = typeof window < "u" && window.__panelSingletonManager__ || A, re = {
 	name: "FunctionPanelUIBase",
-	mixins: [O],
+	mixins: [D],
 	emits: [
 		"close",
 		"minimize",
@@ -706,11 +704,11 @@ var O = /*#__PURE__*/ E(ee, [["render", D]]), k = new class {
 			this.isClosed = !1, console.log(`[FunctionPanelUIBase] ✅ 多实例面板默认显示: ${this.effectiveRegistrationKey} #${this.panelInstanceId}, isClosed: ${e} -> ${this.isClosed}`);
 		} else {
 			let e = this.effectiveRegistrationKey;
-			if (k.hasPanel(e)) {
-				let t = k.getPanel(e);
+			if (j.hasPanel(e)) {
+				let t = j.getPanel(e);
 				if (t) {
 					let n = this.isClosed;
-					this.isClosed = t.isClosed, console.log(`[FunctionPanelUIBase] 🔓 从 PanelSingletonManager 同步面板状态: ${e}, isClosed: ${n} -> ${this.isClosed}`);
+					this.isClosed = t.isClosed, console.log(`[FunctionPanelUIBase] 🔓 从 PanelSingletonManager 同步面板状态: ${e}, isClosed: ${n} -> ${this.isClosed}`), t.visible && this.isClosed && (console.log(`[FunctionPanelUIBase] ⚠️ 发现状态不一致: visible=${t.visible} 但 isClosed=${this.isClosed}，强制修正`), this.isClosed = !1, console.log("[FunctionPanelUIBase] ✅ 强制修正 isClosed: true -> false"));
 				}
 			} else {
 				let t = this.isClosed, n = this.getInstanceConfig(), r = n ? n.visible !== !1 : !0;
@@ -725,7 +723,7 @@ var O = /*#__PURE__*/ E(ee, [["render", D]]), k = new class {
 					console.log("[FunctionPanelUIBase] 📤 发送 lazy-load 事件"), this.$emit("lazy-load", { firstOpen: !0 });
 				})) : console.log(`[FunctionPanelUIBase] ⏭️ 跳过延迟加载: lazyLoad=${this.lazyLoad}, _contentLoaded=${this._contentLoaded}`)) : console.log("[FunctionPanelUIBase] ⏭️ 不触发延迟加载: 状态不是从关闭变为打开");
 			}
-		}, k.addEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener)), !this.isClosed && this.lazyLoad && !this._contentLoaded && (console.log(`[FunctionPanelUIBase] 🔍 面板初始状态为打开，触发延迟加载: ${this.effectiveRegistrationKey}`), this._contentLoaded = !0, this.$nextTick(() => {
+		}, j.addEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener)), !this.isClosed && this.lazyLoad && !this._contentLoaded && (console.log(`[FunctionPanelUIBase] 🔍 面板初始状态为打开，触发延迟加载: ${this.effectiveRegistrationKey}`), this._contentLoaded = !0, this.$nextTick(() => {
 			console.log("[FunctionPanelUIBase] 📤 发送 lazy-load 事件（初始状态）"), this.$emit("lazy-load", { firstOpen: !0 });
 		})), this.initCesium(() => {
 			this.$nextTick(() => {
@@ -736,7 +734,7 @@ var O = /*#__PURE__*/ E(ee, [["render", D]]), k = new class {
 		}), this.boundHandleKeydown = this.handleKeydown.bind(this), document.addEventListener("keydown", this.boundHandleKeydown);
 	},
 	beforeUnmount() {
-		this.autoRegister && this.effectiveRegistrationKey && this.unregisterFromParent(), this.boundMouseMove && (document.removeEventListener("mousemove", this.boundMouseMove), document.removeEventListener("mouseup", this.boundHandleMouseUp)), this.boundHandleKeydown && document.removeEventListener("keydown", this.boundHandleKeydown), this.panelInstanceId === null && this._panelStateChangeListener && k.removeEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener), this.cleanup();
+		this.autoRegister && this.effectiveRegistrationKey && this.unregisterFromParent(), this.boundMouseMove && (document.removeEventListener("mousemove", this.boundMouseMove), document.removeEventListener("mouseup", this.boundHandleMouseUp)), this.boundHandleKeydown && document.removeEventListener("keydown", this.boundHandleKeydown), this.panelInstanceId === null && this._panelStateChangeListener && j.removeEventListener(this.effectiveRegistrationKey, this._panelStateChangeListener), this.cleanup();
 	},
 	methods: {
 		getInstanceConfig() {
@@ -774,9 +772,9 @@ var O = /*#__PURE__*/ E(ee, [["render", D]]), k = new class {
 				let e = this.getInstanceConfig(), t = {
 					...this.$props,
 					...e?.position || {}
-				}, n = !1, r = window.panelSingletonManager || window.__panelSingletonManager__;
-				if (r) {
-					let t = r.getPanel(this.effectiveRegistrationKey);
+				}, n = !1;
+				if (j) {
+					let t = j.getPanel(this.effectiveRegistrationKey);
 					console.log(`[FunctionPanelUIBase] 🔍 检查面板 ${this.effectiveRegistrationKey}:`, {
 						existingPanel: t ? {
 							visible: t.visible,
@@ -807,47 +805,52 @@ var O = /*#__PURE__*/ E(ee, [["render", D]]), k = new class {
 				this.$emit("unregister-panel", { key: this.effectiveRegistrationKey }), console.log(`[FunctionPanelUIBase] ${this.effectiveRegistrationKey} 已通过事件注销`);
 			}
 		},
-		initPosition() {
-			let e = this.$refs.panelRef, t = !!e, n = this.isClosed;
+		initPosition(e = 0) {
+			let t = this.$refs.panelRef, n = !!t, r = this.isClosed;
 			if (console.log(`[FunctionPanelUIBase] 🔧 初始化面板位置: ${this.effectiveRegistrationKey} #${this.panelInstanceId || "singleton"}`, {
 				initialX: this.initialX,
 				initialY: this.initialY,
 				currentX: this.x,
 				currentY: this.y,
-				panelRef: t,
-				panelRefElement: e ? e.tagName : "N/A",
-				isClosed: n,
+				panelRef: n,
+				panelRefElement: t ? t.tagName : "N/A",
+				isClosed: r,
 				windowInnerWidth: window.innerWidth,
 				windowInnerHeight: window.innerHeight,
-				panelWidth: this.width
-			}), n) {
+				panelWidth: this.width,
+				retryCount: e
+			}), r) {
 				console.log("[FunctionPanelUIBase] ⏸️ 面板已关闭，跳过位置初始化，等待面板打开");
 				return;
 			}
-			if (!t) {
-				console.warn("[FunctionPanelUIBase] ⚠️ panelRef 还不存在，延迟初始化位置"), this.$nextTick(() => {
-					this.initPosition();
-				});
+			if (!n) {
+				if (e >= 10) {
+					console.error(`[FunctionPanelUIBase] ❌ panelRef 初始化超时，放弃初始化位置: ${this.effectiveRegistrationKey}`);
+					return;
+				}
+				console.warn(`[FunctionPanelUIBase] ⚠️ panelRef 还不存在，延迟初始化位置（重试 ${e + 1}/10）`), setTimeout(() => {
+					this.initPosition(e + 1);
+				}, 100);
 				return;
 			}
-			let r = this.initialX;
-			if (r === "center") {
+			let i = this.initialX;
+			if (i === "center") {
 				let e = this.$refs.panelRef, t = e ? e.offsetWidth : this.width;
-				r = Math.round((window.innerWidth - t) / 2), console.log("[FunctionPanelUIBase] 📍 居中计算:", {
+				i = Math.round((window.innerWidth - t) / 2), console.log("[FunctionPanelUIBase] 📍 居中计算:", {
 					panelWidth: t,
-					calculatedX: r
+					calculatedX: i
 				});
-			} else if (r === "right") {
+			} else if (i === "right") {
 				let e = this.$refs.panelRef, t = e ? e.offsetWidth : this.width, n = Math.max(20, t / 2);
-				r = Math.round(window.innerWidth - t - n), console.log("[FunctionPanelUIBase] 📍 右侧对齐计算:", {
+				i = Math.round(window.innerWidth - t - n), console.log("[FunctionPanelUIBase] 📍 右侧对齐计算:", {
 					panelWidth: t,
 					windowInnerWidth: window.innerWidth,
 					rightMargin: n,
-					calculatedX: r
+					calculatedX: i
 				});
-			} else typeof r != "number" && (r = 20, console.log("[FunctionPanelUIBase] 📍 使用默认 x 值: 20"));
-			let i = window.innerWidth - this.width - 20;
-			r = Math.max(20, Math.min(r, i)), this.x = r, this.y = Math.max(20, Math.min(this.initialY, window.innerHeight - 100)), console.log(`[FunctionPanelUIBase] ✅ 面板位置已设置: ${this.effectiveRegistrationKey} #${this.panelInstanceId || "singleton"}`, {
+			} else typeof i != "number" && (i = 20, console.log("[FunctionPanelUIBase] 📍 使用默认 x 值: 20"));
+			let a = window.innerWidth - this.width - 20;
+			i = Math.max(20, Math.min(i, a)), this.x = i, this.y = Math.max(20, Math.min(this.initialY, window.innerHeight - 100)), console.log(`[FunctionPanelUIBase] ✅ 面板位置已设置: ${this.effectiveRegistrationKey} #${this.panelInstanceId || "singleton"}`, {
 				x: this.x,
 				y: this.y,
 				transform: `translate(${this.x}px, ${this.y}px)`
@@ -890,7 +893,7 @@ var O = /*#__PURE__*/ E(ee, [["render", D]]), k = new class {
 		close() {
 			let e = this.panelInstanceId || null, t = this.autoRegister && this.registrationKey && !e, n = !t && e !== null;
 			if (t) {
-				if (console.log(`[FunctionPanelUIBase] 🔄 面板假关闭（单例模式）: ${this.effectiveRegistrationKey}`), this.isClosed = !0, this.cleanup && typeof this.cleanup == "function" && this.cleanup(), k.updatePanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已通过 PanelSingletonManager 更新面板 ${this.effectiveRegistrationKey} 可见性为 false`), this.setPanelVisible && typeof this.setPanelVisible == "function") this.setPanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false`);
+				if (console.log(`[FunctionPanelUIBase] 🔄 面板假关闭（单例模式）: ${this.effectiveRegistrationKey}`), this.isClosed = !0, this.cleanup && typeof this.cleanup == "function" && this.cleanup(), j.updatePanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已通过 PanelSingletonManager 更新面板 ${this.effectiveRegistrationKey} 可见性为 false`), this.setPanelVisible && typeof this.setPanelVisible == "function") this.setPanelVisible(this.effectiveRegistrationKey, !1), console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false`);
 				else if (this.getRegisteredPanels && typeof this.getRegisteredPanels == "function") {
 					let e = this.getRegisteredPanels();
 					e && e[this.effectiveRegistrationKey] && (e[this.effectiveRegistrationKey].visible = !1, console.log(`[FunctionPanelUIBase] ✅ 已设置面板 ${this.effectiveRegistrationKey} 可见性为 false（直接修改）`));
@@ -954,25 +957,25 @@ var O = /*#__PURE__*/ E(ee, [["render", D]]), k = new class {
 			e.key === "Escape" && this.close();
 		}
 	}
-}, re = { class: "header-left" }, ie = { class: "panel-title" }, A = { class: "header-controls" }, j = ["aria-label"], M = {
+}, ie = { class: "header-left" }, ae = { class: "panel-title" }, M = { class: "header-controls" }, N = ["aria-label"], P = {
 	width: "14",
 	height: "14",
 	viewBox: "0 0 14 14",
 	fill: "none"
-}, N = {
+}, F = {
 	key: 0,
 	d: "M2 7H12",
 	stroke: "currentColor",
 	"stroke-width": "2",
 	"stroke-linecap": "round"
-}, P = {
+}, I = {
 	key: 1,
 	d: "M7 2V12M2 7H12",
 	stroke: "currentColor",
 	"stroke-width": "2",
 	"stroke-linecap": "round"
-}, F = ["aria-label"], I = ["title"], L = { class: "fab-icon" }, R = { class: "fab-text" };
-function z(e, s, l, u, m, g) {
+}, L = ["aria-label"], R = ["title"], z = { class: "fab-icon" }, B = { class: "fab-text" };
+function V(e, s, l, u, m, g) {
 	return p(), r(t, { to: "body" }, [c(n, { name: "panel-fade" }, {
 		default: S(() => [m.isClosed ? i("", !0) : (p(), a("div", {
 			key: 0,
@@ -987,17 +990,17 @@ function z(e, s, l, u, m, g) {
 		}, [o("div", {
 			class: "panel-header",
 			onMousedown: s[2] ||= (...e) => g.onHeaderMouseDown && g.onHeaderMouseDown(...e)
-		}, [o("div", re, [s[5] ||= o("div", { class: "drag-indicator" }, [
+		}, [o("div", ie, [s[5] ||= o("div", { class: "drag-indicator" }, [
 			o("span", { class: "grip-dot" }),
 			o("span", { class: "grip-dot" }),
 			o("span", { class: "grip-dot" })
-		], -1), h(e.$slots, "header", {}, () => [o("h3", ie, v(l.title), 1)], !0)]), o("div", A, [l.allowMinimize ? (p(), a("button", {
+		], -1), h(e.$slots, "header", {}, () => [o("h3", ae, v(l.title), 1)], !0)]), o("div", M, [l.allowMinimize ? (p(), a("button", {
 			key: 0,
 			onClick: s[0] ||= w((...e) => g.toggleMinimize && g.toggleMinimize(...e), ["stop"]),
 			class: "icon-btn minimize-btn",
 			type: "button",
 			"aria-label": m.isMinimized ? "展开" : "最小化"
-		}, [(p(), a("svg", M, [m.isMinimized ? (p(), a("path", P)) : (p(), a("path", N))]))], 8, j)) : i("", !0), o("button", {
+		}, [(p(), a("svg", P, [m.isMinimized ? (p(), a("path", I)) : (p(), a("path", F))]))], 8, N)) : i("", !0), o("button", {
 			onClick: s[1] ||= w((...e) => g.close && g.close(...e), ["stop"]),
 			class: "icon-btn close-btn",
 			type: "button",
@@ -1012,7 +1015,7 @@ function z(e, s, l, u, m, g) {
 			stroke: "currentColor",
 			"stroke-width": "2",
 			"stroke-linecap": "round"
-		})], -1)]], 8, F)])], 32), c(n, { name: "content-slide" }, {
+		})], -1)]], 8, L)])], 32), c(n, { name: "content-slide" }, {
 			default: S(() => [C(o("div", {
 				class: "panel-body",
 				style: f(g.bodyStyles)
@@ -1032,13 +1035,13 @@ function z(e, s, l, u, m, g) {
 			style: f(g.fabStyles),
 			onClick: s[4] ||= (...e) => g.toggleMinimize && g.toggleMinimize(...e),
 			title: l.title
-		}, [o("span", L, v(l.titleIcon || "⚙️"), 1), o("span", R, v(l.title), 1)], 12, I)) : i("", !0)]),
+		}, [o("span", z, v(l.titleIcon || "⚙️"), 1), o("span", B, v(l.title), 1)], 12, R)) : i("", !0)]),
 		_: 1
 	})]);
 }
-var B = /*#__PURE__*/ E(ne, [["render", z], ["__scopeId", "data-v-fa8a4c38"]]), V = {
+var H = /*#__PURE__*/ E(re, [["render", V], ["__scopeId", "data-v-2ca14fbb"]]), U = {
 	name: "TestPanelModule",
-	components: { FunctionPanelUIBase: B },
+	components: { FunctionPanelUIBase: H },
 	inheritAttrs: !1,
 	emits: [
 		"close",
@@ -1156,8 +1159,8 @@ var B = /*#__PURE__*/ E(ne, [["render", z], ["__scopeId", "data-v-fa8a4c38"]]), 
 			this.count++;
 		}
 	}
-}, H = { class: "test-panel-content" }, U = { class: "demo-section" }, W = { class: "status-info" }, G = { class: "status-item" }, K = { class: "value" };
-function q(e, t, n, i, a, s) {
+}, W = { class: "test-panel-content" }, G = { class: "demo-section" }, K = { class: "status-info" }, q = { class: "status-item" }, J = { class: "value" };
+function oe(e, t, n, i, a, s) {
 	let c = g("FunctionPanelUIBase");
 	return p(), r(c, u(s.filteredAttrs, {
 		title: s.effectiveTitle,
@@ -1184,7 +1187,7 @@ function q(e, t, n, i, a, s) {
 			isClosed: n.isClosed,
 			panelInstanceId: n.panelInstanceId,
 			isSingleton: n.isSingleton
-		}, () => [o("div", H, [
+		}, () => [o("div", W, [
 			t[6] ||= o("div", { class: "section-title" }, "🎉 自动加载测试", -1),
 			t[7] ||= o("p", { class: "hint-text" }, " 这个面板是通过以下方式自动加载的： ", -1),
 			t[8] ||= o("ul", { class: "feature-list" }, [
@@ -1193,7 +1196,7 @@ function q(e, t, n, i, a, s) {
 				o("li", null, "✅ 设置 registration-key=\"TestPanelModule\""),
 				o("li", null, "✅ CesiumMain 自动导入并渲染")
 			], -1),
-			o("div", U, [
+			o("div", G, [
 				t[2] ||= o("div", { class: "section-label" }, "演示功能", -1),
 				o("button", {
 					onClick: t[0] ||= (...e) => s.showAlert && s.showAlert(...e),
@@ -1204,8 +1207,8 @@ function q(e, t, n, i, a, s) {
 					class: "demo-btn"
 				}, " 📊 计数器: " + v(a.count), 1)
 			]),
-			o("div", W, [
-				o("div", G, [t[3] ||= o("span", { class: "label" }, "组件名称:", -1), o("span", K, v(a.componentName), 1)]),
+			o("div", K, [
+				o("div", q, [t[3] ||= o("span", { class: "label" }, "组件名称:", -1), o("span", J, v(a.componentName), 1)]),
 				t[4] ||= o("div", { class: "status-item" }, [o("span", { class: "label" }, "注册状态:"), o("span", { class: "value success" }, "已注册 ✓")], -1),
 				t[5] ||= o("div", { class: "status-item" }, [o("span", { class: "label" }, "渲染方式:"), o("span", { class: "value" }, "动态组件")], -1)
 			])
@@ -1228,10 +1231,10 @@ function q(e, t, n, i, a, s) {
 		"onExpand"
 	]);
 }
-var J = /*#__PURE__*/ E(V, [["render", q], ["__scopeId", "data-v-9092d2be"]]), Y = {
+var se = /*#__PURE__*/ E(U, [["render", oe], ["__scopeId", "data-v-9092d2be"]]), ce = {
 	name: "ObliqueHeightAdjustPanel",
-	components: { FunctionPanelUIBase: B },
-	mixins: [O],
+	components: { FunctionPanelUIBase: H },
+	mixins: [D],
 	props: {
 		registrationKey: {
 			type: String,
@@ -1351,14 +1354,14 @@ var J = /*#__PURE__*/ E(V, [["render", q], ["__scopeId", "data-v-9092d2be"]]), Y
 			});
 		}
 	}
-}, ae = {
+}, le = {
 	key: 0,
 	class: "recommended-offset-banner"
-}, oe = { class: "banner-content" }, se = { class: "banner-text" }, ce = { class: "banner-suggestion" }, le = { class: "highlight" }, ue = ["disabled"], de = { class: "current-height-card" }, fe = { class: "height-value" }, pe = { class: "value" }, me = { class: "adjustment-section" }, he = { class: "slider-container" }, ge = ["value"], _e = { class: "precise-input-section" }, ve = { class: "input-group" }, ye = ["value"], be = { class: "preset-section" }, xe = { class: "preset-grid" }, Se = ["onClick"], Ce = {
+}, ue = { class: "banner-content" }, de = { class: "banner-text" }, fe = { class: "banner-suggestion" }, pe = { class: "highlight" }, me = ["disabled"], he = { class: "current-height-card" }, ge = { class: "height-value" }, _e = { class: "value" }, ve = { class: "adjustment-section" }, ye = { class: "slider-container" }, be = ["value"], xe = { class: "precise-input-section" }, Se = { class: "input-group" }, Ce = ["value"], we = { class: "preset-section" }, Te = { class: "preset-grid" }, Ee = ["onClick"], De = {
 	key: 1,
 	class: "empty-state"
 };
-function we(t, n, c, l, u, f) {
+function Oe(t, n, c, l, u, f) {
 	let h = g("FunctionPanelUIBase");
 	return p(), r(h, {
 		title: f.panelTitle,
@@ -1377,7 +1380,7 @@ function we(t, n, c, l, u, f) {
 		onExpand: f.handleExpand
 	}, {
 		default: S(() => [c.selectedLayer ? (p(), a(e, { key: 0 }, [
-			c.selectedLayer.loaded && c.selectedLayer.recommendedOffset !== void 0 && c.selectedLayer.recommendedOffset !== null ? (p(), a("div", ae, [o("div", oe, [
+			c.selectedLayer.loaded && c.selectedLayer.recommendedOffset !== void 0 && c.selectedLayer.recommendedOffset !== null ? (p(), a("div", le, [o("div", ue, [
 				n[8] ||= o("svg", {
 					class: "banner-icon",
 					viewBox: "0 0 24 24",
@@ -1389,18 +1392,18 @@ function we(t, n, c, l, u, f) {
 					"stroke-linecap": "round",
 					"stroke-linejoin": "round"
 				})], -1),
-				o("div", se, [n[7] ||= o("div", { class: "banner-main" }, "检测到倾斜摄影地形高度较低", -1), o("div", ce, [
+				o("div", de, [n[7] ||= o("div", { class: "banner-main" }, "检测到倾斜摄影地形高度较低", -1), o("div", fe, [
 					n[5] ||= s(" 建议向上偏移 ", -1),
-					o("span", le, v(c.selectedLayer.recommendedOffset.toFixed(1)) + " 米", 1),
+					o("span", pe, v(c.selectedLayer.recommendedOffset.toFixed(1)) + " 米", 1),
 					n[6] ||= s(" 以与大坐标模型底部对齐 ", -1)
 				])]),
 				o("button", {
 					onClick: n[0] ||= (...e) => f.applyRecommendedOffset && f.applyRecommendedOffset(...e),
 					class: "apply-recommended-btn",
 					disabled: Math.abs(c.selectedLayer.heightOffset - c.selectedLayer.recommendedOffset) < .1
-				}, v(Math.abs(c.selectedLayer.heightOffset - c.selectedLayer.recommendedOffset) < .1 ? "已应用" : "应用推荐值"), 9, ue)
+				}, v(Math.abs(c.selectedLayer.heightOffset - c.selectedLayer.recommendedOffset) < .1 ? "已应用" : "应用推荐值"), 9, me)
 			])])) : i("", !0),
-			o("div", de, [n[10] ||= o("div", { class: "card-header" }, [o("h4", { class: "card-title" }, "当前高度偏移"), o("span", {
+			o("div", he, [n[10] ||= o("div", { class: "card-header" }, [o("h4", { class: "card-title" }, "当前高度偏移"), o("span", {
 				class: "hint-icon",
 				title: "调整倾斜摄影的整体高度，正值向上，负值向下"
 			}, [o("svg", {
@@ -1415,10 +1418,10 @@ function we(t, n, c, l, u, f) {
 			}), o("path", {
 				d: "M12 16v-4M12 8h.01",
 				"stroke-linecap": "round"
-			})])])], -1), o("div", fe, [o("span", pe, v((c.selectedLayer.heightOffset || 0).toFixed(2)), 1), n[9] ||= o("span", { class: "unit" }, "米", -1)])]),
-			o("div", me, [
+			})])])], -1), o("div", ge, [o("span", _e, v((c.selectedLayer.heightOffset || 0).toFixed(2)), 1), n[9] ||= o("span", { class: "unit" }, "米", -1)])]),
+			o("div", ve, [
 				n[12] ||= o("div", { class: "section-label" }, [o("span", null, "调整偏移"), o("span", { class: "range-hint" }, "-2000m ~ +2000m")], -1),
-				o("div", he, [o("input", {
+				o("div", ye, [o("input", {
 					type: "range",
 					min: "-2000",
 					max: "2000",
@@ -1427,16 +1430,16 @@ function we(t, n, c, l, u, f) {
 					onInput: n[1] ||= (...e) => f.onHeightSliderInput && f.onHeightSliderInput(...e),
 					onChange: n[2] ||= (...e) => f.onHeightSliderChange && f.onHeightSliderChange(...e),
 					class: "height-slider"
-				}, null, 40, ge), n[11] ||= o("div", { class: "slider-track-fill" }, null, -1)]),
+				}, null, 40, be), n[11] ||= o("div", { class: "slider-track-fill" }, null, -1)]),
 				n[13] ||= o("div", { class: "usage-hint" }, "调整后使倾斜摄影与大坐标模型高度对齐", -1)
 			]),
-			o("div", _e, [n[15] ||= o("label", { class: "input-label" }, "精确设置偏移（米）", -1), o("div", ve, [o("input", {
+			o("div", xe, [n[15] ||= o("label", { class: "input-label" }, "精确设置偏移（米）", -1), o("div", Se, [o("input", {
 				type: "number",
 				value: c.selectedLayer.heightOffset || 0,
 				onChange: n[3] ||= (...e) => f.onHeightInputChange && f.onHeightInputChange(...e),
 				class: "number-input",
 				step: "0.1"
-			}, null, 40, ye), o("button", {
+			}, null, 40, Ce), o("button", {
 				onClick: n[4] ||= (...e) => f.resetToZero && f.resetToZero(...e),
 				class: "reset-btn",
 				title: "重置为0"
@@ -1450,12 +1453,12 @@ function we(t, n, c, l, u, f) {
 				"stroke-linecap": "round",
 				"stroke-linejoin": "round"
 			})], -1), s(" 重置 ", -1)]])])]),
-			o("div", be, [n[16] ||= o("div", { class: "section-label" }, "快捷预设", -1), o("div", xe, [(p(!0), a(e, null, m(u.presets, (e) => (p(), a("button", {
+			o("div", we, [n[16] ||= o("div", { class: "section-label" }, "快捷预设", -1), o("div", Te, [(p(!0), a(e, null, m(u.presets, (e) => (p(), a("button", {
 				key: e.value,
 				onClick: (t) => f.applyPreset(e.value),
 				class: d(["preset-btn", { active: Math.abs(c.selectedLayer.heightOffset - e.value) < .1 }])
-			}, v(e.label), 11, Se))), 128))])])
-		], 64)) : (p(), a("div", Ce, [...n[17] ||= [o("svg", {
+			}, v(e.label), 11, Ee))), 128))])])
+		], 64)) : (p(), a("div", De, [...n[17] ||= [o("svg", {
 			class: "empty-icon",
 			viewBox: "0 0 24 24",
 			fill: "none",
@@ -1479,7 +1482,7 @@ function we(t, n, c, l, u, f) {
 		"onExpand"
 	]);
 }
-var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), Z = new class {
+var Y = /*#__PURE__*/ E(ce, [["render", Oe], ["__scopeId", "data-v-80456ab5"]]), X = new class {
 	constructor() {
 		this.configDefinitions = new Map([["oblique-photography", {
 			id: "oblique-photography",
@@ -1727,13 +1730,13 @@ var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), 
 			return console.error("[DataManager] ❌ 获取目录结构失败:", e), {};
 		}
 	}
-}(), Te = "/data/gis/oblique_photography.json", Q = "oblique-photography", Ee = {
+}(), Z = typeof window < "u" && window.__panelSingletonManager__ || A, ke = "/data/gis/oblique_photography.json", Q = "oblique-photography", Ae = {
 	name: "ObliquePhotographyPanel",
 	components: {
-		FunctionPanelUIBase: B,
-		ObliqueHeightAdjustPanel: X
+		FunctionPanelUIBase: H,
+		ObliqueHeightAdjustPanel: Y
 	},
-	mixins: [O],
+	mixins: [D],
 	props: {
 		registrationKey: {
 			type: String,
@@ -1847,8 +1850,8 @@ var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), 
 					t.isClosed = e.isClosed, console.log(`[${this.componentName}] 🔔 监听到状态变化: isClosed ${n} -> ${t.isClosed}`), n && !t.isClosed && (t.$forceUpdate(), console.log(`[${this.componentName}] ✅ 强制重新渲染 FunctionPanelUIBase`));
 				} else console.warn(`[${this.componentName}] ⚠️ 无法找到 FunctionPanelUIBase 实例`);
 			}
-		}, k.addEventListener(this.componentName, this._panelStateChangeListener), console.log(`[${this.componentName}] 📝 已注册面板状态监听器`);
-		let e = k.getPanelState(this.componentName), t = e && e.cesiumTilesets && e.cesiumTilesets.size > 0;
+		}, Z.addEventListener(this.componentName, this._panelStateChangeListener), console.log(`[${this.componentName}] 📝 已注册面板状态监听器`);
+		let e = Z.getPanelState(this.componentName), t = e && e.cesiumTilesets && e.cesiumTilesets.size > 0;
 		t && (console.log(`[${this.componentName}] 📦 恢复保存的 Cesium 对象（单例模式）`), this._cesiumTilesets = e.cesiumTilesets, this._cesiumTransforms = e.cesiumTransforms, this._cesiumHeightOffsets = e.cesiumHeightOffsets, this._cesiumErrorHandlers = e.cesiumErrorHandlers, this._cesiumErrorHandlers.forEach((e, t) => {
 			e && e.tileset && e.tileset.tileFailed && e.tileset.tileFailed.addEventListener(e.errorHandler);
 		}));
@@ -1868,7 +1871,7 @@ var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), 
 		});
 	},
 	beforeUnmount() {
-		console.log(`[${this.componentName}] 💾 保存 Cesium 对象到单例管理器`), k.savePanelState(this.componentName, {
+		console.log(`[${this.componentName}] 💾 保存 Cesium 对象到单例管理器`), Z.savePanelState(this.componentName, {
 			cesiumTilesets: this._cesiumTilesets,
 			cesiumTransforms: this._cesiumTransforms,
 			cesiumHeightOffsets: this._cesiumHeightOffsets,
@@ -1888,7 +1891,7 @@ var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), 
 		},
 		onLazyLoad(e) {
 			console.log(`[${this.componentName}] ⚡ 延迟加载触发，首次打开面板`, e);
-			let t = k.getPanelState(this.componentName), n = t && t.cesiumTilesets && t.cesiumTilesets.size > 0;
+			let t = Z.getPanelState(this.componentName), n = t && t.cesiumTilesets && t.cesiumTilesets.size > 0;
 			this.initCesium(() => {
 				console.log(`[${this.componentName}] Cesium 已就绪，开始延迟加载配置`), this.loadFromJson().then(() => {
 					n && (console.log(`[${this.componentName}] 🔄 恢复 Cesium 对象状态`), this.restoreCesiumObjects());
@@ -1934,10 +1937,10 @@ var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), 
 				console.log(`[${this.componentName}] 📂 开始加载配置数据: ${Q}`), console.log(`[${this.componentName}] 🔍 当前列表长度: ${this.obliquePhotographyList?.length || 0}`);
 				let e = null, t = "";
 				try {
-					e = await Z.loadFromServer(Q), t = "API服务器（数据库）", console.log(`[${this.componentName}] ✅ 从 API 服务器加载数据成功`);
+					e = await X.loadFromServer(Q), t = "API服务器（数据库）", console.log(`[${this.componentName}] ✅ 从 API 服务器加载数据成功`);
 				} catch (n) {
 					console.warn(`[${this.componentName}] ⚠️ API 服务器加载失败，尝试静态文件:`, n.message);
-					let r = await fetch(Te, { cache: "no-cache" });
+					let r = await fetch(ke, { cache: "no-cache" });
 					if (!r.ok) throw Error(`HTTP error! status: ${r.status}`);
 					e = await r.json(), t = "静态文件", console.log(`[${this.componentName}] ✅ 从静态文件加载数据成功`);
 				}
@@ -1975,9 +1978,9 @@ var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), 
 				id: e.id,
 				name: e.name,
 				url: e.url
-			})), t = Z.validateConfig(Q, e);
+			})), t = X.validateConfig(Q, e);
 			if (!t.valid) return console.error(`[${this.componentName}] ❌ 数据验证失败:`, t.errors), alert(`数据验证失败:\n${t.errors.join("\n")}`), !1;
-			let n = await Z.uploadToServer(Q, e);
+			let n = await X.uploadToServer(Q, e);
 			return n.success ? (console.log(`[${this.componentName}] ✅ 配置已导出到服务器`), alert("配置已成功导出到服务器！\n\n文件：oblique-photography.json\n数据将自动同步到 FTP 目录")) : (console.error(`[${this.componentName}] ❌ 导出失败:`, n.error), alert(`导出失败！\n\n错误：${n.error}\n\n请检查：\n1. API 服务器是否启动（端口 8081）\n2. 网络连接是否正常`)), n.success;
 		},
 		async saveToJson() {
@@ -1986,9 +1989,9 @@ var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), 
 					id: e.id,
 					name: e.name,
 					url: e.url
-				})), t = Z.validateConfig(Q, e);
+				})), t = X.validateConfig(Q, e);
 				if (!t.valid) return console.error(`[${this.componentName}] ❌ 数据验证失败:`, t.errors), !1;
-				let n = await Z.uploadToServer(Q, e);
+				let n = await X.uploadToServer(Q, e);
 				return n.success ? console.log(`[${this.componentName}] ✅ 配置已自动保存到服务器`) : console.error(`[${this.componentName}] ❌ 自动保存失败:`, n.error), n.success;
 			} catch (e) {
 				return console.error(`[${this.componentName}] ❌ saveToJson 错误:`, e), !1;
@@ -2003,7 +2006,7 @@ var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), 
 		async loadServerFiles(e = "") {
 			this.loadingServerFiles = !0;
 			try {
-				let t = await Z.listServerFiles(e), n = await Z.getServerDirectoryStructure();
+				let t = await X.listServerFiles(e), n = await X.getServerDirectoryStructure();
 				this.serverFiles = t, this.serverDirectories = n, this.allFilesMap = /* @__PURE__ */ new Map(), t.forEach((e) => {
 					let t = e.filePath || e.path;
 					t && this.allFilesMap.set(t, e);
@@ -2035,12 +2038,12 @@ var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), 
 				console.log(`[${this.componentName}] ⚠️ 用户取消导入`);
 				return;
 			}
-			let i = await Z.loadFromServer(Q);
+			let i = await X.loadFromServer(Q);
 			if (!i) {
 				alert("从服务器加载文件失败！\n\n请检查网络连接");
 				return;
 			}
-			let a = Z.validateConfig(Q, i);
+			let a = X.validateConfig(Q, i);
 			if (!a.valid) {
 				alert(`服务器数据验证失败:\n${a.errors.join("\n")}`);
 				return;
@@ -2076,7 +2079,7 @@ var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), 
 				name: e.name,
 				url: e.url
 			}));
-			return Z.getConfigStats(Q, e);
+			return X.getConfigStats(Q, e);
 		},
 		closeDialog() {
 			this.showAddDialog = !1, this.showEditDialog = !1, this.formData = {
@@ -2279,37 +2282,37 @@ var X = /*#__PURE__*/ E(Y, [["render", we], ["__scopeId", "data-v-80456ab5"]]), 
 			}
 		}
 	}
-}, De = { class: "toolbar" }, Oe = { class: "oblique-list" }, ke = { class: "item-main" }, Ae = { class: "oblique-checkbox" }, je = [
+}, je = { class: "toolbar" }, Me = { class: "oblique-list" }, Ne = { class: "item-main" }, Pe = { class: "oblique-checkbox" }, Fe = [
 	"checked",
 	"onChange",
 	"disabled"
-], Me = { class: "item-info" }, Ne = { class: "oblique-name" }, Pe = {
+], Ie = { class: "item-info" }, Le = { class: "oblique-name" }, Re = {
 	key: 0,
 	class: "loading-text"
-}, Fe = {
+}, ze = {
 	key: 1,
 	class: "status-text loaded"
-}, Ie = {
+}, Be = {
 	key: 2,
 	class: "status-text unloaded"
-}, Le = { class: "item-actions" }, Re = [
+}, Ve = { class: "item-actions" }, He = [
 	"onClick",
 	"disabled",
 	"aria-label"
-], ze = ["onClick", "aria-label"], Be = ["onClick", "aria-label"], Ve = ["onClick", "aria-label"], He = {
+], Ue = ["onClick", "aria-label"], We = ["onClick", "aria-label"], Ge = ["onClick", "aria-label"], Ke = {
 	key: 0,
 	class: "empty-state"
-}, Ue = { class: "dialog-header" }, We = { class: "dialog-title" }, Ge = { class: "dialog-body" }, Ke = { class: "form-group" }, qe = ["disabled"], Je = { class: "form-group" }, Ye = { class: "form-group" }, Xe = { class: "dialog-footer" }, Ze = { class: "dialog-body" }, Qe = { class: "delete-warning" }, $e = { class: "warning-text" }, et = { class: "dialog-footer" }, tt = { class: "dialog-header" }, nt = { class: "dialog-body" }, rt = { class: "server-info" }, it = { class: "server-url" }, at = { class: "file-browser" }, ot = { class: "directory-nav" }, st = { class: "nav-path" }, ct = {
+}, qe = { class: "dialog-header" }, Je = { class: "dialog-title" }, Ye = { class: "dialog-body" }, Xe = { class: "form-group" }, Ze = ["disabled"], Qe = { class: "form-group" }, $e = { class: "form-group" }, et = { class: "dialog-footer" }, tt = { class: "dialog-body" }, nt = { class: "delete-warning" }, rt = { class: "warning-text" }, it = { class: "dialog-footer" }, at = { class: "dialog-header" }, ot = { class: "dialog-body" }, st = { class: "server-info" }, ct = { class: "server-url" }, lt = { class: "file-browser" }, ut = { class: "directory-nav" }, dt = { class: "nav-path" }, ft = {
 	key: 0,
 	class: "file-list"
-}, lt = ["onClick"], ut = { class: "file-info" }, dt = { class: "file-name" }, ft = ["onClick"], $ = { class: "file-info" }, pt = { class: "file-name" }, mt = { class: "file-path" }, ht = { class: "file-meta" }, gt = { class: "file-size" }, _t = { class: "file-date" }, vt = {
+}, pt = ["onClick"], mt = { class: "file-info" }, ht = { class: "file-name" }, gt = ["onClick"], _t = { class: "file-info" }, vt = { class: "file-name" }, yt = { class: "file-path" }, $ = { class: "file-meta" }, bt = { class: "file-size" }, xt = { class: "file-date" }, St = {
 	key: 1,
 	class: "file-list loading"
-}, yt = {
+}, Ct = {
 	key: 2,
 	class: "empty-state"
-}, bt = { class: "dialog-footer" }, xt = ["disabled"];
-function St(l, u, f, h, _, y) {
+}, wt = { class: "dialog-footer" }, Tt = ["disabled"];
+function Et(l, u, f, h, _, y) {
 	let x = g("FunctionPanelUIBase"), T = g("ObliqueHeightAdjustPanel");
 	return p(), a(e, null, [c(x, {
 		ref: "basePanel",
@@ -2331,7 +2334,7 @@ function St(l, u, f, h, _, y) {
 		onLazyLoad: y.onLazyLoad
 	}, {
 		default: S(() => [
-			o("div", De, [
+			o("div", je, [
 				o("button", {
 					onClick: u[0] ||= (e) => _.showAddDialog = !0,
 					class: "tool-btn add-btn",
@@ -2393,24 +2396,24 @@ function St(l, u, f, h, _, y) {
 					"stroke-linejoin": "round"
 				})], -1), s(" 刷新 ", -1)]])
 			]),
-			o("div", Oe, [(p(!0), a(e, null, m(_.obliquePhotographyList, (e) => (p(), a("div", {
+			o("div", Me, [(p(!0), a(e, null, m(_.obliquePhotographyList, (e) => (p(), a("div", {
 				key: e.id,
 				class: d(["oblique-item", {
 					"is-loaded": e.loaded,
 					"is-loading": e.loading,
 					"is-selected": _.selectedItemId === e.id
 				}])
-			}, [o("div", ke, [o("label", Ae, [
+			}, [o("div", Ne, [o("label", Pe, [
 				o("input", {
 					type: "checkbox",
 					checked: e.loaded || !1,
 					onChange: (t) => y.toggleObliquePhotography(e),
 					disabled: e.loading || !1,
 					class: "checkbox-input"
-				}, null, 40, je),
+				}, null, 40, Fe),
 				u[27] ||= o("span", { class: "check-indicator" }, null, -1),
-				o("div", Me, [o("span", Ne, v(e.name || "未知"), 1), e.loading ? (p(), a("span", Pe, "加载中...")) : e.loaded ? (p(), a("span", Fe, "已加载")) : (p(), a("span", Ie, "未加载"))])
-			])]), o("div", Le, [
+				o("div", Ie, [o("span", Le, v(e.name || "未知"), 1), e.loading ? (p(), a("span", Re, "加载中...")) : e.loaded ? (p(), a("span", ze, "已加载")) : (p(), a("span", Be, "未加载"))])
+			])]), o("div", Ve, [
 				o("button", {
 					onClick: (t) => y.locateToObliquePhotography(e),
 					class: "action-btn locate-btn",
@@ -2433,7 +2436,7 @@ function St(l, u, f, h, _, y) {
 					r: "3",
 					"stroke-linecap": "round",
 					"stroke-linejoin": "round"
-				})], -1)]], 8, Re),
+				})], -1)]], 8, He),
 				e.loaded ? (p(), a("button", {
 					key: 0,
 					onClick: (t) => y.openHeightAdjust(e),
@@ -2450,7 +2453,7 @@ function St(l, u, f, h, _, y) {
 					d: "M12 19V5M5 12l7-7 7 7",
 					"stroke-linecap": "round",
 					"stroke-linejoin": "round"
-				})], -1)]], 8, ze)) : i("", !0),
+				})], -1)]], 8, Ue)) : i("", !0),
 				o("button", {
 					onClick: (t) => y.openEditDialog(e),
 					class: "action-btn edit-btn",
@@ -2470,7 +2473,7 @@ function St(l, u, f, h, _, y) {
 					d: "M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z",
 					"stroke-linecap": "round",
 					"stroke-linejoin": "round"
-				})], -1)]], 8, Be),
+				})], -1)]], 8, We),
 				o("button", {
 					onClick: (t) => y.confirmDelete(e),
 					class: "action-btn delete-btn",
@@ -2486,9 +2489,9 @@ function St(l, u, f, h, _, y) {
 					d: "M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2",
 					"stroke-linecap": "round",
 					"stroke-linejoin": "round"
-				})], -1)]], 8, Ve)
+				})], -1)]], 8, Ge)
 			])], 2))), 128))]),
-			_.obliquePhotographyList.length === 0 ? (p(), a("div", He, [...u[32] ||= [
+			_.obliquePhotographyList.length === 0 ? (p(), a("div", Ke, [...u[32] ||= [
 				o("svg", {
 					class: "empty-icon",
 					viewBox: "0 0 24 24",
@@ -2512,7 +2515,7 @@ function St(l, u, f, h, _, y) {
 					class: "dialog",
 					onClick: u[10] ||= w(() => {}, ["stop"])
 				}, [
-					o("div", Ue, [o("h3", We, v(_.showEditDialog ? "编辑倾斜摄影" : "添加倾斜摄影"), 1), o("button", {
+					o("div", qe, [o("h3", Je, v(_.showEditDialog ? "编辑倾斜摄影" : "添加倾斜摄影"), 1), o("button", {
 						onClick: u[4] ||= (...e) => y.closeDialog && y.closeDialog(...e),
 						class: "dialog-close",
 						"aria-label": "关闭对话框"
@@ -2526,28 +2529,28 @@ function St(l, u, f, h, _, y) {
 						"stroke-linecap": "round",
 						"stroke-linejoin": "round"
 					})], -1)]])]),
-					o("div", Ge, [
-						o("div", Ke, [u[34] ||= o("label", { class: "form-label" }, [s("ID "), o("span", { class: "required" }, "*")], -1), C(o("input", {
+					o("div", Ye, [
+						o("div", Xe, [u[34] ||= o("label", { class: "form-label" }, [s("ID "), o("span", { class: "required" }, "*")], -1), C(o("input", {
 							"onUpdate:modelValue": u[5] ||= (e) => _.formData.id = e,
 							type: "text",
 							class: "form-input",
 							placeholder: "输入唯一标识符",
 							disabled: _.showEditDialog
-						}, null, 8, qe), [[b, _.formData.id]])]),
-						o("div", Je, [u[35] ||= o("label", { class: "form-label" }, [s("名称 "), o("span", { class: "required" }, "*")], -1), C(o("input", {
+						}, null, 8, Ze), [[b, _.formData.id]])]),
+						o("div", Qe, [u[35] ||= o("label", { class: "form-label" }, [s("名称 "), o("span", { class: "required" }, "*")], -1), C(o("input", {
 							"onUpdate:modelValue": u[6] ||= (e) => _.formData.name = e,
 							type: "text",
 							class: "form-input",
 							placeholder: "输入显示名称"
 						}, null, 512), [[b, _.formData.name]])]),
-						o("div", Ye, [u[36] ||= o("label", { class: "form-label" }, [s("URL "), o("span", { class: "required" }, "*")], -1), C(o("textarea", {
+						o("div", $e, [u[36] ||= o("label", { class: "form-label" }, [s("URL "), o("span", { class: "required" }, "*")], -1), C(o("textarea", {
 							"onUpdate:modelValue": u[7] ||= (e) => _.formData.url = e,
 							class: "form-textarea",
 							rows: "3",
 							placeholder: "输入倾斜摄影数据URL"
 						}, null, 512), [[b, _.formData.url]])])
 					]),
-					o("div", Xe, [o("button", {
+					o("div", et, [o("button", {
 						onClick: u[8] ||= (...e) => y.closeDialog && y.closeDialog(...e),
 						class: "dialog-btn cancel-btn"
 					}, "取消"), o("button", {
@@ -2567,7 +2570,7 @@ function St(l, u, f, h, _, y) {
 					onClick: u[14] ||= w(() => {}, ["stop"])
 				}, [
 					u[38] ||= o("div", { class: "dialog-header" }, [o("h3", { class: "dialog-title" }, "确认删除")], -1),
-					o("div", Ze, [o("div", Qe, [u[37] ||= o("svg", {
+					o("div", tt, [o("div", nt, [u[37] ||= o("svg", {
 						class: "warning-icon",
 						viewBox: "0 0 24 24",
 						fill: "none",
@@ -2577,8 +2580,8 @@ function St(l, u, f, h, _, y) {
 						d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
 						"stroke-linecap": "round",
 						"stroke-linejoin": "round"
-					})], -1), o("div", $e, " 确定要删除 \"" + v(_.deleteTarget?.name) + "\" 吗？此操作无法撤销。 ", 1)])]),
-					o("div", et, [o("button", {
+					})], -1), o("div", rt, " 确定要删除 \"" + v(_.deleteTarget?.name) + "\" 吗？此操作无法撤销。 ", 1)])]),
+					o("div", it, [o("button", {
 						onClick: u[12] ||= (e) => _.showDeleteDialog = !1,
 						class: "dialog-btn cancel-btn"
 					}, "取消"), o("button", {
@@ -2597,13 +2600,13 @@ function St(l, u, f, h, _, y) {
 					class: "dialog dialog-large",
 					onClick: u[20] ||= w(() => {}, ["stop"])
 				}, [
-					o("div", tt, [u[39] ||= o("h3", { class: "dialog-title" }, "📂 从服务器导入配置", -1), o("button", {
+					o("div", at, [u[39] ||= o("h3", { class: "dialog-title" }, "📂 从服务器导入配置", -1), o("button", {
 						onClick: u[16] ||= (...e) => y.closeImportDialog && y.closeImportDialog(...e),
 						class: "close-btn",
 						"aria-label": "关闭"
 					}, "×")]),
-					o("div", nt, [o("div", rt, [u[40] ||= o("span", { class: "server-label" }, "服务器：", -1), o("span", it, v(_.apiServerURL), 1)]), o("div", at, [
-						o("div", ot, [
+					o("div", ot, [o("div", st, [u[40] ||= o("span", { class: "server-label" }, "服务器：", -1), o("span", ct, v(_.apiServerURL), 1)]), o("div", lt, [
+						o("div", ut, [
 							y.canGoBack ? (p(), a("button", {
 								key: 0,
 								onClick: u[17] ||= (...e) => y.navigateToParentDirectory && y.navigateToParentDirectory(...e),
@@ -2620,43 +2623,43 @@ function St(l, u, f, h, _, y) {
 								"stroke-linejoin": "round"
 							})], -1), s(" 返回 ", -1)]])) : i("", !0),
 							u[42] ||= o("span", { class: "nav-label" }, "目录：", -1),
-							o("span", st, v(y.currentDirectoryDisplay), 1)
+							o("span", dt, v(y.currentDirectoryDisplay), 1)
 						]),
-						_.loadingServerFiles ? (p(), a("div", vt, [...u[48] ||= [o("div", { class: "loading-spinner" }, null, -1), o("p", null, "正在加载服务器文件...", -1)]])) : (p(), a("div", ct, [(p(!0), a(e, null, m(y.currentSubdirectories, (e) => (p(), a("div", {
+						_.loadingServerFiles ? (p(), a("div", St, [...u[48] ||= [o("div", { class: "loading-spinner" }, null, -1), o("p", null, "正在加载服务器文件...", -1)]])) : (p(), a("div", ft, [(p(!0), a(e, null, m(y.currentSubdirectories, (e) => (p(), a("div", {
 							key: "dir-" + e,
 							class: "file-item directory-item",
 							onClick: (t) => y.navigateToDirectory(e)
 						}, [
 							u[44] ||= o("div", { class: "file-icon" }, "📁", -1),
-							o("div", ut, [o("div", dt, v(e), 1), u[43] ||= o("div", { class: "file-path" }, "目录", -1)]),
+							o("div", mt, [o("div", ht, v(e), 1), u[43] ||= o("div", { class: "file-path" }, "目录", -1)]),
 							u[45] ||= o("div", { class: "file-action" }, "📂", -1)
-						], 8, lt))), 128)), (p(!0), a(e, null, m(y.currentDirectoryFiles, (e) => (p(), a("div", {
+						], 8, pt))), 128)), (p(!0), a(e, null, m(y.currentDirectoryFiles, (e) => (p(), a("div", {
 							key: e.path || e.filePath,
 							class: d(["file-item", { "is-selected": _.selectedServerFile === e }]),
 							onClick: (t) => y.selectServerFile(e)
 						}, [
 							u[46] ||= o("div", { class: "file-icon" }, "📄", -1),
-							o("div", $, [
-								o("div", pt, v(e.fileName || e.name), 1),
-								o("div", mt, v(e.filePath || e.path), 1),
-								o("div", ht, [o("span", gt, v(y.formatFileSize(e.fileSize || e.size)), 1), o("span", _t, v(y.formatDate(e.modifiedTime || e.modified)), 1)])
+							o("div", _t, [
+								o("div", vt, v(e.fileName || e.name), 1),
+								o("div", yt, v(e.filePath || e.path), 1),
+								o("div", $, [o("span", bt, v(y.formatFileSize(e.fileSize || e.size)), 1), o("span", xt, v(y.formatDate(e.modifiedTime || e.modified)), 1)])
 							]),
 							u[47] ||= o("div", { class: "file-action" }, "📥", -1)
-						], 10, ft))), 128))])),
-						!_.loadingServerFiles && _.serverFiles.length === 0 ? (p(), a("div", yt, [...u[49] ||= [
+						], 10, gt))), 128))])),
+						!_.loadingServerFiles && _.serverFiles.length === 0 ? (p(), a("div", Ct, [...u[49] ||= [
 							o("div", { class: "empty-icon" }, "📁", -1),
 							o("div", { class: "empty-title" }, "服务器上没有找到配置文件", -1),
 							o("div", { class: "empty-hint" }, "请确保 API 服务器已启动", -1)
 						]])) : i("", !0)
 					])]),
-					o("div", bt, [o("button", {
+					o("div", wt, [o("button", {
 						onClick: u[18] ||= (...e) => y.closeImportDialog && y.closeImportDialog(...e),
 						class: "dialog-btn cancel-btn"
 					}, "取消"), o("button", {
 						onClick: u[19] ||= (e) => y.loadServerFiles(),
 						class: "dialog-btn secondary-btn",
 						disabled: _.loadingServerFiles
-					}, " 🔄 刷新 ", 8, xt)])
+					}, " 🔄 刷新 ", 8, Tt)])
 				])])) : i("", !0)]),
 				_: 1
 			})]))
@@ -2692,9 +2695,9 @@ function St(l, u, f, h, _, y) {
 		_: 1
 	})]))], 64);
 }
-var Ct = /*#__PURE__*/ E(Ee, [["render", St], ["__scopeId", "data-v-0ea33695"]]), wt = {
+var Dt = /*#__PURE__*/ E(Ae, [["render", Et], ["__scopeId", "data-v-3d58609d"]]), Ot = {
 	name: "MultiContentExample",
-	components: { TestPanelModule: J },
+	components: { TestPanelModule: se },
 	props: {
 		registrationKey: {
 			type: String,
@@ -2722,7 +2725,7 @@ var Ct = /*#__PURE__*/ E(Ee, [["render", St], ["__scopeId", "data-v-0ea33695"]])
 	},
 	methods: {
 		switchToHeightPanel() {
-			this.$refs.panel.setContent(X, {
+			this.$refs.panel.setContent(Y, {
 				props: { "selected-layer": this.selectedLayer },
 				events: { "height-change": this.handleHeightChange },
 				title: "高度调整",
@@ -2730,7 +2733,7 @@ var Ct = /*#__PURE__*/ E(Ee, [["render", St], ["__scopeId", "data-v-0ea33695"]])
 			});
 		},
 		switchToPhotoPanel() {
-			this.$refs.panel.setContent(Ct, {
+			this.$refs.panel.setContent(Dt, {
 				props: {
 					"initial-x": "center",
 					"initial-y": 120
@@ -2748,7 +2751,7 @@ var Ct = /*#__PURE__*/ E(Ee, [["render", St], ["__scopeId", "data-v-0ea33695"]])
 		}
 	}
 };
-function Tt(e, t, n, i, a, s) {
+function kt(e, t, n, i, a, s) {
 	let c = g("TestPanelModule");
 	return p(), r(c, u({
 		ref: "panel",
@@ -2769,6 +2772,6 @@ function Tt(e, t, n, i, a, s) {
 		"initial-y"
 	]);
 }
-var Et = /*#__PURE__*/ E(wt, [["render", Tt]]);
+var At = /*#__PURE__*/ E(Ot, [["render", kt]]);
 //#endregion
-export { Et as default };
+export { At as default };

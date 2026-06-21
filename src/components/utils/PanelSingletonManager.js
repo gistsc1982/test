@@ -114,9 +114,13 @@ class PanelSingletonManager {
     });
 
     // 暴露到全局（用于调试）
+    // ⭐ 同时设置两个全局变量，确保兼容性
     if (typeof window !== 'undefined') {
       if (!window.__panelSingletonManager__) {
         window.__panelSingletonManager__ = this;
+      }
+      if (!window.panelSingletonManager) {
+        window.panelSingletonManager = this;
       }
     }
   }
@@ -399,19 +403,6 @@ class PanelSingletonManager {
       }
       console.log(`[PanelSingletonManager] 🔄 更新面板可见性: ${panelName} = ${visible}, isClosed = ${panel.isClosed}`);
 
-      // ⭐ 直接更新面板组件实例的 isClosed 状态（绕过事件机制）
-      if (panel.component && typeof panel.component === 'object') {
-        const oldIsClosed = panel.component.isClosed;
-        panel.component.isClosed = panel.isClosed;
-        console.log(`[PanelSingletonManager] 🔧 直接更新组件 isClosed: ${oldIsClosed} -> ${panel.component.isClosed}`);
-
-        // ⭐ 强制 Vue 重新渲染组件
-        if (panel.component.$forceUpdate && typeof panel.component.$forceUpdate === 'function') {
-          panel.component.$forceUpdate();
-          console.log(`[PanelSingletonManager] ✅ 强制重新渲染面板组件: ${panelName}`);
-        }
-      }
-
       // ⭐ 触发面板状态变化事件（通知组件同步状态）
       this.emitEvent(panelName, {
         type: 'visibleChange',
@@ -521,20 +512,16 @@ class PanelSingletonManager {
     const containerId = containerConfig.containerId || this.getMjsContainerId(panelName);
     const iifeGlobalVar = containerConfig.iifeGlobalVar || this.getIifeGlobalVarName(panelName);
 
-    // ⭐ 修复：正确处理 visible 参数，支持布尔值和 undefined
-    // visible: true 或 undefined -> 显示
-    // visible: false -> 隐藏
-    const visible = containerConfig.visible === false ? false : (containerConfig.visible === true ? true : true);
-
     this.mjsContainers.set(panelName, {
       containerId,
       iifeGlobalVar,
-      visible: visible,
-      isClosed: !visible
+      visible: containerConfig.visible !== false,
+      isClosed: containerConfig.visible === false
     });
-    console.log(`[PanelSingletonManager] ✅ 注册 mjs 容器: ${panelName}`, { containerId, iifeGlobalVar, visible });
+    console.log(`[PanelSingletonManager] ✅ 注册 mjs 容器: ${panelName}`, { containerId, iifeGlobalVar });
 
     // ⭐ 立即应用可见性状态到 DOM
+    const visible = containerConfig.visible !== false;
     this.updateMjsContainerVisible(panelName, visible);
   }
 
@@ -683,6 +670,14 @@ class PanelSingletonManager {
   }
 }
 
-// 导出全局单例
-export const panelSingletonManager = new PanelSingletonManager();
+// 导出全局单例（优先使用已存在的全局实例，确保只有一个实例）
+const existingManager = typeof window !== 'undefined' && (window.__panelSingletonManager__ || window.panelSingletonManager);
+export const panelSingletonManager = existingManager || new PanelSingletonManager();
+
+// 如果是新创建的实例，同时设置两个全局变量
+if (!existingManager && typeof window !== 'undefined') {
+  window.__panelSingletonManager__ = panelSingletonManager;
+  window.panelSingletonManager = panelSingletonManager;
+}
+
 export default panelSingletonManager;

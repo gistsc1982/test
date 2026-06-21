@@ -2052,22 +2052,33 @@ export default {
 
       // ⭐ 使用 $nextTick 延迟注册，避免在渲染过程中修改响应式数据导致无限循环
       this.$nextTick(() => {
-        // ⭐ 从多实例配置管理器获取实例特定的配置
-        const instancePanelConfig = multiInstancePanelConfigManager.getPanelConfig(instanceId, key);
+        // ⭐ 根据面板的 singleton 属性决定使用哪个配置管理器
+        const panelConfigs = getAvailablePanelConfigs();
+        const panelConfig = panelConfigs[key];
+        const isSingleton = panelConfig?.singleton === true;
 
-        // ⭐ 从 FunctionPanelsConfigManager 获取单例面板配置
-        const functionPanelConfig = window.__functionPanelsConfigManager__
-          ? window.__functionPanelsConfigManager__.getPanel(key)
-          : null;
+        let instancePanelConfig;
+        let functionPanelConfig;
+
+        if (isSingleton) {
+          // 单例面板：只从 FunctionPanelsConfigManager 获取配置
+          functionPanelConfig = window.__functionPanelsConfigManager__
+            ? window.__functionPanelsConfigManager__.getPanel(key)
+            : null;
+        } else {
+          // 多实例面板：只从 MultiInstancePanelConfigManager 获取配置
+          instancePanelConfig = multiInstancePanelConfigManager.getPanelConfig(instanceId, key);
+        }
 
         console.log(`[CesiumMain #${instanceId}] 🔍 调试面板 ${key}:`, {
+          isSingleton,
           instancePanelConfig,
           functionPanelConfig,
           configVisible: config.visible
         });
-        // 合并配置：实例配置优先，然后是传入的配置
+        // 合并配置：使用正确的配置源
         const mergedProps = {
-          ...(instancePanelConfig?.position || {}),
+          ...(instancePanelConfig?.position || functionPanelConfig?.position || {}),
           ...(config.props || {})
         };
 
@@ -2336,112 +2347,10 @@ export default {
       const { panelId, visible, singleton, action } = event;
       console.log(`[CesiumMain] 🔧 工具栏面板切换: ${panelId}, 可见性: ${visible}, 单例: ${singleton}`);
 
-      // ⭐ 获取面板配置（在整个方法中都需要使用）
-      const panelConfig = getPanelConfig(panelId);
-      const isLazyLoad = panelConfig?.lazyLoad === true && panelConfig?.file?.endsWith('.mjs');
-
-      if (isLazyLoad && !this.functionPanelComponents[panelId] && !panelSingletonManager.hasPanel(panelId)) {
-        // 懒加载面板还未加载：先加载组件
-        console.log(`[CesiumMain] 📦 懒加载面板: ${panelId}`);
-
-        // 显示加载提示
-        this.panelLoadingProgress = {
-          show: true,
-          currentPanel: panelId,
-          currentIndex: 1,
-          total: 1,
-          completedCount: 0,
-          panels: [{
-            name: panelId,
-            status: 'loading',
-            duration: 0,
-            steps: []
-          }]
-        };
-
-        const loadStart = performance.now();
-
-        this.loadFunctionPanel(panelId)
-          .then((component) => {
-            const loadEnd = performance.now();
-            const duration = (loadEnd - loadStart).toFixed(2);
-
-            console.log(`[CesiumMain] ✅ 懒加载面板 ${panelId} 加载完成 (${duration}ms)`);
-
-            // 更新加载状态
-            this.panelLoadingProgress.completedCount = 1;
-            this.panelLoadingProgress.panels[0].status = 'success';
-            this.panelLoadingProgress.panels[0].duration = duration;
-            setTimeout(() => {
-              this.panelLoadingProgress.show = false;
-            }, 500);
-
-            // 通知工具栏更新按钮状态（从禁用变为可用）
-            if (this.$refs.toolbar) {
-              console.log(`[CesiumMain] 🔧 通知工具栏更新按钮状态: ${panelId}`);
-              this.$refs.toolbar.updatePanelButtonState(panelId, { disabled: false, loaded: true });
-            }
-
-            // 注册面板组件
-            const panelProps = {
-              ...(panelConfig?.position || {})
-            };
-
-            if (singleton) {
-              // 单例面板：注册到 PanelSingletonManager
-              this.registerPanelComponent(panelId, {
-                component,
-                props: panelProps,
-                visible: true
-              });
-
-              // 对于 mjs 单例组件，需要挂载 Vue 应用
-              if (panelConfig.file?.endsWith('.mjs')) {
-                // 挂载组件到容器
-                console.log(`[CesiumMain] 🔧 挂载单例 mjs 组件到容器: ${panelId}`);
-                this.mountMjsSingletonApp(panelId, panelConfig, component);
-              }
-            } else {
-              // 多实例面板：创建新实例
-              this.createMjsMultiInstance(panelId, panelConfig);
-            }
-          })
-          .catch((error) => {
-            console.error(`[CesiumMain] ❌ 懒加载面板 ${panelId} 加载失败:`, error);
-
-            this.panelLoadingProgress.panels[0].status = 'error';
-            this.panelLoadingProgress.panels[0].error = error.message;
-            setTimeout(() => {
-              this.panelLoadingProgress.show = false;
-            }, 2000);
-          });
-
-        return;
-      }
-
       // ⭐ 多实例模式：每次点击都创建新实例
       if (!singleton && visible) {
         console.log(`[CesiumMain] 🧬 多实例模式：创建新面板实例 - ${panelId}`);
-
-        // ⭐ 在创建多实例之前，先隐藏对应的单例面板（如果存在）
-        if (panelConfig?.singletonContainerId) {
-          const singletonPanelName = this.findSingletonPanelByContainerId(panelConfig.singletonContainerId);
-          console.log(`[CesiumMain] 🔍 查找单例面板: ${singletonPanelName}`);
-
-          if (singletonPanelName) {
-            // 更新 PanelSingletonManager 中的状态
-            panelSingletonManager.updatePanelVisible(singletonPanelName, false);
-            console.log(`[CesiumMain] 🔄 已隐藏单例面板: ${singletonPanelName}`);
-
-            // ⭐ 使用 CSS 类来隐藏容器（更可靠，防止 Vue 响应式系统覆盖）
-            const singletonContainer = document.getElementById(panelConfig.singletonContainerId);
-            if (singletonContainer) {
-              singletonContainer.classList.add('hidden');
-              console.log(`[CesiumMain] 🙈 已添加 hidden 类到单例容器: ${panelConfig.singletonContainerId}`);
-            }
-          }
-        }
-
+        // ⭐ 不再隐藏单例面板，让多实例和单例各自管理
         this.createMultiInstancePanel(panelId);
         return;
       }
@@ -2484,7 +2393,8 @@ export default {
           .then((component) => {
             console.log(`[CesiumMain] ✅ ${panelId} 组件加载完成，开始注册...`);
 
-            // ⭐ 获取面板配置（使用前面已获取的 panelConfig）
+            // ⭐ 获取面板配置
+            const panelConfig = getPanelConfig(panelId);
             const panelProps = {
               ...(panelConfig?.position || {})
             };
@@ -2499,17 +2409,6 @@ export default {
 
             this.$nextTick(() => {
               console.log(`[CesiumMain] 🎯 ${panelId} 已注册并设置为可见`);
-
-              // ⭐ 关键修复：组件的 mounted 钩子会使用配置文件的 visible 值
-              // 所以我们需要在组件渲染后强制更新可见性
-              setTimeout(() => {
-                panelSingletonManager.updatePanelVisible(panelId, true);
-                if (this.registeredPanels[panelId]) {
-                  this.registeredPanels[panelId].visible = true;
-                }
-                this._panelsRefreshCounter++;
-                console.log(`[CesiumMain] 🔧 ${panelId} 已强制更新为可见`);
-              }, 100);
             });
           })
           .catch((error) => {
@@ -3999,6 +3898,8 @@ export default {
       // 设置全局对象
       if (typeof window !== 'undefined') {
         window.__cesiumViewer__ = this.cesiumViewer;
+        window.__panelSingletonManager__ = panelSingletonManager; // ⭐ 暴露到全局供 FunctionPanelUIBase 使用
+        window.__multiInstancePanelConfigManager__ = multiInstancePanelConfigManager;
 
         // ⭐ 触发 Viewer 就绪事件
         const viewerReadyEvent = new CustomEvent('cesium-viewer-ready', {

@@ -13,6 +13,7 @@
     :panel-name="panelName || 'ObliquePhotoManager'"
     :auto-register="autoRegister !== false"
     :panel-instance-id="panelInstanceId"
+    :registration-key="registrationKey || 'ObliquePhotoManager'"
     :field-definitions="fieldDefinitions"
     :default-form-values="defaultFormValues"
     :toolbar-buttons="toolbarButtons"
@@ -122,6 +123,10 @@ export default {
     },
     panelInstanceId: {
       type: Number,
+      default: null
+    },
+    registrationKey: {
+      type: String,
       default: null
     }
   },
