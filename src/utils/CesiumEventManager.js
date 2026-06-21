@@ -178,9 +178,15 @@ class CesiumEventManager {
   }
 }
 
-const eventManager = new CesiumEventManager();
+// 创建全局单例（优先使用已存在的全局实例，确保只有一个实例）
+const existingManager = typeof window !== 'undefined' && window.__cesiumEventManager__;
+const eventManager = existingManager || new CesiumEventManager();
 
-if (typeof window !== 'undefined') {
+// 如果是新创建的实例，注册到全局并初始化
+if (!existingManager && typeof window !== 'undefined') {
+  window.__cesiumEventManager__ = eventManager;
+
+  // 自动初始化
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       eventManager.init();
@@ -188,7 +194,6 @@ if (typeof window !== 'undefined') {
   } else {
     eventManager.init();
   }
-  window.__cesiumEventManager__ = eventManager;
 }
 
 export default eventManager;
