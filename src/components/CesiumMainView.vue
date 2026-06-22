@@ -372,21 +372,34 @@ async function loadPanelCSS(componentName, panelConfig) {
     console.warn(`[CesiumMain] ⚠️ CSS 加载失败: cesiumBase.css`, error);
   }
 
-  // ⭐ 如果组件有特定的 CSS 文件（如 examples 组件），也加载它
-  if (panelConfig.file && panelConfig.file.includes('/examples/')) {
-    // 构建对应的 CSS 文件路径
-    // 例如：@componentsFunctions/examples/MultiContentExample.vue
-    // 对应：@componentsFunctions/lib/examples/MultiContentExample.mjs.css
-    const cssPath = panelConfig.file
-      .replace('@componentsFunctions/', '@componentsFunctions/lib/')
-      .replace('.vue', '.mjs.css')
-      .replace(/\.mjs$/, '.mjs.css');
+  // ⭐ 如果组件有特定的 CSS 文件，也加载它（支持 examples 和 lib 目录）
+  if (panelConfig.file) {
+    let cssPath;
+    
+    if (panelConfig.file.includes('/examples/')) {
+      // examples 目录：@componentsFunctions/examples/Component.vue → @componentsFunctions/lib/examples/Component.mjs.css
+      cssPath = panelConfig.file
+        .replace('@componentsFunctions/', '@componentsFunctions/lib/')
+        .replace('.vue', '.mjs.css')
+        .replace(/\.mjs$/, '.mjs.css');
+    } else if (panelConfig.file.includes('@cesiumBaseComponentsFunctions/')) {
+      // cesiumBase 目录：@cesiumBaseComponentsFunctions/Component.vue → @componentsFunctionsLib/Component.mjs.css
+      const componentName = panelConfig.file
+        .replace('@cesiumBaseComponentsFunctions/', '')
+        .replace('.vue', '');
+      cssPath = `@componentsFunctionsLib/${componentName}.mjs.css`;
+    } else {
+      // 其他情况：@componentsFunctions/Component.vue → @componentsFunctionsLib/Component.mjs.css
+      cssPath = panelConfig.file
+        .replace('@componentsFunctions/', '@componentsFunctionsLib/')
+        .replace('.vue', '.mjs.css');
+    }
 
     try {
       await import(cssPath);
       console.log(`[CesiumMain] ✅ CSS 加载成功: ${cssPath}`);
     } catch (error) {
-      console.warn(`[CesiumMain] ⚠️ CSS 加载失败: ${cssPath}`, error);
+      // CSS 文件不存在，忽略
     }
   }
 }

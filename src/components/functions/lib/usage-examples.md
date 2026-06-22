@@ -1,6 +1,6 @@
 # Function Panels 组件使用示例
 
-生成时间: 2026-06-21T16:25:31.070Z
+生成时间: 2026-06-22T01:35:19.454Z
 
 ## 组件列表
 
@@ -13,6 +13,61 @@ import TestPanelModule from '@componentsFunctionsLib/TestPanelModule.mjs';
 // 示例：导入 examples 目录下的组件
 import MultiContentExample from '@componentsFunctionsLib/examples/MultiContentExample.mjs';
 ```
+
+### ObliqueHeightAdjustPanel
+
+**路径**: ObliqueHeightAdjustPanel.vue
+
+**导入**: 
+```javascript
+import ObliqueHeightAdjustPanel from '@componentsFunctionsLib/examples/ObliqueHeightAdjustPanel.mjs';
+```
+
+---
+
+### ObliquePhotographyPanel
+
+**路径**: ObliquePhotographyPanel.vue
+
+**导入**: 
+```javascript
+import ObliquePhotographyPanel from '@componentsFunctionsLib/examples/ObliquePhotographyPanel.mjs';
+```
+
+---
+
+### ObliquePhotographyPanelExample
+
+**路径**: ObliquePhotographyPanelExample.vue
+
+**导入**: 
+```javascript
+import ObliquePhotographyPanelExample from '@componentsFunctionsLib/examples/ObliquePhotographyPanelExample.mjs';
+```
+
+---
+
+### TestPanel
+
+**路径**: TestPanel.vue
+
+**导入**: 
+```javascript
+import TestPanel from '@componentsFunctionsLib/examples/TestPanel.mjs';
+```
+
+---
+
+### TestPanelModule
+
+**路径**: TestPanelModule.vue
+
+**导入**: 
+```javascript
+import TestPanelModule from '@componentsFunctionsLib/examples/TestPanelModule.mjs';
+```
+
+---
 
 ### MultiContentExample
 

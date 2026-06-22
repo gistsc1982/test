@@ -1,7 +1,47 @@
 {
-  "generated": "2026-06-21T16:25:31.069Z",
-  "count": 5,
+  "generated": "2026-06-22T01:35:19.452Z",
+  "count": 10,
   "components": [
+    {
+      "name": "ObliqueHeightAdjustPanel",
+      "entry": "ObliqueHeightAdjustPanel.vue",
+      "subDir": "",
+      "relativePath": "ObliqueHeightAdjustPanel.vue",
+      "importPath": "@componentsFunctionsLib/ObliqueHeightAdjustPanel.mjs",
+      "file": "ObliqueHeightAdjustPanel.mjs"
+    },
+    {
+      "name": "ObliquePhotographyPanel",
+      "entry": "ObliquePhotographyPanel.vue",
+      "subDir": "",
+      "relativePath": "ObliquePhotographyPanel.vue",
+      "importPath": "@componentsFunctionsLib/ObliquePhotographyPanel.mjs",
+      "file": "ObliquePhotographyPanel.mjs"
+    },
+    {
+      "name": "ObliquePhotographyPanelExample",
+      "entry": "ObliquePhotographyPanelExample.vue",
+      "subDir": "",
+      "relativePath": "ObliquePhotographyPanelExample.vue",
+      "importPath": "@componentsFunctionsLib/ObliquePhotographyPanelExample.mjs",
+      "file": "ObliquePhotographyPanelExample.mjs"
+    },
+    {
+      "name": "TestPanel",
+      "entry": "TestPanel.vue",
+      "subDir": "",
+      "relativePath": "TestPanel.vue",
+      "importPath": "@componentsFunctionsLib/TestPanel.mjs",
+      "file": "TestPanel.mjs"
+    },
+    {
+      "name": "TestPanelModule",
+      "entry": "TestPanelModule.vue",
+      "subDir": "",
+      "relativePath": "TestPanelModule.vue",
+      "importPath": "@componentsFunctionsLib/TestPanelModule.mjs",
+      "file": "TestPanelModule.mjs"
+    },
     {
       "name": "MultiContentExample",
       "entry": "examples/MultiContentExample.vue",
