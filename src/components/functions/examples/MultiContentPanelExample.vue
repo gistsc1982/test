@@ -36,9 +36,12 @@
 </template>
 
 <script>
-import TestPanelModule from '@cesiumBaseComponentsFunctions/TestPanelModule.vue';
+import TestPanelModule from '@componentsFunctionsLib/TestPanelModule.mjs';
+import '@componentsFunctionsLib/TestPanelModule.mjs.css';
 import ObliqueHeightAdjustPanel from '../lib/ObliqueHeightAdjustPanel.mjs';
+import '../lib/ObliqueHeightAdjustPanel.mjs.css';
 import ObliquePhotographyPanel from '../lib/ObliquePhotographyPanel.mjs';
+import '../lib/ObliquePhotographyPanel.mjs.css';
 import { markRaw } from 'vue';
 
 export default {

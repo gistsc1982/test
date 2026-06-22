@@ -19,6 +19,7 @@
 
 <script>
 import TestPanelModule from '../lib/TestPanelModule.mjs';
+import '../lib/TestPanelModule.mjs.css';
 
 export default {
   name: 'SlotExample',

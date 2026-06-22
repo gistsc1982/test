@@ -1,5 +1,5 @@
 import { createCommentVNode as e, createElementBlock as t, createElementVNode as n, normalizeClass as r, normalizeStyle as i, openBlock as a, toDisplayString as o, vModelText as s, withDirectives as c } from "vue";
-//#region ../cesiumBase/src/utils/CesiumEventManager.js
+//#region ../../GISBIM/cesiumBase/src/utils/CesiumEventManager.js
 var l = class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
@@ -270,7 +270,7 @@ function h(e, n, r, i, o, s) {
 	return a(), t("div", m);
 }
 //#endregion
-//#region ../cesiumBase/src/components/TestSfc.vue
+//#region ../../GISBIM/cesiumBase/src/components/TestSfc.vue
 var g = {
 	name: "TestSfc",
 	mixins: [/* @__PURE__ */ f(p, [["render", h]])],

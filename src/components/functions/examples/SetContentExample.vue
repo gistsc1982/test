@@ -26,6 +26,7 @@
 
 <script>
 import TestPanelModule from '../lib/TestPanelModule.mjs';
+import  '../lib/TestPanelModule.mjs.css';
 import SetContentMjsExampleContent from './SetContentMjsExampleContent.vue';
 
 export default {

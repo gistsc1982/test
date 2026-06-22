@@ -69,8 +69,8 @@ D:\GISBIM\test\
 
 ```vue
 <script setup>
-import CesiumToolbarButton from '@cesiumBaseComponents/CesiumToolbarButton.vue'
-import FunctionPanelUIBase from '@cesiumBaseComponents/FunctionPanelUIBase.vue'
+import CesiumToolbarButton from '@componentsLib/CesiumToolbarButton.mjs'
+import FunctionPanelUIBase from '@componentsLib/FunctionPanelUIBase.mjs'
 </script>
 ```
 

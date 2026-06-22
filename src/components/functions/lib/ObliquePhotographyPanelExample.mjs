@@ -1,5 +1,5 @@
 import { Fragment as e, Teleport as t, Transition as n, createBlock as r, createCommentVNode as i, createElementBlock as a, createElementVNode as o, createTextVNode as s, createVNode as c, normalizeClass as l, normalizeStyle as u, openBlock as d, renderList as f, renderSlot as p, resolveComponent as m, toDisplayString as h, vModelDynamic as g, vModelSelect as _, vModelText as v, vShow as y, withCtx as b, withDirectives as x, withKeys as ee, withModifiers as S } from "vue";
-//#region ../cesiumBase/src/utils/CesiumEventManager.js
+//#region ../../GISBIM/cesiumBase/src/utils/CesiumEventManager.js
 var C = class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
@@ -493,7 +493,7 @@ var A = /*#__PURE__*/ E(D, [["render", k]]), j = class {
 }, M = typeof window < "u" && (window.__panelSingletonManager__ || window.panelSingletonManager), N = M || new j();
 !M && typeof window < "u" && (window.__panelSingletonManager__ = N, window.panelSingletonManager = N);
 //#endregion
-//#region ../cesiumBase/src/components/FunctionPanelUIBase.vue
+//#region ../../GISBIM/cesiumBase/src/components/FunctionPanelUIBase.vue
 var P = typeof window < "u" && window.__panelSingletonManager__ || N, te = {
 	name: "FunctionPanelUIBase",
 	mixins: [A],
@@ -2409,7 +2409,7 @@ function lt(t, n, c, u, p, g) {
 	]);
 }
 //#endregion
-//#region ../cesiumBase/src/components/functions/ObliquePhotographyPanelExample.vue
+//#region ../../GISBIM/cesiumBase/src/components/functions/ObliquePhotographyPanelExample.vue
 var ut = {
 	name: "ObliquePhotographyPanelExample",
 	components: {

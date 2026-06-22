@@ -1,5 +1,5 @@
 import { Teleport as e, Transition as t, createBlock as n, createCommentVNode as r, createElementBlock as i, createElementVNode as a, createVNode as o, normalizeClass as s, normalizeStyle as c, openBlock as l, renderSlot as u, toDisplayString as d, vShow as f, withCtx as p, withDirectives as m, withModifiers as h } from "vue";
-//#region ../cesiumBase/src/utils/CesiumEventManager.js
+//#region ../../GISBIM/cesiumBase/src/utils/CesiumEventManager.js
 var g = class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
@@ -493,7 +493,7 @@ var C = /*#__PURE__*/ y(b, [["render", S]]), w = class {
 }, T = typeof window < "u" && (window.__panelSingletonManager__ || window.panelSingletonManager), E = T || new w();
 !T && typeof window < "u" && (window.__panelSingletonManager__ = E, window.panelSingletonManager = E);
 //#endregion
-//#region ../cesiumBase/src/components/FunctionPanelUIBase.vue
+//#region ../../GISBIM/cesiumBase/src/components/FunctionPanelUIBase.vue
 var D = typeof window < "u" && window.__panelSingletonManager__ || E, O = {
 	name: "FunctionPanelUIBase",
 	mixins: [C],

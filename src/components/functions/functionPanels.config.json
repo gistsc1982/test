@@ -275,7 +275,7 @@
     },
     {
       "name": "TestPanelModuleMulti",
-      "file": "@cesiumBaseComponentsFunctions/TestPanelModule.vue",
+      "file": "@componentsFunctionsLib/TestPanelModule.mjs",
       "title": "面板模板（多实例）",
       "description": "可复用的面板模板（多实例）",
       "enabled": false,

@@ -89,7 +89,7 @@ function g(e, t, n, s, c, u) {
 	], 10, f);
 }
 //#endregion
-//#region ../cesiumBase/src/components/CesiumToolbar.vue
+//#region ../../GISBIM/cesiumBase/src/components/CesiumToolbar.vue
 var _ = {
 	name: "CesiumToolbar",
 	components: { CesiumToolbarButton: /* @__PURE__ */ u(d, [["render", g], ["__scopeId", "data-v-4bd42dcf"]]) },

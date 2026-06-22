@@ -128,9 +128,10 @@
 </template>
 
 <script>
-import FunctionPanelUIBase from '@cesiumBaseComponents/FunctionPanelUIBase.vue';
+import FunctionPanelUIBase from '@componentsLib/FunctionPanelUIBase.mjs'
+import '@componentsLib/FunctionPanelUIBase.mjs.css'
 import SfcBase from '@/components/lib/SfcBase.mjs';
-
+import '@/components/lib/SfcBase.mjs.css';
 /**
  * ObliqueHeightAdjustPanel - 倾斜摄影高度偏移调整面板
  *

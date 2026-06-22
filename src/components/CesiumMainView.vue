@@ -321,7 +321,9 @@ if (typeof window !== 'undefined') {
 // import { HeightAlignmentManager } from '../utils/HeightAlignmentManager.js';
 // import TiandituTerrainProvider from '../utils/TiandituTerrainProvider.js'; // ⚠️ 文件已删除，暂时注释
 // ⭐ 使用 @cesiumBaseComponents 别名导入组件
-import CesiumToolbar from '@cesiumBaseComponents/CesiumToolbar.vue';
+import CesiumToolbar from '@componentsLib/CesiumToolbar.mjs';
+// ⭐ 导入 CesiumToolbar 样式
+import '@componentsLib/CesiumToolbar.mjs.css';
 
 // ⭐ 辅助函数：安全获取全局 THREE
 // 等待 load-three-globals.js 加载完成
@@ -372,34 +374,41 @@ async function loadPanelCSS(componentName, panelConfig) {
     console.warn(`[CesiumMain] ⚠️ CSS 加载失败: cesiumBase.css`, error);
   }
 
-  // ⭐ 如果组件有特定的 CSS 文件，也加载它（支持 examples 和 lib 目录）
+  // ⭐ 如果组件有特定的 CSS 文件，尝试加载它
   if (panelConfig.file) {
-    let cssPath;
+    // 构建对应的 CSS 文件路径
+    // 情况1: 路径包含 /examples/（examples 目录下的组件）
+    // 例如：@componentsFunctions/examples/MultiContentExample.vue
+    // 对应：@componentsFunctions/lib/examples/MultiContentExample.mjs.css
+    // 情况2: 根目录下的 .vue 组件
+    // 例如：@cesiumBaseComponentsFunctions/ObliquePhotographyPanel.vue
+    // 对应：@componentsFunctions/lib/ObliquePhotographyPanel.mjs.css
+    let cssPath = '';
     
     if (panelConfig.file.includes('/examples/')) {
-      // examples 目录：@componentsFunctions/examples/Component.vue → @componentsFunctions/lib/examples/Component.mjs.css
       cssPath = panelConfig.file
         .replace('@componentsFunctions/', '@componentsFunctions/lib/')
         .replace('.vue', '.mjs.css')
         .replace(/\.mjs$/, '.mjs.css');
-    } else if (panelConfig.file.includes('@cesiumBaseComponentsFunctions/')) {
-      // cesiumBase 目录：@cesiumBaseComponentsFunctions/Component.vue → @componentsFunctionsLib/Component.mjs.css
-      const componentName = panelConfig.file
-        .replace('@cesiumBaseComponentsFunctions/', '')
-        .replace('.vue', '');
-      cssPath = `@componentsFunctionsLib/${componentName}.mjs.css`;
-    } else {
-      // 其他情况：@componentsFunctions/Component.vue → @componentsFunctionsLib/Component.mjs.css
-      cssPath = panelConfig.file
-        .replace('@componentsFunctions/', '@componentsFunctionsLib/')
-        .replace('.vue', '.mjs.css');
+    } else if (panelConfig.file.startsWith('@cesiumBaseComponentsFunctions/')) {
+      // 处理 @cesiumBaseComponentsFunctions/ 开头的路径
+      // 转换为 @componentsFunctions/lib/ 路径
+      const componentFileName = panelConfig.file.replace('@cesiumBaseComponentsFunctions/', '');
+      cssPath = `@componentsFunctions/lib/${componentFileName}`
+        .replace('.vue', '.mjs.css')
+        .replace(/\.mjs$/, '.mjs.css');
+    } else if (panelConfig.file.endsWith('.mjs')) {
+      // 直接是 .mjs 文件
+      cssPath = panelConfig.file + '.css';
     }
 
-    try {
-      await import(cssPath);
-      console.log(`[CesiumMain] ✅ CSS 加载成功: ${cssPath}`);
-    } catch (error) {
-      // CSS 文件不存在，忽略
+    if (cssPath) {
+      try {
+        await import(cssPath);
+        console.log(`[CesiumMain] ✅ CSS 加载成功: ${cssPath}`);
+      } catch (error) {
+        console.warn(`[CesiumMain] ⚠️ CSS 加载失败: ${cssPath}`, error);
+      }
     }
   }
 }

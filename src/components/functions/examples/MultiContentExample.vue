@@ -21,7 +21,9 @@
 <script>
 import MultiContentPanel from './MultiContentPanelExample.vue';
 import ObliqueHeightAdjustPanel from '../lib/ObliqueHeightAdjustPanel.mjs';
+import '../lib/ObliqueHeightAdjustPanel.mjs.css';
 import ObliquePhotographyPanel from '../lib/ObliquePhotographyPanel.mjs';
+import '../lib/ObliquePhotographyPanel.mjs.css';
 
 export default {
   name: 'MultiContentExample',

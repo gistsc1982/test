@@ -1,5 +1,5 @@
 import { Teleport as e, Transition as t, createBlock as n, createCommentVNode as r, createElementBlock as i, createElementVNode as a, createVNode as o, normalizeClass as s, normalizeStyle as c, openBlock as l, renderSlot as u, resolveComponent as d, toDisplayString as f, vShow as p, withCtx as m, withDirectives as h, withModifiers as g } from "vue";
-//#region ../cesiumBase/src/utils/CesiumEventManager.js
+//#region ../../GISBIM/cesiumBase/src/utils/CesiumEventManager.js
 var _ = class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
@@ -493,7 +493,7 @@ var w = /*#__PURE__*/ b(x, [["render", C]]), T = class {
 }, E = typeof window < "u" && (window.__panelSingletonManager__ || window.panelSingletonManager), D = E || new T();
 !E && typeof window < "u" && (window.__panelSingletonManager__ = D, window.panelSingletonManager = D);
 //#endregion
-//#region ../cesiumBase/src/components/FunctionPanelUIBase.vue
+//#region ../../GISBIM/cesiumBase/src/components/FunctionPanelUIBase.vue
 var O = typeof window < "u" && window.__panelSingletonManager__ || D, k = {
 	name: "FunctionPanelUIBase",
 	mixins: [w],
@@ -1041,7 +1041,7 @@ function V(d, _, v, y, b, x) {
 	})]);
 }
 //#endregion
-//#region ../cesiumBase/src/components/functions/TestPanel.vue
+//#region ../../GISBIM/cesiumBase/src/components/functions/TestPanel.vue
 var H = {
 	name: "TestPanel",
 	components: { FunctionPanelUIBase: /* @__PURE__ */ b(k, [["render", V], ["__scopeId", "data-v-2ca14fbb"]]) },

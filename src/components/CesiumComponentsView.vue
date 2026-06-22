@@ -187,16 +187,16 @@
 
         <h3>2. 组件导入</h3>
         <pre><code>import CesiumToolbarButton from '@cesiumBaseComponents/CesiumToolbarButton.vue'
-import FunctionPanelUIBase from '@cesiumBaseComponents/FunctionPanelUIBase.vue'</code></pre>
+import FunctionPanelUIBase from '@componentsLib/FunctionPanelUIBase.mjs'</code></pre>
 
         <h3>3. 可用组件列表</h3>
         <ul>
           <li><code>CesiumToolbarButton.vue</code> - 工具栏按钮</li>
-          <li><code>CesiumToolbar.vue</code> - 工具栏容器</li>
-          <li><code>FunctionPanelUIBase.vue</code> - 功能面板基础组件</li>
-          <li><code>JsonConfigPanelBase.vue</code> - JSON 配置面板</li>
-          <li><code>SfcBase.vue</code> - SFC 基础组件</li>
-          <li><code>TestSfc.vue</code> - 测试 SFC 组件</li>
+          <li><code>CesiumToolbar.mjs</code> - 工具栏容器</li>
+          <li><code>FunctionPanelUIBase.mjs</code> - 功能面板基础组件</li>
+          <li><code>JsonConfigPanelBase.mjs</code> - JSON 配置面板</li>
+          <li><code>SfcBase.mjs</code> - SFC 基础组件</li>
+          <li><code>TestSfc.mjs</code> - 测试 SFC 组件</li>
         </ul>
       </div>
     </section>
@@ -206,8 +206,8 @@ import FunctionPanelUIBase from '@cesiumBaseComponents/FunctionPanelUIBase.vue'<
 <script setup>
 import { ref } from 'vue'
 // ⭐ 从 cesiumBase 直接导入组件
-import CesiumToolbarButton from '@cesiumBaseComponents/CesiumToolbarButton.vue'
-import FunctionPanelUIBase from '@cesiumBaseComponents/FunctionPanelUIBase.vue'
+import CesiumToolbarButton from '@componentsLib/CesiumToolbarButton.mjs'
+import FunctionPanelUIBase from '@componentsLib/FunctionPanelUIBase.mjs'
 
 const activeSection = ref('toolbar')
 const showPanel = ref(false)

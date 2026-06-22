@@ -211,7 +211,7 @@ const buttons = ref([
 
 <script setup>
 import { ref } from 'vue'
-import FunctionPanelUIBase from '@cesiumBaseComponents/FunctionPanelUIBase.vue'
+import FunctionPanelUIBase from '@componentsLib/FunctionPanelUIBase.mjs'
 
 const showPanel = ref(false)
 </script>

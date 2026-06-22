@@ -1,5 +1,5 @@
 import { Teleport as e, Transition as t, createBlock as n, createCommentVNode as r, createElementBlock as i, createElementVNode as a, createVNode as o, markRaw as s, mergeProps as c, normalizeClass as l, normalizeStyle as u, openBlock as d, renderSlot as f, resolveComponent as p, resolveDynamicComponent as m, toDisplayString as h, toHandlers as g, vShow as _, withCtx as v, withDirectives as y, withModifiers as b } from "vue";
-//#region ../cesiumBase/src/utils/CesiumEventManager.js
+//#region ../../GISBIM/cesiumBase/src/utils/CesiumEventManager.js
 var x = class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
@@ -493,7 +493,7 @@ var O = /*#__PURE__*/ w(T, [["render", D]]), k = class {
 }, A = typeof window < "u" && (window.__panelSingletonManager__ || window.panelSingletonManager), j = A || new k();
 !A && typeof window < "u" && (window.__panelSingletonManager__ = j, window.panelSingletonManager = j);
 //#endregion
-//#region ../cesiumBase/src/components/FunctionPanelUIBase.vue
+//#region ../../GISBIM/cesiumBase/src/components/FunctionPanelUIBase.vue
 var M = typeof window < "u" && window.__panelSingletonManager__ || j, N = {
 	name: "FunctionPanelUIBase",
 	mixins: [O],
@@ -1041,7 +1041,7 @@ function G(s, c, p, m, g, x) {
 	})]);
 }
 //#endregion
-//#region ../cesiumBase/src/components/functions/TestPanelModule.vue
+//#region ../../GISBIM/cesiumBase/src/components/functions/TestPanelModule.vue
 var K = {
 	name: "TestPanelModule",
 	components: { FunctionPanelUIBase: /* @__PURE__ */ w(N, [["render", G], ["__scopeId", "data-v-2ca14fbb"]]) },
@@ -1440,7 +1440,7 @@ function ne(e, t, n, r, o, s) {
 	return y((d(), i("div", te, [...t[0] ||= [a("div", { class: "loading-message" }, "正在初始化双画布查看器（MJS模式）...", -1)]], 512)), [[_, !n.isClosed]]);
 }
 //#endregion
-//#region ../cesiumBase/src/components/functions/examples/SetContentExample.vue
+//#region ../../GISBIM/cesiumBase/src/components/functions/examples/SetContentExample.vue
 var re = {
 	name: "SetContentExample",
 	components: {

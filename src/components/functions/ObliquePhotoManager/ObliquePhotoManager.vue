@@ -93,7 +93,8 @@
 </template>
 
 <script>
-import JsonConfigPanelBase from '@cesiumBaseComponents/JsonConfigPanelBase.vue';
+import JsonConfigPanelBase from '@componentsLib/JsonConfigPanelBase.mjs';
+import '@componentsLib/JsonConfigPanelBase.mjs.css';
 import ObliqueHeightAdjustPanel from './ObliqueHeightAdjustPanel.vue';
 
 export default {
