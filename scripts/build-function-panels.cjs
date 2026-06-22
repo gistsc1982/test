@@ -72,38 +72,56 @@ function scanDirectoryRecursively(dir, results = []) {
 }
 
 /**
- * 扫描 functions/examples 目录下所有 Vue 组件
+ * 扫描 functions 根目录和 examples 目录下所有 Vue 组件
  * @returns {Array} 发现的组件列表
  */
 function discoverFunctionPanels() {
-  const examplesDir = path.resolve(CONFIG.cesiumBaseRoot, CONFIG.srcDir, 'examples');
-
-  if (!fs.existsSync(examplesDir)) {
-    log(`⚠️ examples 目录不存在: ${examplesDir}`, 'yellow');
-    return [];
-  }
-
-  log('🔍 扫描 functions/examples 目录...', 'yellow');
-
-  // 递归扫描所有 .vue 文件
-  const vueFiles = scanDirectoryRecursively(examplesDir);
+  const functionsDir = path.resolve(CONFIG.cesiumBaseRoot, CONFIG.srcDir);
+  const examplesDir = path.resolve(functionsDir, 'examples');
 
   const discovered = [];
 
-  for (const filePath of vueFiles) {
-    // 计算相对于 src/components/functions/examples 的路径
-    const relativePath = path.relative(path.resolve(CONFIG.cesiumBaseRoot, CONFIG.srcDir, 'examples'), filePath);
-    const componentName = path.basename(filePath, '.vue');
-    const subDir = path.dirname(relativePath).replace(/\\/g, '/'); // Windows 路径处理
+  // 先扫描 functions 根目录下的 Vue 组件
+  log('🔍 扫描 functions 根目录...', 'yellow');
+  if (fs.existsSync(functionsDir)) {
+    const entries = fs.readdirSync(functionsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isFile() && entry.name.endsWith('.vue')) {
+        const componentName = path.basename(entry.name, '.vue');
+        discovered.push({
+          name: componentName,
+          entry: entry.name, // 直接使用文件名作为入口
+          subDir: '', // 根目录组件，无子目录
+          relativePath: entry.name
+        });
+        log(`   ✅ 发现 ${componentName} (functions根目录)`, 'green');
+      }
+    }
+  }
 
-    discovered.push({
-      name: componentName,
-      entry: `examples/${relativePath.replace(/\\/g, '/')}`, // 添加 examples/ 前缀
-      subDir: subDir === '.' ? '' : subDir, // 如果是当前目录，使用空字符串
-      relativePath: relativePath.replace(/\\/g, '/')
-    });
+  // 再扫描 examples 目录下的 Vue 组件
+  log('🔍 扫描 functions/examples 目录...', 'yellow');
+  if (fs.existsSync(examplesDir)) {
+    // 递归扫描所有 .vue 文件
+    const vueFiles = scanDirectoryRecursively(examplesDir);
 
-    log(`   ✅ 发现 ${componentName} (${subDir || 'examples根目录'})`, 'green');
+    for (const filePath of vueFiles) {
+      // 计算相对于 src/components/functions/examples 的路径
+      const relativePath = path.relative(examplesDir, filePath);
+      const componentName = path.basename(filePath, '.vue');
+      const subDir = path.dirname(relativePath).replace(/\\/g, '/'); // Windows 路径处理
+
+      discovered.push({
+        name: componentName,
+        entry: `examples/${relativePath.replace(/\\/g, '/')}`, // 添加 examples/ 前缀
+        subDir: subDir === '.' ? '' : subDir, // 如果是当前目录，使用空字符串
+        relativePath: relativePath.replace(/\\/g, '/')
+      });
+
+      log(`   ✅ 发现 ${componentName} (${subDir || 'examples根目录'})`, 'green');
+    }
+  } else {
+    log(`⚠️ examples 目录不存在: ${examplesDir}`, 'yellow');
   }
 
   return discovered;
@@ -139,12 +157,14 @@ async function buildComponent(component) {
           entry: path.resolve(CONFIG.cesiumBaseRoot, CONFIG.srcDir, component.entry),
           name: component.name,
           fileName: (format) => {
-            // examples 组件输出到 examples 子目录
-            if (component.subDir) {
-              return `examples/${component.subDir}/${component.name}.mjs`;
+            const isExample = component.entry.startsWith('examples/');
+            if (isExample) {
+              if (component.subDir) {
+                return `examples/${component.subDir}/${component.name}.mjs`;
+              }
+              return `examples/${component.name}.mjs`;
             }
-            // examples 根目录组件输出到 examples 目录
-            return `examples/${component.name}.mjs`;
+            return `${component.name}.mjs`;
           },
           formats: ['es'] // 只生成 ES 模块
         },
@@ -155,26 +175,27 @@ async function buildComponent(component) {
                     'three/examples/jsm/loaders/DRACOLoader',
                     '@popperjs/core'],
           output: {
-            // 配置入口文件名模式
             entryFileNames: (chunkInfo) => {
-              // examples 组件输出到 examples 子目录
-              if (component.subDir) {
-                return `examples/${component.subDir}/${component.name}.mjs`;
-              }
-              // examples 根目录组件输出到 examples 目录
-              return `examples/${component.name}.mjs`;
-            },
-            // 保持目录结构
-            preserveModules: false,
-            // 对于有子目录的组件，输出到对应子目录
-            // ⭐ 关键修改：为每个组件生成单独的 CSS 文件
-            assetFileNames: (assetInfo) => {
-              // 如果是 CSS 文件，将其命名为与对应的 .mjs 文件相同
-              if (assetInfo.name.endsWith('.css')) {
+              const isExample = component.entry.startsWith('examples/');
+              if (isExample) {
                 if (component.subDir) {
-                  return `examples/${component.subDir}/${component.name}.mjs.css`;
+                  return `examples/${component.subDir}/${component.name}.mjs`;
                 }
-                return `examples/${component.name}.mjs.css`;
+                return `examples/${component.name}.mjs`;
+              }
+              return `${component.name}.mjs`;
+            },
+            preserveModules: false,
+            assetFileNames: (assetInfo) => {
+              if (assetInfo.name.endsWith('.css')) {
+                const isExample = component.entry.startsWith('examples/');
+                if (isExample) {
+                  if (component.subDir) {
+                    return `examples/${component.subDir}/${component.name}.mjs.css`;
+                  }
+                  return `examples/${component.name}.mjs.css`;
+                }
+                return `${component.name}.mjs.css`;
               }
               return '[name][extname]';
             }
@@ -256,18 +277,29 @@ function generateComponentsList(components) {
   const listData = {
     generated: new Date().toISOString(),
     count: components.length,
-    components: components.map(c => ({
-      name: c.name,
-      entry: c.entry,
-      subDir: c.subDir,
-      relativePath: c.relativePath,
-      importPath: c.subDir
-        ? `@componentsFunctionsLib/examples/${c.subDir}/${c.name}.mjs`
-        : `@componentsFunctionsLib/examples/${c.name}.mjs`,
-      file: c.subDir
-        ? `examples/${c.subDir}/${c.name}.mjs`
-        : `examples/${c.name}.mjs`
-    }))
+    components: components.map(c => {
+      const isExample = c.entry.startsWith('examples/');
+      let importPath, file;
+      if (isExample) {
+        importPath = c.subDir
+          ? `@componentsFunctionsLib/examples/${c.subDir}/${c.name}.mjs`
+          : `@componentsFunctionsLib/examples/${c.name}.mjs`;
+        file = c.subDir
+          ? `examples/${c.subDir}/${c.name}.mjs`
+          : `examples/${c.name}.mjs`;
+      } else {
+        importPath = `@componentsFunctionsLib/${c.name}.mjs`;
+        file = `${c.name}.mjs`;
+      }
+      return {
+        name: c.name,
+        entry: c.entry,
+        subDir: c.subDir,
+        relativePath: c.relativePath,
+        importPath,
+        file
+      };
+    })
   };
 
   // 确保输出目录存在
