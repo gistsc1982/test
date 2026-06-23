@@ -44,6 +44,14 @@
       >
         🗺️
       </button>
+      <button
+        @click="hideChart(item)"
+        class="action-btn hide-btn"
+        type="button"
+        title="删除图表显示"
+      >
+        🗑️
+      </button>
     </template>
 
     <template #dialogs>
@@ -254,24 +262,52 @@ export default {
       
       const longitude = parseFloat(chart.longitude) || 0;
       const latitude = parseFloat(chart.latitude) || 0;
-      const altHeight = parseFloat(chart.height) || 500;
+      const chartHeight = parseFloat(chart.height) || 100;
       
-      console.log(`[${this.componentName}] 🔍 目标位置: ${longitude}, ${latitude}, ${altHeight}m`);
+      const cameraHeight = chartHeight + 5000;
       
-      const position = Cesium.Cartesian3.fromDegrees(longitude, latitude, altHeight);
+      console.log(`[${this.componentName}] 🔍 目标位置: ${longitude}, ${latitude}, 图表高度: ${chartHeight}m, 相机高度: ${cameraHeight}m`);
+      
+      const position = Cesium.Cartesian3.fromDegrees(longitude, latitude, cameraHeight);
       console.log(`[${this.componentName}] 🔍 笛卡尔坐标:`, position);
       
       viewer.camera.flyTo({
         destination: position,
         orientation: {
           heading: Cesium.Math.toRadians(0),
-          pitch: Cesium.Math.toRadians(-45),
+          pitch: Cesium.Math.toRadians(-90),
           roll: 0.0
         },
         duration: 1.0
       });
       
-      console.log(`[${this.componentName}] ✅ 定位命令已发送`);
+      console.log(`[${this.componentName}] ✅ 定位命令已发送，相机高度: ${cameraHeight}m，垂直向下视角`);
+    },
+
+    hideChart(chart) {
+      console.log(`[${this.componentName}] 🗑️ 删除图表显示:`, chart.name);
+      
+      const viewer = this.getCesiumViewer();
+      if (!viewer) {
+        console.error(`[${this.componentName}] ❌ 未找到 Cesium Viewer`);
+        return;
+      }
+      
+      const chartInfo = this._cesiumCharts.get(chart.id);
+      if (chartInfo) {
+        if (chartInfo.entity) {
+          viewer.entities.remove(chartInfo.entity);
+          console.log(`[${this.componentName}] ✅ Entity 已移除`);
+        }
+        if (chartInfo.chartInstance) {
+          chartInfo.chartInstance.dispose();
+          console.log(`[${this.componentName}] ✅ 图表实例已销毁`);
+        }
+        this._cesiumCharts.delete(chart.id);
+        console.log(`[${this.componentName}] ✅ 图表 "${chart.name}" 已从地图移除`);
+      } else {
+        console.log(`[${this.componentName}] ℹ️ 图表 "${chart.name}" 未在地图上显示`);
+      }
     },
 
     async showChartOnMap(chart) {
@@ -491,5 +527,14 @@ export default {
 
 .locate-btn:hover {
   background: #5eb838;
+}
+
+.hide-btn {
+  background: #f56c6c;
+  color: white;
+}
+
+.hide-btn:hover {
+  background: #ee5a5a;
 }
 </style>
