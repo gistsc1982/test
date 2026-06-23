@@ -1,0 +1,60 @@
+{
+  "panelId": "geo-json-layer-manager",
+  "panelName": "GeoJSON图层管理",
+  "panelIcon": "🗺️",
+  "configId": "geojson-layers",
+  
+  "featureFolder": "GeoJsonLayerManager",
+  
+  "fieldDefinitions": [
+    { "key": "id", "label": "ID", "type": "text", "required": true, "placeholder": "唯一标识符", "readonly": true, "hidden": true },
+    { "key": "name", "label": "图层名称", "type": "text", "required": true, "placeholder": "图层名称" },
+    { "key": "description", "label": "描述", "type": "text", "required": false, "placeholder": "图层描述" },
+    { 
+      "key": "geoType", 
+      "label": "几何类型", 
+      "type": "select", 
+      "required": true,
+      "options": [
+        { "value": "Point", "label": "点" },
+        { "value": "LineString", "label": "线" },
+        { "value": "Polygon", "label": "面" }
+      ]
+    },
+    { "key": "geoJson", "label": "GeoJSON数据", "type": "textarea", "required": true, "placeholder": "GeoJSON格式数据" },
+    { "key": "fillColor", "label": "填充颜色", "type": "text", "required": false, "default": "#FFFF00" },
+    { "key": "strokeColor", "label": "边框颜色", "type": "text", "required": false, "default": "#000000" },
+    { "key": "strokeWidth", "label": "边框宽度", "type": "number", "required": false, "default": 2 },
+    { "key": "markerIcon", "label": "点图标", "type": "text", "required": false, "default": "📍", "placeholder": "emoji或字符" },
+    { "key": "markerColor", "label": "点颜色", "type": "text", "required": false, "default": "#4169E1" },
+    { "key": "markerSize", "label": "点大小", "type": "number", "required": false, "default": 48 },
+    { "key": "clampToGround", "label": "是否贴地", "type": "boolean", "required": false, "default": true }
+  ],
+  "defaultFormValues": {
+    "id": "",
+    "name": "",
+    "description": "",
+    "geoType": "Point",
+    "geoJson": "{\"type\": \"FeatureCollection\", \"features\": []}",
+    "fillColor": "#FFFF00",
+    "strokeColor": "#000000",
+    "strokeWidth": 2,
+    "markerColor": "#4169E1",
+    "markerIcon": "📍",
+    "markerSize": 48,
+    "clampToGround": true
+  },
+  "toolbarButtons": {
+    "add": true,
+    "import": true,
+    "export": true,
+    "refresh": true
+  },
+  "dataSource": {
+    "type": "sqlite",
+    "tableName": "GeoJsonLayerManager",
+    "primaryKey": "id",
+    "fileName": "GeoJsonLayerManager",
+    "relativePath": "gis/GeoJsonLayerManager/GeoJsonLayerManager.json"
+  }
+}

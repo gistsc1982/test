@@ -1,0 +1,9 @@
+[
+  {
+    "id": "oblique-height-adjust",
+    "presets": "[{\"value\":0,\"label\":\"0m\"},{\"value\":20,\"label\":\"20m\"},{\"value\":50,\"label\":\"50m\"}]",
+    "heightRange": "{\"min\":-2000,\"max\":2000,\"step\":1,\"unit\":\"米\"}",
+    "uiConfig": "{\"showRecommendedOffset\":true,\"showPreciseInput\":true,\"showResetButton\":true,\"showPresets\":true}",
+    "updatedAt": "2026-06-22T00:00:00.000Z"
+  }
+]

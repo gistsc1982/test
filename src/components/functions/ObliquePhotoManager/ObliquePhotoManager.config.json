@@ -24,9 +24,9 @@
   },
   "dataSource": {
     "type": "sqlite",
-    "tableName": "oblique_photography",
+    "tableName": "ObliquePhotoManager",
     "primaryKey": "id",
     "fileName": "ObliquePhotoManager",
-    "relativePath": "gis/oblique_photography.json"
+    "relativePath": "gis/ObliquePhotoManager/ObliquePhotoManager.json"
   }
 }

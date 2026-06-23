@@ -9,7 +9,7 @@
   
   "dataSource": {
     "type": "sqlite",
-    "tableName": "oblique_height_settings",
+    "tableName": "ObliqueHeightAdjustPanel",
     "primaryKey": "id",
     "fileName": "ObliqueHeightAdjustPanel"
   },

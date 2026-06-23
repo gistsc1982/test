@@ -35,7 +35,7 @@ const path = require('path');
  * 不允许连字符、空格、点号（除了 .json 扩展名）
  * @constant {RegExp}
  */
-const VALID_CONFIG_NAME_REGEX = /^[a-z0-9_]+\.json$/;
+const VALID_CONFIG_NAME_REGEX = /^[a-zA-Z0-9_]+\.json$/;
 
 /**
  * 验证配置文件名是否符合命名规范
@@ -79,7 +79,7 @@ function validateConfigPath(relativePath) {
 
   for (let i = 0; i < parts.length - 1; i++) {
     const dirName = parts[i];
-    if (!/^[a-z0-9_]+$/.test(dirName)) {
+    if (!/^[a-zA-Z0-9_]+$/.test(dirName)) {
       return {
         valid: false,
         reason: `目录名 "${dirName}" 只能包含小写字母、数字、下划线`,
@@ -679,7 +679,7 @@ class DatabaseManager {
             const fileName = entry.name;
             const nameWithoutExt = fileName.replace(/\.json$/i, '');
 
-            if (!/^[a-z0-9_]+$/.test(nameWithoutExt)) {
+            if (!/^[a-zA-Z0-9_]+$/.test(nameWithoutExt)) {
               results.skipped.push({
                 path: relPath,
                 fileName: fileName,

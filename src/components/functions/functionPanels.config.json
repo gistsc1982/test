@@ -398,6 +398,42 @@
         "initialX": "left",
         "initialY": 360
       }
+    },
+    {
+      "name": "GeoJsonLayerManager",
+      "file": "@componentsFunctions/GeoJsonLayerManager/GeoJsonLayerManager.vue",
+      "title": "GeoJSON图层管理",
+      "description": "加载和管理GeoJSON格式的点、线、面图层",
+      "enabled": true,
+      "visible": false,
+      "icon": "🗺️",
+      "category": "tools",
+      "singleton": true,
+      "singletonContainerId": "geoJsonLayerManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 440
+      }
+    },
+    {
+      "name": "GeoJsonLayerManagerMulti",
+      "file": "@componentsFunctions/GeoJsonLayerManager/GeoJsonLayerManager.vue",
+      "title": "GeoJSON图层管理（多实例）",
+      "description": "加载和管理GeoJSON格式的点、线、面图层（多实例模式）",
+      "enabled": true,
+      "visible": false,
+      "icon": "🗾",
+      "category": "tools",
+      "singleton": false,
+      "singletonContainerId": "geoJsonLayerManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 520
+      }
     }
   ],
   "categories": {
