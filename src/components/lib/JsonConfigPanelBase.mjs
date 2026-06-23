@@ -1042,21 +1042,20 @@ function K(e, s, f, ee, h, g) {
 }
 var q = /*#__PURE__*/ E(P, [["render", K], ["__scopeId", "data-v-2ca14fbb"]]), J = new class {
 	constructor() {
-		this.configDefinitions = new Map([["oblique-photography", {
-			id: "oblique-photography",
-			name: "倾斜摄影配置",
-			fileName: "oblique_photography.json",
-			relativePath: "gis/oblique_photography.json",
-			description: "倾斜摄影模型加载配置",
-			icon: "📷",
-			category: "gis"
-		}]]), this.serverConfig = {
+		this.configDefinitions = new Map(), this.serverConfig = {
 			baseURL: this.detectServerURL(),
 			apiPort: 8081,
 			dataAPI: "api/data",
 			syncAPI: "api/sync",
 			timeout: 3e4
-		}, console.log("[DataManager] 初始化完成"), console.log("[DataManager] 服务器配置:", this.serverConfig);
+		}, 
+		// ⭐ 从 window.__pendingConfigDefinitions__ 中加载待注册的配置
+		typeof window < "u" && window.__pendingConfigDefinitions__ && window.__pendingConfigDefinitions__.forEach((e, t) => {
+			this.configDefinitions.has(t) || (this.configDefinitions.set(t, e), console.log(`[DataManager] ✅ 加载待注册配置: ${t}`));
+		}),
+		// 将自身暴露到 window
+		typeof window < "u" && (window.__dataManager__ = this),
+		console.log("[DataManager] 初始化完成"), console.log("[DataManager] 服务器配置:", this.serverConfig);
 	}
 	detectServerURL() {
 		if (typeof window > "u") return "http://192.168.31.146:8080";

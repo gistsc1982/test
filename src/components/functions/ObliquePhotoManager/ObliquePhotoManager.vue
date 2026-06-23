@@ -96,7 +96,7 @@
 import JsonConfigPanelBase from '@componentsLib/JsonConfigPanelBase.mjs';
 import '@componentsLib/JsonConfigPanelBase.mjs.css';
 import ObliqueHeightAdjustPanel from './ObliqueHeightAdjustPanel.vue';
-import { ConfigStrategyFactory } from './ConfigLoadStrategy.mjs';
+import { ConfigStrategyFactory, configRegistry } from './ConfigLoadStrategy.mjs';
 import { validateConfigMetadata, formatValidationResult } from './TableNameValidator.mjs';
 
 // ⭐ 导入面板配置元数据
@@ -188,6 +188,9 @@ export default {
   },
 
   created() {
+    // ⭐ 注册配置定义到 DataManager
+    configRegistry.registerFromMetadata(this.panelMetadata);
+    
     // ⭐ 初始化配置加载策略
     // 根据配置元数据创建策略，支持带回退机制
     const dataSourceType = this.panelMetadata.dataSource?.type || 'sqlite';

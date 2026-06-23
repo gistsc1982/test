@@ -362,6 +362,42 @@
         "initialX": "left",
         "initialY": 200
       }
+    },
+    {
+      "name": "EChartManager",
+      "file": "@componentsFunctions/echartManager/EChartManager.vue",
+      "title": "EChart图表管理",
+      "description": "在Cesium地图上显示ECharts图表，支持多种图表类型和自定义配置",
+      "enabled": true,
+      "visible": false,
+      "icon": "📊",
+      "category": "tools",
+      "singleton": true,
+      "singletonContainerId": "echartManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 280
+      }
+    },
+    {
+      "name": "EChartManagerMulti",
+      "file": "@componentsFunctions/echartManager/EChartManager.vue",
+      "title": "EChart图表管理（多实例）",
+      "description": "在Cesium地图上显示ECharts图表（多实例模式）",
+      "enabled": true,
+      "visible": false,
+      "icon": "📈",
+      "category": "tools",
+      "singleton": false,
+      "singletonContainerId": "echartManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 360
+      }
     }
   ],
   "categories": {

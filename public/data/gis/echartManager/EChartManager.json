@@ -1,0 +1,38 @@
+[
+  {
+    "id": "chart1",
+    "name": "示例柱状图",
+    "chartType": "bar",
+    "longitude": 114.927919,
+    "latitude": 27.12451,
+    "height": 100,
+    "width": 300,
+    "heightPx": 200,
+    "theme": "shine",
+    "option": "{\"title\":{\"text\":\"示例数据\",\"left\":\"center\"},\"tooltip\":{},\"xAxis\":{\"data\":[\"周一\",\"周二\",\"周三\",\"周四\",\"周五\"]},\"yAxis\":{},\"series\":[{\"type\":\"bar\",\"data\":[120,200,150,180,220]}]}"
+  },
+  {
+    "id": "chart2",
+    "name": "示例饼图",
+    "chartType": "pie",
+    "longitude": 114.927919,
+    "latitude": 27.12451,
+    "height": 150,
+    "width": 250,
+    "heightPx": 250,
+    "theme": "dark",
+    "option": "{\"title\":{\"text\":\"占比分布\",\"left\":\"center\"},\"tooltip\":{},\"series\":[{\"type\":\"pie\",\"data\":[{\"value\":335,\"name\":\"直接访问\"},{\"value\":278,\"name\":\"邮件营销\"},{\"value\":180,\"name\":\"联盟广告\"},{\"value\":120,\"name\":\"搜索引擎\"}]}]}"
+  },
+  {
+    "id": "chart3",
+    "name": "示例折线图",
+    "chartType": "line",
+    "longitude": 114.927919,
+    "latitude": 27.12451,
+    "height": 200,
+    "width": 300,
+    "heightPx": 200,
+    "theme": "shine",
+    "option": "{\"title\":{\"text\":\"趋势图\",\"left\":\"center\"},\"tooltip\":{},\"xAxis\":{\"data\":[\"1月\",\"2月\",\"3月\",\"4月\",\"5月\"]},\"yAxis\":{},\"series\":[{\"type\":\"line\",\"data\":[80,120,90,150,110]}]}"
+  }
+]

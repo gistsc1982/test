@@ -1,0 +1,60 @@
+{
+  "panelId": "echart-manager",
+  "panelName": "EChart图表管理",
+  "panelIcon": "📊",
+  "configId": "echart_configs",
+  
+  "featureFolder": "echartManager",
+  
+  "fieldDefinitions": [
+    { "key": "id", "label": "ID", "type": "text", "required": true, "readonly": true, "placeholder": "唯一标识符" },
+    { "key": "name", "label": "图表名称", "type": "text", "required": true, "placeholder": "图表名称" },
+    { "key": "chartType", "label": "图表类型", "type": "select", "options": [
+      { "value": "bar", "label": "柱状图" },
+      { "value": "line", "label": "折线图" },
+      { "value": "pie", "label": "饼图" },
+      { "value": "scatter", "label": "散点图" },
+      { "value": "map", "label": "地图" },
+      { "value": "gauge", "label": "仪表盘" }
+    ], "required": true },
+    { "key": "longitude", "label": "经度", "type": "text", "required": true, "placeholder": "经度，如：116.4" },
+    { "key": "latitude", "label": "纬度", "type": "text", "required": true, "placeholder": "纬度，如：39.9" },
+    { "key": "height", "label": "高度", "type": "text", "default": "0", "placeholder": "相对于地面的高度" },
+    { "key": "width", "label": "宽度(px)", "type": "text", "default": "300", "placeholder": "300" },
+    { "key": "heightPx", "label": "高度(px)", "type": "text", "default": "200", "placeholder": "200" },
+    { "key": "theme", "label": "主题", "type": "select", "options": [
+      { "value": "shine", "label": "shine" },
+      { "value": "dark", "label": "dark" },
+      { "value": "essos", "label": "essos" }
+    ], "default": "shine" },
+    { "key": "option", "label": "图表配置(JSON)", "type": "textarea", "required": true, "placeholder": "{\"xAxis\": {...}, \"series\": [...]}" }
+  ],
+  
+  "defaultFormValues": {
+    "id": "",
+    "name": "",
+    "chartType": "bar",
+    "longitude": "114.927919",
+    "latitude": "27.12451",
+    "height": "100",
+    "width": "300",
+    "heightPx": "200",
+    "theme": "shine",
+    "option": "{\"title\": {\"text\": \"新图表\", \"left\": \"center\"}, \"xAxis\": {\"data\": [\"A\", \"B\", \"C\"]}, \"yAxis\": {}, \"series\": [{\"type\": \"bar\", \"data\": [10, 20, 30]}]}"
+  },
+  
+  "toolbarButtons": {
+    "add": true,
+    "import": true,
+    "export": true,
+    "refresh": true
+  },
+  
+  "dataSource": {
+    "type": "sqlite",
+    "tableName": "echart_configs",
+    "primaryKey": "id",
+    "fileName": "EChartManager",
+    "relativePath": "gis/echartManager/EChartManager.json"
+  }
+}

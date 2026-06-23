@@ -40,13 +40,31 @@ export class ConfigRegistry {
     this.registeredConfigs = new Map();
   }
 
+  /**
+   * 获取 DataManager 实例
+   * @returns {Object} DataManager 实例
+   */
   getDataManager() {
+    // 尝试从 window 获取 DataManager 实例
     if (typeof window !== 'undefined' && window.__dataManager__) {
       return window.__dataManager__;
     }
-    return null;
+    
+    // 尝试从 JsonConfigPanelBase.mjs 获取 J 实例
+    try {
+      // 动态导入 JsonConfigPanelBase.mjs
+      return null; // 需要在运行时获取
+    } catch (e) {
+      console.warn('[ConfigRegistry] 无法获取 DataManager 实例');
+      return null;
+    }
   }
 
+  /**
+   * 注册配置定义
+   * @param {string} configId - 配置ID
+   * @param {Object} configDefinition - 配置定义
+   */
   registerConfig(configId, configDefinition) {
     console.log(`[ConfigRegistry] 📝 注册配置: ${configId}`);
     
@@ -55,6 +73,7 @@ export class ConfigRegistry {
       ...configDefinition
     });
 
+    // 尝试注册到 DataManager
     const dataManager = this.getDataManager();
     if (dataManager && dataManager.configDefinitions) {
       dataManager.configDefinitions.set(configId, {
@@ -64,6 +83,7 @@ export class ConfigRegistry {
       console.log(`[ConfigRegistry] ✅ 配置已注册到 DataManager: ${configId}`);
     } else {
       console.warn(`[ConfigRegistry] ⚠️ DataManager 未就绪，配置将在运行时注册: ${configId}`);
+      // 存储到 window 供后续使用
       if (typeof window !== 'undefined') {
         if (!window.__pendingConfigDefinitions__) {
           window.__pendingConfigDefinitions__ = new Map();
@@ -76,6 +96,22 @@ export class ConfigRegistry {
     }
   }
 
+  /**
+   * 批量注册配置定义
+   * @param {Array} configs - 配置定义数组
+   */
+  registerConfigs(configs) {
+    configs.forEach(config => {
+      if (config.id) {
+        this.registerConfig(config.id, config);
+      }
+    });
+  }
+
+  /**
+   * 从配置元数据注册
+   * @param {Object} panelMetadata - 面板配置元数据
+   */
   registerFromMetadata(panelMetadata) {
     if (!panelMetadata || !panelMetadata.configId) {
       console.warn('[ConfigRegistry] ⚠️ 无效的面板配置元数据');
@@ -84,12 +120,15 @@ export class ConfigRegistry {
 
     const configId = panelMetadata.configId;
     
+    // 优先使用配置中指定的 relativePath
     let relativePath = panelMetadata.dataSource?.relativePath;
     
+    // 如果没有指定，则自动生成
     if (!relativePath) {
       relativePath = this.generateRelativePath(panelMetadata);
     }
     
+    // 根据 panelMetadata 生成配置定义
     const configDefinition = {
       id: configId,
       name: panelMetadata.panelName || configId,
@@ -103,13 +142,21 @@ export class ConfigRegistry {
     this.registerConfig(configId, configDefinition);
   }
 
+  /**
+   * 根据配置元数据生成相对路径
+   * @param {Object} panelMetadata - 面板配置元数据
+   * @returns {string} 相对路径
+   */
   generateRelativePath(panelMetadata) {
+    // 优先使用 featureFolder
     let folderName = panelMetadata.featureFolder;
     
+    // 其次使用 dataSource 中的 folderName
     if (!folderName) {
       folderName = panelMetadata.dataSource?.folderName;
     }
     
+    // 最后根据 panelId 生成
     if (!folderName) {
       folderName = panelMetadata.panelId
         .split('-')
@@ -117,8 +164,10 @@ export class ConfigRegistry {
         .join('');
     }
 
+    // 使用 dataSource 中的 fileName，否则使用 panelId
     let fileName = panelMetadata.dataSource?.fileName || panelMetadata.configId;
 
+    // 确保文件扩展名
     if (!fileName.endsWith('.json')) {
       fileName = `${fileName}.json`;
     }
@@ -127,7 +176,40 @@ export class ConfigRegistry {
   }
 }
 
+// 创建全局注册器实例
 export const configRegistry = new ConfigRegistry();
+
+// 页面加载完成后，将待注册配置同步到 DataManager
+if (typeof window !== 'undefined') {
+  window.__dataManagerReady__ = new Promise((resolve) => {
+    // 监听 DataManager 初始化完成事件
+    const checkDataManager = () => {
+      // 尝试从全局变量获取 DataManager
+      const dataManager = typeof window.__dataManager__ !== 'undefined' 
+        ? window.__dataManager__ 
+        : null;
+      
+      if (dataManager && dataManager.configDefinitions) {
+        // 同步待注册的配置
+        if (window.__pendingConfigDefinitions__) {
+          window.__pendingConfigDefinitions__.forEach((config, configId) => {
+            if (!dataManager.configDefinitions.has(configId)) {
+              dataManager.configDefinitions.set(configId, config);
+              console.log(`[ConfigRegistry] ✅ 延迟注册配置到 DataManager: ${configId}`);
+            }
+          });
+        }
+        resolve(dataManager);
+      } else {
+        // 稍后重试
+        setTimeout(checkDataManager, 100);
+      }
+    };
+    
+    // 立即检查一次
+    setTimeout(checkDataManager, 100);
+  });
+}
 
 /**
  * SQLite 配置加载策略
