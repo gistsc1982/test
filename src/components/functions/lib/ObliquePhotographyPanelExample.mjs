@@ -2540,6 +2540,30 @@ var ut = {
 		},
 		onConfigLoadedHandler() {
 			console.log(`[${this.componentName}] ✅ 配置加载完成`);
+			console.log(`[${this.componentName}] 📊 配置总数: ${this.configList.length} 条`);
+			
+			// ⭐ 打印详细配置内容
+			if (this.configList.length > 0) {
+				console.log(`[${this.componentName}] 📋 配置详情:`);
+				this.configList.forEach((item, index) => {
+					console.log(`[${this.componentName}]   ├─ [${index + 1}] ${item.name || item.id || '未命名'}`);
+					console.log(`[${this.componentName}]   │   ├── id: ${item.id}`);
+					console.log(`[${this.componentName}]   │   ├── name: ${item.name}`);
+					console.log(`[${this.componentName}]   │   ├── url: ${item.url || '未设置'}`);
+					console.log(`[${this.componentName}]   │   ├── loaded: ${item.loaded || false}`);
+					console.log(`[${this.componentName}]   │   └── loading: ${item.loading || false}`);
+					
+					// 打印其他可能存在的字段
+					if (item.heightOffset !== undefined) {
+						console.log(`[${this.componentName}]   │   └── heightOffset: ${item.heightOffset}`);
+					}
+					if (item.tileset) {
+						console.log(`[${this.componentName}]   │   └── tileset: ${typeof item.tileset === 'object' ? 'Cesium3DTileset' : item.tileset}`);
+					}
+				});
+			} else {
+				console.log(`[${this.componentName}] ⚠️ 配置列表为空`);
+			}
 		},
 		getCesiumViewer() {
 			return this.cesiumViewer;

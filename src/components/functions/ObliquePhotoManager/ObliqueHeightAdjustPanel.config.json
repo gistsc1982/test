@@ -1,0 +1,32 @@
+{
+  "panelId": "oblique-height-adjust",
+  "panelName": "倾斜摄影高度调整",
+  "panelIcon": "🌏",
+  
+  "configId": "oblique-height-adjust",
+  
+  "featureFolder": "ObliquePhotoManager",
+  
+  "dataSource": {
+    "type": "sqlite",
+    "tableName": "oblique_height_settings",
+    "primaryKey": "id",
+    "fileName": "ObliqueHeightAdjustPanel"
+  },
+  
+  "fieldDefinitions": [
+    { "key": "id", "label": "ID", "type": "text", "required": true },
+    { "key": "presets", "label": "预设值", "type": "text" },
+    { "key": "heightRange", "label": "高度范围", "type": "text" },
+    { "key": "uiConfig", "label": "UI配置", "type": "text" },
+    { "key": "updatedAt", "label": "更新时间", "type": "text" }
+  ],
+  
+  "defaultFormValues": {
+    "id": "oblique-height-adjust",
+    "presets": [],
+    "heightRange": {},
+    "uiConfig": {},
+    "updatedAt": ""
+  }
+}

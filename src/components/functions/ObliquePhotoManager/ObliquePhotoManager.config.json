@@ -1,0 +1,31 @@
+{
+  "panelId": "oblique-photo-manager",
+  "panelName": "倾斜摄影图层管理",
+  "panelIcon": "📷",
+  "configId": "oblique-photography",
+  
+  "featureFolder": "ObliquePhotoManager",
+  
+  "fieldDefinitions": [
+    { "key": "id", "label": "ID", "type": "text", "required": true, "placeholder": "唯一标识符" },
+    { "key": "name", "label": "名称", "type": "text", "required": true, "placeholder": "图层名称" },
+    { "key": "url", "label": "URL", "type": "url", "required": true, "placeholder": "3D Tiles URL 地址" }
+  ],
+  "defaultFormValues": {
+    "id": "",
+    "name": "",
+    "url": ""
+  },
+  "toolbarButtons": {
+    "add": true,
+    "import": true,
+    "export": true,
+    "refresh": true
+  },
+  "dataSource": {
+    "type": "sqlite",
+    "tableName": "oblique_photography",
+    "primaryKey": "id",
+    "fileName": "ObliquePhotoManager"
+  }
+}

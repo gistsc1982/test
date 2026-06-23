@@ -62,14 +62,14 @@
       <div class="adjustment-section">
         <div class="section-label">
           <span>调整偏移</span>
-          <span class="range-hint">-2000m ~ +2000m</span>
+          <span class="range-hint">{{ heightRange.min }}m ~ +{{ heightRange.max }}m</span>
         </div>
         <div class="slider-container">
           <input
             type="range"
-            min="-2000"
-            max="2000"
-            step="1"
+            :min="heightRange.min"
+            :max="heightRange.max"
+            :step="heightRange.step"
             :value="selectedLayer.heightOffset || 0"
             @input="onHeightSliderInput"
             @change="onHeightSliderChange"
@@ -101,7 +101,7 @@
       </div>
 
       <!-- 快捷预设 -->
-      <div class="preset-section">
+      <div v-if="uiConfig.showPresets !== false" class="preset-section">
         <div class="section-label">快捷预设</div>
         <div class="preset-grid">
           <button
@@ -109,7 +109,7 @@
             :key="preset.value"
             @click="applyPreset(preset.value)"
             class="preset-btn"
-            :class="{ active: Math.abs(selectedLayer.heightOffset - preset.value) < 0.1 }"
+            :class="{ active: Math.abs((selectedLayer?.heightOffset || 0) - preset.value) < 0.1 }"
           >
             {{ preset.label }}
           </button>
@@ -132,6 +132,20 @@ import FunctionPanelUIBase from '@componentsLib/FunctionPanelUIBase.mjs'
 import '@componentsLib/FunctionPanelUIBase.mjs.css'
 import SfcBase from '@/components/lib/SfcBase.mjs';
 import '@/components/lib/SfcBase.mjs.css';
+import { ConfigStrategyFactory } from './ConfigLoadStrategy.mjs';
+import { validateConfigMetadata, formatValidationResult } from './TableNameValidator.mjs';
+
+// ⭐ 导入面板配置元数据
+import rawPanelConfig from './ObliqueHeightAdjustPanel.config.json';
+
+// ⭐ 验证配置元数据
+const validationResult = validateConfigMetadata(rawPanelConfig);
+console.log(`[ObliqueHeightAdjustPanel] 📋 配置元数据验证结果:`);
+console.log(formatValidationResult(validationResult));
+
+// ⭐ 使用验证后的安全配置
+const panelConfig = validationResult.safeConfig || rawPanelConfig;
+
 /**
  * ObliqueHeightAdjustPanel - 倾斜摄影高度偏移调整面板
  *
@@ -179,15 +193,30 @@ export default {
   data() {
     return {
       componentName: 'ObliqueHeightAdjustPanel',
-      // 快捷预设值
-      presets: [
+      // ⭐ 使用配置文件中的预设值（作为默认值）
+      presets: panelConfig.presets || [
         { value: 0, label: '0m' },
         { value: 50, label: '50m' },
         { value: 100, label: '100m' },
         { value: 200, label: '200m' },
         { value: 500, label: '500m' },
         { value: 1000, label: '1km' }
-      ]
+      ],
+      // ⭐ 使用配置文件中的高度范围（作为默认值）
+      heightRange: panelConfig.heightRange || {
+        min: -2000,
+        max: 2000,
+        step: 1
+      },
+      // ⭐ UI配置
+      uiConfig: panelConfig.uiConfig || {
+        showRecommendedOffset: true,
+        showPreciseInput: true,
+        showResetButton: true,
+        showPresets: true
+      },
+      // ⭐ 配置加载策略实例
+      _configStrategy: null
     };
   },
   computed: {
@@ -195,7 +224,108 @@ export default {
       return this.selectedLayer ? `${this.selectedLayer.name} 高度调整` : '高度调整';
     }
   },
+  created() {
+    const dataSourceType = panelConfig.dataSource?.type || 'sqlite';
+    this._configStrategy = ConfigStrategyFactory.createWithFallback(
+      [dataSourceType, 'json'],
+      { baseURL: 'http://localhost:8081' }
+    );
+    console.log(`[${this.componentName}] ✅ 配置加载策略已初始化: ${this._configStrategy.getName()}`);
+    console.log(`[${this.componentName}] 📋 初始预设值（来自配置文件）:`, this.presets);
+    this.loadPanelConfig();
+  },
   methods: {
+    async loadPanelConfig() {
+      try {
+        console.log(`[${this.componentName}] 📂 开始从数据库加载面板配置`);
+        const rawData = await this._configStrategy.load(panelConfig);
+        
+        console.log(`[${this.componentName}] 📦 数据库返回数据:`, rawData);
+        
+        if (rawData && rawData.length > 0) {
+          const savedConfig = rawData[0];
+          console.log(`[${this.componentName}] 📋 找到已保存的配置:`, savedConfig);
+          
+          if (savedConfig.presets) {
+            try {
+              // 反序列化 JSON 字符串
+              const loadedPresets = typeof savedConfig.presets === 'string' 
+                ? JSON.parse(savedConfig.presets) 
+                : savedConfig.presets;
+              
+              console.log(`[${this.componentName}] 🎯 加载到预设值:`, loadedPresets);
+              
+              // 验证预设值格式
+              if (Array.isArray(loadedPresets) && loadedPresets.length > 0) {
+                this.presets = loadedPresets;
+                console.log(`[${this.componentName}] ✅ 预设配置已更新为数据库中的值`);
+              } else {
+                console.warn(`[${this.componentName}] ⚠️ 数据库中的预设值格式无效，使用默认值`);
+              }
+            } catch (parseError) {
+              console.error(`[${this.componentName}] ❌ 解析预设配置失败:`, parseError);
+            }
+          } else {
+            console.log(`[${this.componentName}] ℹ️ 数据库中没有预设配置，使用默认值`);
+          }
+          
+          if (savedConfig.heightRange) {
+            try {
+              const loadedRange = typeof savedConfig.heightRange === 'string' 
+                ? JSON.parse(savedConfig.heightRange) 
+                : savedConfig.heightRange;
+              if (typeof loadedRange === 'object') {
+                this.heightRange = { ...this.heightRange, ...loadedRange };
+                console.log(`[${this.componentName}] ✅ 高度范围配置已更新:`, this.heightRange);
+              }
+            } catch (parseError) {
+              console.error(`[${this.componentName}] ❌ 解析高度范围配置失败:`, parseError);
+            }
+          }
+          
+          if (savedConfig.uiConfig) {
+            try {
+              const loadedUI = typeof savedConfig.uiConfig === 'string' 
+                ? JSON.parse(savedConfig.uiConfig) 
+                : savedConfig.uiConfig;
+              if (typeof loadedUI === 'object') {
+                this.uiConfig = { ...this.uiConfig, ...loadedUI };
+                console.log(`[${this.componentName}] ✅ UI配置已更新:`, this.uiConfig);
+              }
+            } catch (parseError) {
+              console.error(`[${this.componentName}] ❌ 解析UI配置失败:`, parseError);
+            }
+          }
+        } else {
+          console.log(`[${this.componentName}] ℹ️ 数据库中无配置记录，使用默认配置`);
+          console.log(`[${this.componentName}] 💡 提示：可以调用 savePanelConfig() 将当前配置保存到数据库`);
+        }
+      } catch (error) {
+        console.error(`[${this.componentName}] ❌ 加载配置失败:`, error);
+        console.log(`[${this.componentName}] ℹ️ 使用默认配置继续`);
+      }
+    },
+    async savePanelConfig() {
+      try {
+        console.log(`[${this.componentName}] 📤 准备保存面板配置`);
+        const configData = {
+          id: panelConfig.panelId,
+          presets: JSON.stringify(this.presets),
+          heightRange: JSON.stringify(this.heightRange),
+          uiConfig: JSON.stringify(this.uiConfig),
+          updatedAt: new Date().toISOString()
+        };
+        const success = await this._configStrategy.save(panelConfig, [configData]);
+        if (success) {
+          console.log(`[${this.componentName}] ✅ 配置已保存`);
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error(`[${this.componentName}] ❌ 保存失败:`, error);
+        return false;
+      }
+    },
     handleClose() {
       console.log(`[${this.componentName}] 面板关闭`);
       this.$emit('close');

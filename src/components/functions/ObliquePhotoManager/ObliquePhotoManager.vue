@@ -2,21 +2,21 @@
   <!-- 使用 JsonConfigPanelBase 作为基类 -->
   <JsonConfigPanelBase
     ref="basePanel"
-    panel-title="倾斜摄影图层管理"
-    panel-icon="📷"
+    :panel-title="panelMetadata.panelName"
+    :panel-icon="panelMetadata.panelIcon"
     :panel-width="450"
     :panel-max-height="'70vh'"
     :initial-x="initialX"
     :initial-y="initialY"
     close-event-name="obliquePhotoManagerClose"
-    config-id="oblique-photography"
+    :config-id="panelMetadata.configId"
     :panel-name="panelName || 'ObliquePhotoManager'"
     :auto-register="autoRegister !== false"
     :panel-instance-id="panelInstanceId"
     :registration-key="registrationKey || 'ObliquePhotoManager'"
-    :field-definitions="fieldDefinitions"
-    :default-form-values="defaultFormValues"
-    :toolbar-buttons="toolbarButtons"
+    :field-definitions="panelMetadata.fieldDefinitions"
+    :default-form-values="panelMetadata.defaultFormValues"
+    :toolbar-buttons="panelMetadata.toolbarButtons"
     :lazy-load="true"
     @config-loaded="onConfigLoadedHandler"
   >
@@ -42,7 +42,7 @@
 
     <!-- 列表项额外操作按钮 -->
     <template #item-actions="{ item }">
-      <span style="color: blue; font-size: 10px; margin-right: 4px;">📍</span>
+      <span style="color: blue; font-size: 10px; margin-right: 4px;"></span>
       
       <!-- 定位按钮 -->
       <button
@@ -96,6 +96,19 @@
 import JsonConfigPanelBase from '@componentsLib/JsonConfigPanelBase.mjs';
 import '@componentsLib/JsonConfigPanelBase.mjs.css';
 import ObliqueHeightAdjustPanel from './ObliqueHeightAdjustPanel.vue';
+import { ConfigStrategyFactory } from './ConfigLoadStrategy.mjs';
+import { validateConfigMetadata, formatValidationResult } from './TableNameValidator.mjs';
+
+// ⭐ 导入面板配置元数据
+import rawPanelMetadata from './ObliquePhotoManager.config.json';
+
+// ⭐ 验证配置元数据
+const validationResult = validateConfigMetadata(rawPanelMetadata);
+console.log(`[ObliquePhotoManager] 📋 配置元数据验证结果:`);
+console.log(formatValidationResult(validationResult));
+
+// ⭐ 使用验证后的安全配置
+const panelMetadata = validationResult.safeConfig || rawPanelMetadata;
 
 export default {
   name: 'ObliquePhotoManager',
@@ -134,27 +147,8 @@ export default {
 
   data() {
     return {
-      // 字段定义
-      fieldDefinitions: [
-        { key: 'id', label: 'ID', type: 'text', required: true, placeholder: '唯一标识符' },
-        { key: 'name', label: '名称', type: 'text', required: true, placeholder: '图层名称' },
-        { key: 'url', label: 'URL', type: 'url', required: true, placeholder: '3D Tiles URL 地址' }
-      ],
-
-      // 表单默认值
-      defaultFormValues: {
-        id: '',
-        name: '',
-        url: ''
-      },
-
-      // 工具栏按钮配置
-      toolbarButtons: {
-        add: true,
-        import: true,
-        export: true,
-        refresh: true
-      },
+      // ⭐ 使用配置元数据
+      panelMetadata,
 
       // Cesium 对象（非响应式）
       _cesiumTilesets: null,
@@ -167,8 +161,8 @@ export default {
 
       componentName: 'ObliquePhotoManager',
 
-      // ⭐ API 服务器配置
-      apiServerURL: 'http://localhost:8081/api/data/gis/oblique_photography.json'
+      // ⭐ 配置加载策略实例
+      _configStrategy: null
     };
   },
 
@@ -193,7 +187,42 @@ export default {
     this._cesiumHeightOffsets = new Map();
   },
 
+  created() {
+    // ⭐ 初始化配置加载策略
+    // 根据配置元数据创建策略，支持带回退机制
+    const dataSourceType = this.panelMetadata.dataSource?.type || 'sqlite';
+    this._configStrategy = ConfigStrategyFactory.createWithFallback(
+      [dataSourceType, 'json'],
+      { baseURL: 'http://localhost:8081' }
+    );
+    console.log(`[${this.componentName}] ✅ 配置加载策略已初始化: ${this._configStrategy.getName()}`);
+    
+    // ⭐ 对 Manager 组件进行配置结构验证
+    this.validateManagerStructure();
+  },
+
   methods: {
+    /**
+     * 验证 Manager 组件的配置结构
+     */
+    async validateManagerStructure() {
+      console.log(`[${this.componentName}] 🔍 开始验证配置结构`);
+      
+      const strategies = this._configStrategy._strategies || [this._configStrategy];
+      
+      for (const strategy of strategies) {
+        if (typeof strategy.validateManagerStructure === 'function') {
+          const result = await strategy.validateManagerStructure(this.panelMetadata);
+          console.log(`[${this.componentName}] 📋 结构验证结果:`, result);
+          
+          if (result.isManager && !result.folderExists) {
+            console.warn(`[${this.componentName}] ⚠️ 配置文件夹不存在: /data/gis/${result.folderName}/`);
+            console.warn(`[${this.componentName}] 💡 建议创建: public/data/gis/${result.folderName}/`);
+          }
+        }
+      }
+    },
+
     // ==================== 基类钩子方法覆盖 ====================
 
     initCesium(callback) {
@@ -213,84 +242,51 @@ export default {
       }
     },
 
-    // ⭐ 覆盖 loadConfig 方法，直接从 API 服务器加载配置
+    // ⭐ 使用策略模式加载配置
     async loadConfig() {
       try {
-        console.log(`[${this.componentName}] 📂 开始加载配置: ${this.configId}`);
-        console.log(`[${this.componentName}] 📡 从 API 服务器加载: ${this.apiServerURL}`);
+        console.log(`[${this.componentName}] 📂 开始加载配置: ${this.panelMetadata.panelId}`);
+        console.log(`[${this.componentName}] 🎯 使用策略: ${this._configStrategy.getName()}`);
 
-        const response = await fetch(this.apiServerURL, {
-          method: 'GET',
-          mode: 'cors',
-          cache: 'no-cache'
-        });
+        // 使用策略加载配置
+        const rawData = await this._configStrategy.load(this.panelMetadata);
+        
+        console.log(`[${this.componentName}] � 加载到数据:`, rawData);
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const result = await response.json();
-        console.log(`[${this.componentName}] 📦 API 返回:`, result);
-
-        if (result.success && result.data) {
-          console.log(`[${this.componentName}] ✅ 从 API 服务器加载成功，共 ${result.data.length} 条`);
-          this.configList = this.processLoadedData(result.data);
-          this.onConfigLoaded();
-        } else {
-          throw new Error(result.error || '加载数据失败');
-        }
+        // 处理加载的数据
+        this.configList = this.processLoadedData(rawData);
+        this.onConfigLoaded();
+        
+        console.log(`[${this.componentName}] ✅ 配置加载完成，共 ${this.configList.length} 条`);
       } catch (error) {
-        console.error(`[${this.componentName}] ❌ 从 API 服务器加载失败:`, error);
-        // 尝试从静态文件加载作为回退
-        try {
-          console.log(`[${this.componentName}] 🔄 回退到静态文件加载`);
-          const response = await fetch(`/data/gis/oblique_photography.json`, {
-            cache: 'no-cache'
-          });
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`[${this.componentName}] ✅ 从静态文件加载成功`);
-            this.configList = this.processLoadedData(data);
-            this.onConfigLoaded();
-          } else {
-            console.error(`[${this.componentName}] ❌ 静态文件加载也失败`);
-            this.configList = [];
-          }
-        } catch (fallbackError) {
-          console.error(`[${this.componentName}] ❌ 静态文件加载也失败:`, fallbackError);
-          this.configList = [];
-        }
+        console.error(`[${this.componentName}] ❌ 配置加载失败:`, error);
+        this.configList = [];
       }
     },
 
-    // ⭐ 覆盖 saveConfig 方法，直接保存到 API 服务器
+    // ⭐ 使用策略模式保存配置
     async saveConfig() {
       try {
         console.log(`[${this.componentName}] 📤 准备保存配置`);
 
-        const saveData = this.configList.map(item => ({
-          id: item.id,
-          name: item.name,
-          url: item.url
-        }));
-
-        const response = await fetch(this.apiServerURL, {
-          method: 'PUT',
-          mode: 'cors',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(saveData)
+        // 准备保存数据（移除运行时状态）
+        const saveData = this.configList.map(item => {
+          const cleanItem = { ...item };
+          delete cleanItem.loaded;
+          delete cleanItem.loading;
+          return cleanItem;
         });
 
-        const result = await response.json();
-        if (result.success) {
+        // 使用策略保存配置
+        const success = await this._configStrategy.save(this.panelMetadata, saveData);
+        
+        if (success) {
           console.log(`[${this.componentName}] ✅ 配置已保存`);
           this.onConfigSaved();
           return true;
         } else {
-          console.error(`[${this.componentName}] ❌ 保存失败:`, result.error);
-          alert(`保存失败！\n错误：${result.error}`);
+          console.error(`[${this.componentName}] ❌ 保存失败`);
+          alert('保存失败！');
           return false;
         }
       } catch (error) {
@@ -349,7 +345,32 @@ export default {
     },
 
     onConfigLoadedHandler() {
-      console.log(`[${this.componentName}] ✅ 配置加载完成，共 ${this.configList.length} 条`);
+      console.log(`[${this.componentName}] ✅ 配置加载完成`);
+      console.log(`[${this.componentName}] 📊 配置总数: ${this.configList.length} 条`);
+      
+      // ⭐ 打印详细配置内容
+      if (this.configList.length > 0) {
+        console.log(`[${this.componentName}] 📋 配置详情:`);
+        this.configList.forEach((item, index) => {
+          console.log(`[${this.componentName}]   ├─ [${index + 1}] ${item.name || item.id || '未命名'}`);
+          console.log(`[${this.componentName}]   │   ├── id: ${item.id}`);
+          console.log(`[${this.componentName}]   │   ├── name: ${item.name}`);
+          console.log(`[${this.componentName}]   │   ├── url: ${item.url || '未设置'}`);
+          console.log(`[${this.componentName}]   │   ├── loaded: ${item.loaded || false}`);
+          console.log(`[${this.componentName}]   │   └── loading: ${item.loading || false}`);
+          
+          // 打印其他可能存在的字段
+          if (item.heightOffset !== undefined) {
+            console.log(`[${this.componentName}]   │   └── heightOffset: ${item.heightOffset}`);
+          }
+          if (item.tileset) {
+            console.log(`[${this.componentName}]   │   └── tileset: ${typeof item.tileset === 'object' ? 'Cesium3DTileset' : item.tileset}`);
+          }
+        });
+      } else {
+        console.log(`[${this.componentName}] ⚠️ 配置列表为空`);
+      }
+      
       // 初始化 loaded 和 loading 状态
       this.configList.forEach(item => {
         if (item.loaded === undefined) item.loaded = false;
