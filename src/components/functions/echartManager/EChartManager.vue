@@ -29,6 +29,14 @@
 
     <template #item-actions="{ item }">
       <button
+        @click="locateChart(item)"
+        class="action-btn locate-btn"
+        type="button"
+        title="定位到图表位置"
+      >
+        📍
+      </button>
+      <button
         @click="showChartOnMap(item)"
         class="action-btn show-btn"
         type="button"
@@ -108,11 +116,38 @@ export default {
 
   methods: {
     async initECharts() {
-      try {
-        const module = await import('echarts');
-        this._echartsModule = module.default;
+      console.log(`[${this.componentName}] 🚀 开始加载 ECharts 模块`);
+      
+      if (typeof window !== 'undefined' && window.SGKJ_SDK && window.SGKJ_SDK.EChartModule) {
+        try {
+          const echartModule = await new window.SGKJ_SDK.EChartModule();
+          this._echartsModule = echartModule;
+          console.log(`[${this.componentName}] ✅ 使用 SGKJ_SDK.EChartModule 成功`);
+          console.log(`[${this.componentName}] ✅ 主题已由 SGKJ_SDK 自动注册`);
+          return;
+        } catch (error) {
+          console.error(`[${this.componentName}] ❌ SGKJ_SDK.EChartModule 初始化失败:`, error);
+        }
+      }
+      
+      if (typeof window !== 'undefined' && window.echarts && typeof window.echarts.init === 'function') {
+        this._echartsModule = window.echarts;
+        console.log(`[${this.componentName}] ✅ 使用 window.echarts 成功，版本:`, window.echarts.version);
         this.registerThemes();
+        console.log(`[${this.componentName}] ✅ 主题注册完成`);
+        return;
+      }
+      
+      try {
+        const module = await import(/* webpackChunkName: "echarts" */ 'echarts');
+        this._echartsModule = module.default || module;
+        
+        if (!this._echartsModule || typeof this._echartsModule.init !== 'function') {
+          throw new Error('ECharts 模块导出格式不正确');
+        }
         console.log(`[${this.componentName}] ✅ ECharts 模块加载成功`);
+        this.registerThemes();
+        console.log(`[${this.componentName}] ✅ 主题注册完成`);
       } catch (error) {
         console.error(`[${this.componentName}] ❌ ECharts 模块加载失败:`, error);
       }
@@ -123,29 +158,56 @@ export default {
 
       this._echartsModule.registerTheme('shine', {
         color: ['#c12e34', '#e6b600', '#0098d9', '#2b821d', '#005eaa', '#339ca8', '#cda819', '#32a487'],
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        textStyle: { color: '#fff' },
-        title: { textStyle: { color: '#fff' } },
-        legend: { textStyle: { color: '#fff' } },
-        tooltip: { textStyle: { color: '#fff' } }
+        backgroundColor: '#ffffff',
+        textStyle: { color: '#333' },
+        title: { textStyle: { color: '#333' } },
+        legend: { textStyle: { color: '#333' } },
+        tooltip: { textStyle: { color: '#333' } },
+        categoryAxis: {
+          axisLine: { lineStyle: { color: '#666' } },
+          axisLabel: { color: '#333' }
+        },
+        valueAxis: {
+          axisLine: { lineStyle: { color: '#666' } },
+          axisLabel: { color: '#333' },
+          splitLine: { lineStyle: { color: '#eee' } }
+        }
       });
 
       this._echartsModule.registerTheme('dark', {
         color: ['#dd6b66', '#759aa0', '#e69d87', '#8dc1a9', '#ea7e53', '#eedd78', '#73a373', '#73b9bc'],
-        backgroundColor: 'rgba(51,51,51,0.9)',
-        textStyle: { color: '#eee' },
-        title: { textStyle: { color: '#eee' } },
-        legend: { textStyle: { color: '#eee' } },
-        tooltip: { textStyle: { color: '#eee' } }
+        backgroundColor: '#ffffff',
+        textStyle: { color: '#333' },
+        title: { textStyle: { color: '#333' } },
+        legend: { textStyle: { color: '#333' } },
+        tooltip: { textStyle: { color: '#333' } },
+        categoryAxis: {
+          axisLine: { lineStyle: { color: '#666' } },
+          axisLabel: { color: '#333' }
+        },
+        valueAxis: {
+          axisLine: { lineStyle: { color: '#666' } },
+          axisLabel: { color: '#333' },
+          splitLine: { lineStyle: { color: '#eee' } }
+        }
       });
 
       this._echartsModule.registerTheme('essos', {
         color: ['#893448', '#d95850', '#eb8146', '#ffb248', '#f2d643', '#ebdba4'],
-        backgroundColor: 'rgba(242,234,191,0.2)',
+        backgroundColor: '#ffffff',
         textStyle: { color: '#333' },
         title: { textStyle: { color: '#893448' } },
         legend: { textStyle: { color: '#333' } },
-        tooltip: { textStyle: { color: '#333' } }
+        tooltip: { textStyle: { color: '#333' } },
+        categoryAxis: {
+          axisLine: { lineStyle: { color: '#666' } },
+          axisLabel: { color: '#333' }
+        },
+        valueAxis: {
+          axisLine: { lineStyle: { color: '#666' } },
+          axisLabel: { color: '#333' },
+          splitLine: { lineStyle: { color: '#eee' } }
+        }
       });
     },
 
@@ -175,49 +237,169 @@ export default {
       return types[type] || type;
     },
 
+    locateChart(chart) {
+      console.log(`[${this.componentName}] 📍 定位到图表位置:`, chart.name);
+      
+      const viewer = this.getCesiumViewer();
+      if (!viewer) {
+        console.error(`[${this.componentName}] ❌ 未找到 Cesium Viewer`);
+        return;
+      }
+      
+      const Cesium = this.getCesium();
+      if (!Cesium) {
+        console.error(`[${this.componentName}] ❌ Cesium 库未加载`);
+        return;
+      }
+      
+      const longitude = parseFloat(chart.longitude) || 0;
+      const latitude = parseFloat(chart.latitude) || 0;
+      const altHeight = parseFloat(chart.height) || 500;
+      
+      console.log(`[${this.componentName}] 🔍 目标位置: ${longitude}, ${latitude}, ${altHeight}m`);
+      
+      const position = Cesium.Cartesian3.fromDegrees(longitude, latitude, altHeight);
+      console.log(`[${this.componentName}] 🔍 笛卡尔坐标:`, position);
+      
+      viewer.camera.flyTo({
+        destination: position,
+        orientation: {
+          heading: Cesium.Math.toRadians(0),
+          pitch: Cesium.Math.toRadians(-45),
+          roll: 0.0
+        },
+        duration: 1.0
+      });
+      
+      console.log(`[${this.componentName}] ✅ 定位命令已发送`);
+    },
+
     async showChartOnMap(chart) {
-      if (!this._echartsModule || !chart) return;
+      console.log(`[${this.componentName}] 📊 开始显示图表:`, chart);
+      
+      if (!this._echartsModule || !chart) {
+        console.error(`[${this.componentName}] ❌ ECharts模块或图表数据为空`);
+        return;
+      }
 
       const viewer = this.getCesiumViewer();
       if (!viewer) {
-        console.warn(`[${this.componentName}] ⚠️ 未找到 Cesium Viewer`);
+        console.error(`[${this.componentName}] ❌ 未找到 Cesium Viewer`);
         return;
       }
+      console.log(`[${this.componentName}] ✅ Cesium Viewer 已获取`);
+
+      const Cesium = this.getCesium();
+      if (!Cesium) {
+        console.error(`[${this.componentName}] ❌ Cesium 库未加载`);
+        return;
+      }
+      console.log(`[${this.componentName}] ✅ Cesium 库已获取`);
 
       this.destroyChart(chart.id);
 
       try {
-        const canvas = document.createElement('canvas');
         const width = parseFloat(chart.width) || 300;
         const height = parseFloat(chart.heightPx) || 200;
-        canvas.width = width;
-        canvas.height = height;
+        console.log(`[${this.componentName}] 📏 图表尺寸: ${width} x ${height}`);
 
-        const chartInstance = this._echartsModule.init(canvas, chart.theme);
-        const option = typeof chart.option === 'string' ? JSON.parse(chart.option) : chart.option;
+        const container = document.createElement('div');
+        container.style.width = `${width}px`;
+        container.style.height = `${height}px`;
+        container.style.position = 'fixed';
+        container.style.top = '-1000px';
+        container.style.left = '-1000px';
+        container.style.zIndex = '-1';
+        document.body.appendChild(container);
+        console.log(`[${this.componentName}] ✅ 临时容器已添加到 DOM`);
+
+        console.log(`[${this.componentName}] 🔍 ECharts 模块:`, this._echartsModule);
+        
+        const chartInstance = this._echartsModule.init(container, chart.theme);
+        console.log(`[${this.componentName}] ✅ ECharts 实例创建成功，主题: ${chart.theme}`);
+
+        let option;
+        try {
+          option = typeof chart.option === 'string' ? JSON.parse(chart.option) : chart.option;
+          console.log(`[${this.componentName}] ✅ 图表配置解析成功`);
+        } catch (parseError) {
+          console.error(`[${this.componentName}] ❌ 图表配置解析失败:`, parseError);
+          document.body.removeChild(container);
+          return;
+        }
+
         chartInstance.setOption(option);
+        console.log(`[${this.componentName}] ✅ setOption 执行完成`);
 
-        const position = Cesium.Cartesian3.fromDegrees(
-          parseFloat(chart.longitude) || 0,
-          parseFloat(chart.latitude) || 0,
-          parseFloat(chart.height) || 0
-        );
+        setTimeout(() => {
+          try {
+            let dataUrl;
+            if (typeof chartInstance.getDataURL === 'function') {
+              dataUrl = chartInstance.getDataURL({
+                type: 'png',
+                pixelRatio: 1,
+                backgroundColor: '#ffffff'
+              });
+              console.log(`[${this.componentName}] ✅ 使用 ECharts getDataURL 方法`);
+            } else {
+              const canvas = container.querySelector('canvas');
+              dataUrl = canvas ? canvas.toDataURL('image/png') : null;
+              console.log(`[${this.componentName}] ✅ 使用 canvas toDataURL 方法`);
+            }
+            
+            console.log(`[${this.componentName}] 🔍 dataUrl 长度: ${dataUrl ? dataUrl.length : 0}`);
 
-        const entity = viewer.entities.add({
-          position: position,
-          billboard: {
-            image: canvas,
-            width: width,
-            height: height,
-            scale: 1,
-            verticalOrigin: Cesium.VerticalOrigin.BOTTOM
+            if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+              console.error(`[${this.componentName}] ❌ 无效的 dataUrl`);
+              document.body.removeChild(container);
+              chartInstance.dispose();
+              return;
+            }
+
+            const longitude = parseFloat(chart.longitude) || 0;
+            const latitude = parseFloat(chart.latitude) || 0;
+            const altHeight = parseFloat(chart.height) || 0;
+
+            const position = Cesium.Cartesian3.fromDegrees(longitude, latitude, altHeight);
+
+            const entity = viewer.entities.add({
+              id: `echart-${chart.id}`,
+              name: chart.name,
+              position: position,
+              billboard: {
+                image: dataUrl,
+                width: width,
+                height: height,
+                scale: 1,
+                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                show: true
+              }
+            });
+
+            this._cesiumCharts.set(chart.id, { entity, chartInstance, container });
+
+            const cameraDistance = Math.max(width, height) * 2;
+            
+            viewer.flyTo(entity, {
+              offset: new Cesium.HeadingPitchRange(
+                0, 
+                -Cesium.Math.PI_OVER_4, 
+                cameraDistance
+              ),
+              duration: 1.0
+            });
+
+            document.body.removeChild(container);
+            console.log(`[${this.componentName}] ✅ 临时容器已从 DOM 移除`);
+            console.log(`[${this.componentName}] 🎉 图表 "${chart.name}" 已成功显示在地图上，位置: ${longitude}, ${latitude}`);
+          } catch (timeoutError) {
+            console.error(`[${this.componentName}] ❌ 显示图表超时错误:`, timeoutError);
+            document.body.removeChild(container);
+            chartInstance.dispose();
           }
-        });
-
-        this._cesiumCharts.set(chart.id, { entity, chartInstance, canvas });
-
-        viewer.zoomTo(entity);
-        console.log(`[${this.componentName}] ✅ 图表 "${chart.name}" 已显示在地图上`);
+        }, 300);
       } catch (error) {
         console.error(`[${this.componentName}] ❌ 显示图表失败:`, error);
       }
@@ -248,6 +430,10 @@ export default {
 
     getCesiumViewer() {
       return typeof window !== 'undefined' ? window.__cesiumViewer__ : null;
+    },
+
+    getCesium() {
+      return typeof window !== 'undefined' ? window.Cesium : null;
     }
   }
 };
@@ -296,5 +482,14 @@ export default {
 
 .show-btn:hover {
   background: #007bb5;
+}
+
+.locate-btn {
+  background: #67c23a;
+  color: white;
+}
+
+.locate-btn:hover {
+  background: #5eb838;
 }
 </style>
