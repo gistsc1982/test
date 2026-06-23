@@ -1,0 +1,16 @@
+[
+  {
+    "id": "start1",
+    "name": "深圳市委-公安指挥中心",
+    "startLng": 114.894205,
+    "startLat": 27.117549,
+    "startAddr": "深圳市委",
+    "endLng": 115.068979,
+    "endLat": 27.077412,
+    "endAddr": "公安指挥中心",
+    "startCity": "深圳",
+    "endCity": "深圳",
+    "routeIndex": "0",
+    "animationSpeed": "2000"
+  }
+]

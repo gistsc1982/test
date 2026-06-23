@@ -418,6 +418,42 @@
       }
     },
     {
+      "name": "MapGuideManager",
+      "file": "@componentsFunctions/mapGuideManager/MapGuideManager.vue",
+      "title": "百度路书路径引导",
+      "description": "配置起终点进行百度地图驾车路线分析，支持多方案切换、路书动画和Cesium三维叠加显示",
+      "enabled": true,
+      "visible": false,
+      "icon": "🚗",
+      "category": "tools",
+      "singleton": true,
+      "singletonContainerId": "mapGuideManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "right",
+        "initialY": 120
+      }
+    },
+    {
+      "name": "MapGuideManagerMulti",
+      "file": "@componentsFunctions/mapGuideManager/MapGuideManager.vue",
+      "title": "百度路书路径引导（多实例）",
+      "description": "配置起终点进行百度地图驾车路线分析（多实例模式）",
+      "enabled": true,
+      "visible": false,
+      "icon": "🚙",
+      "category": "tools",
+      "singleton": false,
+      "singletonContainerId": "mapGuideManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "right",
+        "initialY": 200
+      }
+    },
+    {
       "name": "GeoJsonLayerManagerMulti",
       "file": "@componentsFunctions/GeoJsonLayerManager/GeoJsonLayerManager.vue",
       "title": "GeoJSON图层管理（多实例）",

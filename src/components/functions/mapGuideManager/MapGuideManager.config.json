@@ -1,0 +1,61 @@
+{
+  "panelId": "map-guide-manager",
+  "panelName": "百度路书路径引导",
+  "panelIcon": "🚗",
+  "configId": "map_guide_configs",
+
+  "featureFolder": "mapGuideManager",
+
+  "fieldDefinitions": [
+    { "key": "id", "label": "ID", "type": "text", "required": true, "readonly": true, "placeholder": "唯一标识符" },
+    { "key": "name", "label": "路线名称", "type": "text", "required": true, "placeholder": "如：深圳市委-公安指挥中心" },
+    { "key": "startLng", "label": "起点经度", "type": "text", "required": true, "placeholder": "如：114.006482" },
+    { "key": "startLat", "label": "起点纬度", "type": "text", "required": true, "placeholder": "如：22.596454" },
+    { "key": "startAddr", "label": "起点地址", "type": "text", "placeholder": "如：深圳市委" },
+    { "key": "endLng", "label": "终点经度", "type": "text", "required": true, "placeholder": "如：114.056031" },
+    { "key": "endLat", "label": "终点纬度", "type": "text", "required": true, "placeholder": "如：22.603685" },
+    { "key": "endAddr", "label": "终点地址", "type": "text", "placeholder": "如：公安指挥中心" },
+    { "key": "startCity", "label": "起点城市", "type": "text", "default": "深圳", "placeholder": "如：深圳" },
+    { "key": "endCity", "label": "终点城市", "type": "text", "default": "深圳", "placeholder": "如：深圳" },
+    { "key": "routeIndex", "label": "路线方案", "type": "select", "options": [
+      { "value": "0", "label": "方案一（推荐/最短时间）" },
+      { "value": "1", "label": "方案二（备选）" },
+      { "value": "2", "label": "方案三（备选）" }
+    ], "default": "0" },
+    { "key": "animationSpeed", "label": "路书动画速度", "type": "select", "options": [
+      { "value": "1000", "label": "快速" },
+      { "value": "2000", "label": "正常" },
+      { "value": "4000", "label": "慢速" }
+    ], "default": "2000" },
+    { "key": "iconUrl", "label": "小车图标", "type": "text", "default": "🚗", "placeholder": "路书动画小车图标，支持emoji或图片URL" }
+  ],
+
+  "defaultFormValues": {
+    "id": "",
+    "name": "",
+    "startLng": "114.006482",
+    "startLat": "22.596454",
+    "startAddr": "深圳市委",
+    "endLng": "114.056031",
+    "endLat": "22.603685",
+    "endAddr": "公安指挥中心",
+    "startCity": "深圳",
+    "endCity": "深圳",
+    "routeIndex": "0",
+    "animationSpeed": "2000",
+    "iconUrl": "🚗"
+  },
+
+  "toolbarButtons": {
+    "add": true,
+    "import": true,
+    "export": true,
+    "refresh": true
+  },
+
+  "dataSource": {
+    "type": "json",
+    "fileName": "MapGuideManager",
+    "relativePath": "gis/mapGuideManager/MapGuideManager.json"
+  }
+}
