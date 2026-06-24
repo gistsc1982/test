@@ -52,7 +52,7 @@
     "strokeColor": "#000000",
     "strokeWidth": 1,
     "markerColor": "#FF4500",
-    "markerIcon": "🛸",
+    "markerIcon": "🚁",
     "markerSize": 32,
     "clampToGround": true,
     "labelField": "name",
