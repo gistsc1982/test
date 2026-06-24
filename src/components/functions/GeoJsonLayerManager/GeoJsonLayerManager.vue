@@ -101,8 +101,8 @@ export default {
     initConfigStrategy() {
       const factory = new ConfigStrategyFactory();
       this._configStrategy = factory.createFallbackStrategy([
-        factory.createJSONFileStrategy(this.panelMetadata.featureFolder),
-        factory.createSQLiteStrategy(this.panelMetadata.dataSource.tableName)
+        factory.createSQLiteStrategy(this.panelMetadata.dataSource.tableName),
+        factory.createJSONFileStrategy(this.panelMetadata.featureFolder)
       ]);
       console.log(`[${this.componentName}] ✅ 配置加载策略已初始化: ${this._configStrategy.getName()}`);
     },
