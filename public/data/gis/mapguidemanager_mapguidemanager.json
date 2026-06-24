@@ -1,13 +1,13 @@
 [
   {
     "id": "start1",
-    "name": "深圳市委-公安指挥中心",
+    "name": "吉安枢纽-清源山",
     "startLng": 114.894205,
     "startLat": 27.117549,
-    "startAddr": "深圳市委",
+    "startAddr": "吉安枢纽",
     "endLng": 115.068979,
     "endLat": 27.077412,
-    "endAddr": "公安指挥中心",
+    "endAddr": "清源山",
     "startCity": "深圳",
     "endCity": "深圳",
     "routeIndex": "0",

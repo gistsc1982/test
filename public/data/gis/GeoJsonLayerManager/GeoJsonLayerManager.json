@@ -4,33 +4,7 @@
     "name": "示例点图层",
     "description": "北京天安门位置标记点",
     "geoType": "Point",
-    "geoJson": {
-      "type": "FeatureCollection",
-      "features": [
-        {
-          "type": "Feature",
-          "geometry": {
-            "type": "Point",
-            "coordinates": [116.403874, 39.914889]
-          },
-          "properties": {
-            "name": "天安门",
-            "description": "中华人民共和国首都北京的象征性建筑"
-          }
-        },
-        {
-          "type": "Feature",
-          "geometry": {
-            "type": "Point",
-            "coordinates": [116.397428, 39.90923]
-          },
-          "properties": {
-            "name": "故宫",
-            "description": "明清两代皇家宫殿"
-          }
-        }
-      ]
-    },
+    "geoJson": "{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[116.403874,39.914889]},\"properties\":{\"name\":\"天安门\",\"description\":\"中华人民共和国首都北京的象征性建筑\"}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[116.397428,39.90923]},\"properties\":{\"name\":\"故宫\",\"description\":\"明清两代皇家宫殿\"}}]}",
     "fillColor": "#FFFF00",
     "strokeColor": "#000000",
     "strokeWidth": 2,
@@ -41,65 +15,26 @@
   },
   {
     "id": "geojson-line-1",
-    "name": "示例线图层",
-    "description": "北京主要道路连接线",
+    "name": "故宫周边街道",
+    "description": "故宫及天安门周边主要道路（真实数据）",
     "geoType": "LineString",
-    "geoJson": {
-      "type": "FeatureCollection",
-      "features": [
-        {
-          "type": "Feature",
-          "geometry": {
-            "type": "LineString",
-            "coordinates": [
-              [116.397428, 39.90923],
-              [116.403874, 39.914889],
-              [116.410000, 39.920000]
-            ]
-          },
-          "properties": {
-            "name": "长安街",
-            "description": "北京市中心的主要街道"
-          }
-        }
-      ]
-    },
+    "geoJson": "{\n  \"type\": \"FeatureCollection\",\n  \"features\": [\n    {\n      \"type\": \"Feature\",\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [\n          [\n            116.3789,\n            39.9078\n          ],\n          [\n            116.3835,\n            39.9078\n          ],\n          [\n            116.3872,\n            39.9079\n          ],\n          [\n            116.3909,\n            39.9079\n          ],\n          [\n            116.3946,\n            39.9079\n          ],\n          [\n            116.3983,\n            39.9079\n          ],\n          [\n            116.402,\n            39.9079\n          ],\n          [\n            116.4057,\n            39.9079\n          ],\n          [\n            116.4094,\n            39.9078\n          ],\n          [\n            116.4131,\n            39.9078\n          ],\n          [\n            116.4168,\n            39.9078\n          ],\n          [\n            116.4205,\n            39.9078\n          ],\n          [\n            116.4242,\n            39.9079\n          ]\n        ]\n      },\n      \"properties\": {\n        \"name\": \"长安街\",\n        \"description\": \"东西向主干道，天安门广场北侧\"\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [\n          [\n            116.4028,\n            39.9073\n          ],\n          [\n            116.4028,\n            39.9094\n          ],\n          [\n            116.4027,\n            39.911\n          ],\n          [\n            116.4027,\n            39.9128\n          ],\n          [\n            116.4028,\n            39.9149\n          ],\n          [\n            116.403,\n            39.9172\n          ],\n          [\n            116.4031,\n            39.919\n          ],\n          [\n            116.4032,\n            39.9208\n          ],\n          [\n            116.4033,\n            39.9226\n          ]\n        ]\n      },\n      \"properties\": {\n        \"name\": \"南/北池子大街\",\n        \"description\": \"故宫东侧南北向街道\"\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [\n          [\n            116.3836,\n            39.9072\n          ],\n          [\n            116.3837,\n            39.9093\n          ],\n          [\n            116.3838,\n            39.9112\n          ],\n          [\n            116.3839,\n            39.9131\n          ],\n          [\n            116.384,\n            39.915\n          ],\n          [\n            116.3841,\n            39.9171\n          ],\n          [\n            116.3842,\n            39.919\n          ],\n          [\n            116.3843,\n            39.9209\n          ],\n          [\n            116.3844,\n            39.9228\n          ]\n        ]\n      },\n      \"properties\": {\n        \"name\": \"南/北长街\",\n        \"description\": \"故宫西侧南北向街道，中南海东侧\"\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [\n          [\n            116.3922,\n            39.9235\n          ],\n          [\n            116.3945,\n            39.9235\n          ],\n          [\n            116.3968,\n            39.9235\n          ],\n          [\n            116.3991,\n            39.9235\n          ],\n          [\n            116.4014,\n            39.9235\n          ],\n          [\n            116.4037,\n            39.9235\n          ],\n          [\n            116.406,\n            39.9235\n          ]\n        ]\n      },\n      \"properties\": {\n        \"name\": \"景山前街\",\n        \"description\": \"故宫北门（神武门）外东西向街道\"\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [\n          [\n            116.4025,\n            39.9076\n          ],\n          [\n            116.4042,\n            39.9085\n          ],\n          [\n            116.4059,\n            39.9094\n          ],\n          [\n            116.4076,\n            39.9103\n          ],\n          [\n            116.4093,\n            39.9112\n          ],\n          [\n            116.4109,\n            39.9121\n          ]\n        ]\n      },\n      \"properties\": {\n        \"name\": \"南河沿大街\",\n        \"description\": \"故宫东南方向斜向街道，通向东华门\"\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [\n          [\n            116.383,\n            39.9075\n          ],\n          [\n            116.3813,\n            39.9084\n          ],\n          [\n            116.3796,\n            39.9093\n          ],\n          [\n            116.3779,\n            39.9102\n          ],\n          [\n            116.3762,\n            39.9111\n          ],\n          [\n            116.3745,\n            39.912\n          ]\n        ]\n      },\n      \"properties\": {\n        \"name\": \"南长街南段\",\n        \"description\": \"故宫西南方向，通往西长安街\"\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [\n          [\n            116.3915,\n            39.9078\n          ],\n          [\n            116.3913,\n            39.9105\n          ],\n          [\n            116.3912,\n            39.9132\n          ],\n          [\n            116.3911,\n            39.9159\n          ],\n          [\n            116.3912,\n            39.9186\n          ],\n          [\n            116.3914,\n            39.9213\n          ]\n        ]\n      },\n      \"properties\": {\n        \"name\": \"故宫西侧通道\",\n        \"description\": \"故宫西华门至北门沿线\"\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [\n          [\n            116.3991,\n            39.9079\n          ],\n          [\n            116.399,\n            39.9106\n          ],\n          [\n            116.3989,\n            39.9133\n          ],\n          [\n            116.399,\n            39.916\n          ],\n          [\n            116.3992,\n            39.9187\n          ]\n        ]\n      },\n      \"properties\": {\n        \"name\": \"故宫东侧通道\",\n        \"description\": \"故宫东华门至北门沿线\"\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [\n          [\n            116.3931,\n            39.922\n          ],\n          [\n            116.3935,\n            39.9245\n          ],\n          [\n            116.3939,\n            39.927\n          ],\n          [\n            116.3943,\n            39.9295\n          ],\n          [\n            116.3947,\n            39.932\n          ]\n        ]\n      },\n      \"properties\": {\n        \"name\": \"景山东街\",\n        \"description\": \"景山公园东侧南北向街道\"\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [\n          [\n            116.3882,\n            39.922\n          ],\n          [\n            116.3879,\n            39.9245\n          ],\n          [\n            116.3876,\n            39.927\n          ],\n          [\n            116.3873,\n            39.9295\n          ],\n          [\n            116.387,\n            39.932\n          ]\n        ]\n      },\n      \"properties\": {\n        \"name\": \"景山西街\",\n        \"description\": \"景山公园西侧，北海公园东侧\"\n      }\n    }\n  ]\n}",
     "fillColor": "#FFFF00",
     "strokeColor": "#FF0000",
     "strokeWidth": 3,
     "markerColor": "#4169E1",
     "markerSize": 48,
-    "clampToGround": true
+    "clampToGround": true,
+    "labelField": "name",
+    "labelFontSize": 24,
+    "labelVisibleMax": 50000
   },
   {
     "id": "geojson-polygon-1",
     "name": "示例面图层",
     "description": "北京市中心区域",
     "geoType": "Polygon",
-    "geoJson": {
-      "type": "FeatureCollection",
-      "features": [
-        {
-          "type": "Feature",
-          "geometry": {
-            "type": "Polygon",
-            "coordinates": [
-              [
-                [116.380000, 39.900000],
-                [116.420000, 39.900000],
-                [116.420000, 39.925000],
-                [116.380000, 39.925000],
-                [116.380000, 39.900000]
-              ]
-            ]
-          },
-          "properties": {
-            "name": "北京市中心",
-            "description": "北京市中心区域范围"
-          }
-        }
-      ]
-    },
+    "geoJson": "{\n  \"type\": \"FeatureCollection\",\n  \"features\": [\n    {\n      \"type\": \"Feature\",\n      \"geometry\": {\n        \"type\": \"Polygon\",\n        \"coordinates\": [\n          [\n            [\n              116.38,\n              39.9\n            ],\n            [\n              116.42,\n              39.9\n            ],\n            [\n              116.42,\n              39.925\n            ],\n            [\n              116.38,\n              39.925\n            ],\n            [\n              116.38,\n              39.9\n            ]\n          ]\n        ]\n      },\n      \"properties\": {\n        \"name\": \"北京市中心\",\n        \"description\": \"北京市中心区域范围\"\n      }\n    }\n  ]\n}",
     "fillColor": "rgba(255, 255, 0, 0.3)",
     "strokeColor": "#FF0000",
     "strokeWidth": 2,

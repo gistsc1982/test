@@ -64,7 +64,7 @@
       "description": "倾斜摄影高度偏移调整面板（多实例）",
       "enabled": false,
       "visible": false,
-      "icon": "📐",
+      "icon": "🧊",
       "category": "tools",
       "singleton": false,
       "singletonContainerId": "obliqueHeightAdjustPanel",
@@ -406,7 +406,7 @@
       "description": "加载和管理GeoJSON格式的点、线、面图层",
       "enabled": true,
       "visible": false,
-      "icon": "🗺️",
+      "icon": "🧊",
       "category": "tools",
       "singleton": true,
       "singletonContainerId": "geoJsonLayerManager",
@@ -418,6 +418,23 @@
       }
     },
     {
+      "name": "GeoJsonLayerManagerMulti",
+      "file": "@componentsFunctions/GeoJsonLayerManager/GeoJsonLayerManager.vue",
+      "title": "GeoJSON图层管理（多实例）",
+      "description": "加载和管理GeoJSON格式的点、线、面图层（多实例模式）",
+      "enabled": true,
+      "visible": false,
+      "icon": "🗾",
+      "category": "tools",
+      "singleton": false,
+      "singletonContainerId": "geoJsonLayerManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 520
+      }
+    },{
       "name": "MapGuideManager",
       "file": "@componentsFunctions/mapGuideManager/MapGuideManager.vue",
       "title": "百度路书路径引导",
@@ -451,24 +468,6 @@
       "position": {
         "initialX": "right",
         "initialY": 200
-      }
-    },
-    {
-      "name": "GeoJsonLayerManagerMulti",
-      "file": "@componentsFunctions/GeoJsonLayerManager/GeoJsonLayerManager.vue",
-      "title": "GeoJSON图层管理（多实例）",
-      "description": "加载和管理GeoJSON格式的点、线、面图层（多实例模式）",
-      "enabled": true,
-      "visible": false,
-      "icon": "🗾",
-      "category": "tools",
-      "singleton": false,
-      "singletonContainerId": "geoJsonLayerManager",
-      "lazyLoad": true,
-      "permissions": [],
-      "position": {
-        "initialX": "left",
-        "initialY": 520
       }
     }
   ],

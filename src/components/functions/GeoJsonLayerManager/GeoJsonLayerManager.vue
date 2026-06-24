@@ -43,6 +43,15 @@
       <button @click="loadLayer(item)" class="action-btn load-btn" type="button" title="加载图层">📥</button>
       <button @click="removeLayer(item)" class="action-btn remove-btn" type="button" title="移除图层">🗑️</button>
       <button @click="locateToItem(item)" class="action-btn locate-btn" type="button" title="定位图层">📍</button>
+      <button
+        v-if="item.loaded"
+        @click="toggleLabels(item)"
+        class="action-btn label-btn"
+        type="button"
+        :title="_isLabelsShown(item.id) ? '隐藏文本标注' : '显示文本标注'"
+      >
+        {{ _isLabelsShown(item.id) ? '🏷️' : '🔖' }}
+      </button>
     </template>
 
     <template #dialogs></template>
@@ -72,7 +81,8 @@ export default {
     return {
       componentName: 'GeoJsonLayerManager',
       panelMetadata,
-      _cesiumLayers: new Map()
+      _cesiumLayers: new Map(),
+      _labelStates: {}
     };
   },
   computed: {
@@ -98,11 +108,30 @@ export default {
     },
     onConfigLoadedHandler() {
       console.log(`[${this.componentName}] ✅ 图层配置加载完成`);
-      // 初始化 loaded 和 loading 状态
+      // 初始化 loaded/loading 状态，并归一化 geoJson 为字符串
+      let changed = false;
       this.configList.forEach(item => {
         if (item.loaded === undefined) item.loaded = false;
         if (item.loading === undefined) item.loading = false;
+        // SQLite/IndexedDB 可能将 geoJson 存储为对象，归一化为字符串以支持编辑表单显示
+        if (item.geoJson && typeof item.geoJson === 'object') {
+          const normalized = JSON.stringify(item.geoJson, null, 2);
+          item.geoJson = normalized;
+          changed = true;
+          console.log(`[${this.componentName}] 🔄 归一化 geoJson: "${item.name}" (${(normalized.length / 1024).toFixed(1)}KB)`);
+        }
       });
+      // 强制同步到 basePanel，并写回 IndexedDB 覆盖旧数据
+      if (changed && this.$refs.basePanel) {
+        const bp = this.$refs.basePanel;
+        bp.configList = [...this.configList];
+        // 立即保存到 IndexedDB 以覆盖旧的对象格式数据
+        if (this._configStrategy && typeof this._configStrategy.save === 'function') {
+          this._configStrategy.save(this.panelMetadata, this.configList).then(() => {
+            console.log(`[${this.componentName}] 💾 geoJson 字符串格式已持久化到存储`);
+          }).catch(() => {});
+        }
+      }
     },
     getGeoTypeName(type) {
       const types = { Point: '点', LineString: '线', Polygon: '面' };
@@ -241,6 +270,7 @@ export default {
       if (dataSource) {
         viewer.dataSources.remove(dataSource);
         this._cesiumLayers.delete(layer.id);
+        this._labelStates = { ...this._labelStates, [layer.id]: false };
         this.updateItemState(layer.id, { loaded: false, loading: false });
         console.log(`[${this.componentName}] ✅ 图层 "${layer.name}" 已移除`);
       } else {
@@ -306,6 +336,89 @@ export default {
         console.error(`[${this.componentName}] ❌ 定位失败:`, err);
       }
     },
+    /**
+     * 参考 layerManagement.js addGeoJson 的文本标注实现
+     * 根据配置的 labelField 从 feature.properties 读取文本，显示/隐藏标签
+     */
+    toggleLabels(item) {
+      const Cesium = this.getCesium();
+      if (!Cesium) return;
+
+      const dataSource = this._cesiumLayers.get(item.id);
+      if (!dataSource) return;
+
+      const labelField = item.labelField || 'name';
+
+      const isShown = this._isLabelsShown(item.id);
+
+      if (isShown) {
+        // 隐藏标签
+        const entities = dataSource.entities.values;
+        entities.forEach(entity => {
+          entity.label = undefined;
+        });
+        this._labelStates = { ...this._labelStates, [item.id]: false };
+        console.log(`[${this.componentName}] 🏷️ 文本标注已隐藏: "${item.name}"`);
+      } else {
+        // 显示标签 — 参考 layerManagement.js:327-343
+        const entities = dataSource.entities.values;
+        entities.forEach((entity, idx) => {
+          const props = entity.properties?.getValue?.();
+          const text = props ? props[labelField] : null;
+          if (text == null && text === undefined) {
+            console.warn(`[${this.componentName}] ⚠️ entity[${idx}] 缺少字段 "${labelField}"`);
+            return;
+          }
+          // 计算标注位置：点用自身坐标；线/面取几何中心
+          let position = entity.position?.getValue?.();
+          if (!position) {
+            if (entity.polyline) {
+              const positions = entity.polyline.positions?.getValue?.();
+              if (positions?.length >= 2) {
+                const C = Cesium.Cartesian3;
+                const mid = C.lerp(positions[0], positions[1], 0.5, new C());
+                position = mid;
+              }
+            } else if (entity.polygon) {
+              const hierarchy = entity.polygon.hierarchy?.getValue?.();
+              if (hierarchy?.positions?.length) {
+                const center = Cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
+                position = Cesium.Ellipsoid.WGS84.scaleToGeodeticSurface(center);
+              }
+            }
+          }
+
+          const fontSize = item.labelFontSize || 28;
+          const labelScale = item.labelScale || 1.2;
+          const labelColor = item.labelColor || '#a6fd1c';
+          const visMin = item.labelVisibleMin ?? 0;
+          const visMax = item.labelVisibleMax ?? 50000;
+
+          entity.label = {
+            text: String(text),
+            font: `normal ${fontSize}px AlibabaPuHuiTi`,
+            showBackground: true,
+            backgroundColor: Cesium.Color.BLACK.withAlpha(0.6),
+            fillColor: Cesium.Color.fromCssColorString(labelColor),
+            scale: labelScale,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(visMin, visMax)
+          };
+          if (position && !entity.position) {
+            entity.position = position;
+          }
+        });
+        this._labelStates = { ...this._labelStates, [item.id]: true };
+        console.log(`[${this.componentName}] 🏷️ 文本标注已显示: "${item.name}", 字段: "${labelField}", 实体数: ${entities.length}`);
+      }
+    },
+
+    _isLabelsShown(layerId) {
+      return !!this._labelStates[layerId];
+    },
+
     destroyAllLayers() {
       const viewer = this.getCesiumViewer();
       if (viewer) {
@@ -418,4 +531,6 @@ export default {
 .remove-btn:hover { background: #ee5a5a; }
 .locate-btn { background: #2196f3; color: white; }
 .locate-btn:hover { background: #1976d2; }
+.label-btn { background: #8bc34a; color: white; }
+.label-btn:hover { background: #7cb342; }
 </style>
