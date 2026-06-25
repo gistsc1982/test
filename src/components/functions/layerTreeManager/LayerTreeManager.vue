@@ -123,6 +123,10 @@
                   <input v-model="addChildForm.url" class="tree-form-input" placeholder="图层资源的URL地址" />
                 </div>
                 <div class="tree-form-group" v-if="addChildForm.nodeType === 'layer'">
+                  <label class="tree-form-label">WMS图层名 <span style="font-weight:normal;color:#888;font-size:11px;">(WMS服务留空自动检测)</span></label>
+                  <input v-model="addChildForm.wmsLayerName" class="tree-form-input" placeholder="如: gebco_latest_2024" />
+                </div>
+                <div class="tree-form-group" v-if="addChildForm.nodeType === 'layer'">
                   <label class="tree-form-label">MVT源图层 <span style="font-weight:normal;color:#888;font-size:11px;">(逗号分隔，留空自动检测)</span></label>
                   <input v-model="addChildForm.mvtSourceLayers" class="tree-form-input" placeholder="如: water,transportation,building" />
                 </div>
@@ -182,6 +186,10 @@
                 <div class="tree-form-group" v-if="editForm.nodeType === 'layer'">
                   <label class="tree-form-label">资源URL</label>
                   <input v-model="editForm.url" class="tree-form-input" placeholder="图层资源的URL地址" />
+                </div>
+                <div class="tree-form-group" v-if="editForm.nodeType === 'layer'">
+                  <label class="tree-form-label">WMS图层名 <span style="font-weight:normal;color:#888;font-size:11px;">(WMS服务留空自动检测)</span></label>
+                  <input v-model="editForm.wmsLayerName" class="tree-form-input" placeholder="如: gebco_latest_2024" />
                 </div>
                 <div class="tree-form-group" v-if="editForm.nodeType === 'layer'">
                   <label class="tree-form-label">MVT源图层 <span style="font-weight:normal;color:#888;font-size:11px;">(逗号分隔，留空自动检测)</span></label>
@@ -397,6 +405,345 @@ function parseLayerMessage(buffer, start, end) {
   }
 
   return names;
+}
+
+/**
+ * 从 WMS GetCapabilities XML 中解析时间维度范围
+ * 支持 WMS 1.1.1 的 <Extent name="time"> 和 WMS 1.3.0 的 <Dimension name="time">
+ *
+ * ⚠️ 优先查找目标图层自己的时间维度；如果找不到，回退到根图层
+ *
+ * @param {string} xmlText - GetCapabilities 返回的 XML 文本
+ * @param {string} [targetLayerName] - 可选：要匹配的图层名，优先提取该图层的 Dimension
+ * @returns {string|null} 时间范围字符串
+ */
+function parseWmsTimeDimension(xmlText, targetLayerName) {
+  if (typeof DOMParser !== 'undefined') {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlText, 'text/xml');
+      const parseError = doc.querySelector('parsererror');
+      if (parseError) throw new Error('XML parse error');
+
+      // 如果指定了目标图层，先找到它的 <Layer> 元素
+      let searchRoot = doc;
+      if (targetLayerName) {
+        const allLayers = doc.querySelectorAll('Layer');
+        for (const layerEl of allLayers) {
+          const nameEl = Array.from(layerEl.children).find(c => c.tagName === 'Name');
+          if (nameEl && nameEl.textContent.trim() === targetLayerName) {
+            searchRoot = layerEl;
+            break;
+          }
+        }
+      }
+
+      // 在目标范围内查找 <Dimension name="time"> 或 <Extent name="time">
+      const timeEl = searchRoot.querySelector('Dimension[name="time"], Extent[name="time"]');
+      if (timeEl && timeEl.textContent.trim()) {
+        const value = timeEl.textContent.trim();
+        console.log(`[WMS检测] ⏱️ 时间维度${targetLayerName ? ` (layer="${targetLayerName}")` : ''}: ${value.slice(0, 100)}`);
+        return value;
+      }
+    } catch (e) {
+      // DOM 解析失败，回退到正则
+    }
+  }
+
+  // 正则 fallback: 匹配第一个时间维度
+  const timeRegex = /<(?:Dimension|Extent)\s[^>]*name\s*=\s*["']time["'][^>]*>([^<]+)<\/(?:Dimension|Extent)>/i;
+  const match = xmlText.match(timeRegex);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+  return null;
+}
+
+/**
+ * 从 WMS 时间范围字符串中提取最晚的有效时间
+ * 支持格式:
+ *   - "2026-06-19T22:09:54Z/2026-06-21T20:10:19Z/PT30M" (datetime 区间)
+ *   - "2024-06-01/2026-04-01/P1M" (date-only 区间)
+ *   - "time1/end1/period1,time2/end2/period2,..." (逗号分隔区间列表)
+ *
+ * @param {string} timeExtent - 时间范围字符串
+ * @returns {string|null} 最新时间值（保持与 GetCapabilities 一致的格式）
+ */
+function getLatestTimeFromExtent(timeExtent) {
+  if (!timeExtent) return null;
+
+  // 通用区间格式: (start)/(end) 其中时间部分可选
+  // 匹配 datetime: 2026-06-19T22:09:54Z/2026-06-21T20:10:19Z
+  // 匹配 date-only: 2024-06-01/2026-04-01
+  // period 后缀 (/PT30M, /P1M 等) 会被忽略
+  const intervalRegex = /(\d{4}-\d{2}-\d{2}(?:T[\d:]+Z)?)\/(\d{4}-\d{2}-\d{2}(?:T[\d:]+Z)?)/g;
+  let lastEnd = null;
+  let match;
+  while ((match = intervalRegex.exec(timeExtent)) !== null) {
+    // match[1] = start, match[2] = end — 取最后一个区间的 end 时间
+    lastEnd = match[2];
+  }
+  if (lastEnd) {
+    console.log(`[WMS时间] 📅 提取到最新时间: ${lastEnd}`);
+    return lastEnd;
+  }
+
+  console.warn(`[WMS时间] ⚠️ 无法从时间范围提取有效时间: ${timeExtent.slice(0, 100)}`);
+  return null;
+}
+
+/**
+ * 从 WMS GetCapabilities XML 中解析可用的图层名称
+ * 支持 WMS 1.1.1 和 1.3.0 两种版本的 XML 格式
+ * ⚠️ 通用 fallback：如果 XML 解析失败，尝试用正则提取
+ *
+ * @param {string} xmlText - GetCapabilities 返回的 XML 文本
+ * @returns {string[]} 图层名称数组（按嵌套顺序）
+ */
+function parseWmsLayerNames(xmlText) {
+  const layerNames = [];
+
+  // 方法1: 使用 DOMParser（浏览器环境）
+  if (typeof DOMParser !== 'undefined') {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlText, 'text/xml');
+
+      // 检查解析错误
+      const parseError = doc.querySelector('parsererror');
+      if (parseError) {
+        console.warn('[WMS检测] XML 解析错误，回退到正则提取');
+      } else {
+        // 遍历所有 <Layer> 元素，提取直接子元素 <Name>
+        const allLayerEls = doc.querySelectorAll('Layer');
+        for (const layerEl of allLayerEls) {
+          // 只取该 Layer 的直接子 <Name>（跳过嵌套 Layer 的 Name）
+          for (const child of layerEl.children) {
+            if (child.tagName === 'Name' && child.textContent.trim()) {
+              layerNames.push(child.textContent.trim());
+              break; // 每个 Layer 只取第一个 Name
+            }
+          }
+        }
+        if (layerNames.length > 0) {
+          console.log(`[WMS检测] ✅ XML 解析成功，发现 ${layerNames.length} 个图层`);
+          return layerNames;
+        }
+      }
+    } catch (e) {
+      console.warn('[WMS检测] DOMParser 异常，回退到正则提取:', e.message);
+    }
+  }
+
+  // 方法2: 正则 fallback — 提取 <Name> 标签内容
+  // 注意：会同时提取 Layer/Name 和父级 Capability 的 Name，需要过滤
+  const nameRegex = /<Name>([^<]+)<\/Name>/gi;
+  let match;
+  while ((match = nameRegex.exec(xmlText)) !== null) {
+    const name = match[1].trim();
+    // 排除常见的非图层名称（服务级名称通常很短或包含特殊字符）
+    if (name && name.length > 1 && !name.includes(' ') && !layerNames.includes(name)) {
+      layerNames.push(name);
+    }
+  }
+  console.log(`[WMS检测] ✅ 正则提取成功，发现 ${layerNames.length} 个候选图层`);
+  return layerNames;
+}
+
+/**
+ * 获取 WMS 服务完整能力信息（图层名 + 时间维度 + 版本）
+ * 通过获取 GetCapabilities XML 并解析
+ * ⚠️ 整体超时 5 秒
+ *
+ * @param {string} wmsUrl - WMS 服务基础 URL（不含参数）
+ * @param {string} [preferredVersion] - 优先尝试的 WMS 版本
+ * @returns {Promise<Object|null>} { layerName, timeExtent, latestTime, version, allLayers } 或 null
+ */
+/**
+ * 从 GetCapabilities XML 中提取所有图层的 Dimension time 的最新结束时间
+ * 用于 best 复合图层：父层时间维度是过期的聚合值，子层才有准确的近实时时间
+ */
+function parseLatestTimeFromAllLayers(xmlText) {
+  let latestDate = null;
+  if (typeof DOMParser === 'undefined') return null;
+  try {
+    const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+    if (doc.querySelector('parsererror')) return null;
+    const allLayers = doc.querySelectorAll('Layer');
+    for (const layerEl of allLayers) {
+      const timeEl = layerEl.querySelector('Dimension[name="time"], Extent[name="time"]');
+      if (!timeEl || !timeEl.textContent.trim()) continue;
+      const endTime = getLatestTimeFromExtent(timeEl.textContent.trim());
+      if (!endTime) continue;
+      const d = new Date(endTime);
+      if (!isNaN(d.getTime()) && (!latestDate || d > latestDate)) {
+        latestDate = d;
+      }
+    }
+  } catch (e) { /* ignore */ }
+  if (latestDate) {
+    // 返回 ISO 格式（带 Z），保留秒精度（去掉毫秒）
+    const iso = latestDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
+    console.log(`[WMS检测] 📅 从 ${latestDate.toISOString().slice(0, 10)} 子层中提取到最新时间: ${iso}`);
+    return iso;
+  }
+  return null;
+}
+
+/**
+ * 对 best 复合图层做一次试探 GetMap 请求，从服务器返回的
+ * InvalidDimensionValue 错误中解析出精确的有效时间范围，
+ * 提取最后时刻作为可靠 TIME 参数。
+ *
+ * @param {string} baseUrl - WMS 服务基础 URL
+ * @param {string} layers - 图层名
+ * @param {string} version - WMS 版本
+ * @returns {Promise<string|null>} 有效时间字符串，如 "2026-06-21T22:10:19Z"
+ */
+async function probeBestLayerValidTime(baseUrl, layers, version) {
+  const PROBE_TIMEOUT = 5000;
+  const bbox = '-180,-90,180,90'; // CRS:84 和 EPSG:4326 均为 lon,lat 序
+  const crsParam = version === '1.3.0'
+    ? 'crs=CRS:84'
+    : 'srs=EPSG:4326';
+
+  const probeUrl = baseUrl.includes('?')
+    ? `${baseUrl}&SERVICE=WMS&REQUEST=GetMap&VERSION=${version}&LAYERS=${encodeURIComponent(layers)}&STYLES=&${crsParam}&BBOX=${bbox}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=true`
+    : `${baseUrl}?SERVICE=WMS&REQUEST=GetMap&VERSION=${version}&LAYERS=${encodeURIComponent(layers)}&STYLES=&${crsParam}&BBOX=${bbox}&WIDTH=256&HEIGHT=256&FORMAT=image/png&TRANSPARENT=true`;
+
+  console.log(`[TIME探测] 🔍 发起探测 GetMap: ${probeUrl.slice(0, 200)}...`);
+
+  try {
+    const resp = await fetch(probeUrl, {
+      mode: 'cors',
+      signal: AbortSignal.timeout(PROBE_TIMEOUT)
+    });
+
+    const text = await resp.text();
+
+    // 搜索时间范围：从报错中提取所有时间区间
+    // 格式: "2026-06-20T00:30:10Z/2026-06-20T00:30:10Z/PT39M49S,2026-06-20T01:10:18Z/..."
+    const timeListRegex = /(\d{4}-\d{2}-\d{2}T[\d:]+Z)\/(\d{4}-\d{2}-\d{2}T[\d:]+Z)/g;
+    const matches = [];
+    let m;
+    while ((m = timeListRegex.exec(text)) !== null) {
+      // m[2] 是每个区间的结束时间
+      if (m[2]) matches.push(m[2]);
+    }
+
+    if (matches.length > 0) {
+      // 取最后一个（最新）时刻
+      const latest = matches[matches.length - 1];
+      console.log(`[TIME探测] ✅ 找到 ${matches.length} 个有效时刻，最新: ${latest}`);
+      return latest;
+    }
+
+    // 没找到时间范围 → 可能返回了正常图片（服务器有可用默认值）
+    if (resp.ok && resp.headers.get('content-type')?.includes('image')) {
+      console.log(`[TIME探测] ℹ️ 服务器返回了图片（默认时间可用），不需要 TIME 参数`);
+      return null;
+    }
+
+    console.warn(`[TIME探测] ⚠️ 无法从响应中解析时间范围，响应前 300 字符:`, text.slice(0, 300));
+    return null;
+  } catch (err) {
+    console.warn(`[TIME探测] ⚠️ 探测请求失败:`, err.message);
+    return null;
+  }
+}
+
+async function fetchWmsCapabilitiesInfo(wmsUrl, preferredVersion) {
+  const WMS_DETECT_TIMEOUT = 5000;
+
+  // WMS 版本兼容回退链：优先 1.1.1（MapServer 最兼容），其次 1.3.0
+  const versionsToTry = preferredVersion
+    ? [preferredVersion, '1.1.1', '1.3.0'].filter((v, i, a) => a.indexOf(v) === i)
+    : ['1.1.1', '1.3.0'];
+
+  for (const version of versionsToTry) {
+    try {
+      const url = wmsUrl.includes('?')
+        ? `${wmsUrl}&SERVICE=WMS&REQUEST=GetCapabilities&VERSION=${version}`
+        : `${wmsUrl}?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=${version}`;
+
+      console.log(`[WMS检测] 🔍 获取 GetCapabilities: version=${version}`);
+
+      const response = await fetch(url, {
+        mode: 'cors',
+        signal: AbortSignal.timeout(WMS_DETECT_TIMEOUT)
+      });
+
+      if (!response.ok) {
+        console.warn(`[WMS检测] ⚠️ version=${version} 返回 HTTP ${response.status}`);
+        continue;
+      }
+
+      const xmlText = await response.text();
+      if (!xmlText || xmlText.length < 50) continue;
+
+      // 检查是否是错误响应
+      if (xmlText.includes('ServiceExceptionReport') || xmlText.includes('ServiceException')) {
+        console.warn(`[WMS检测] ⚠️ version=${version} 返回异常:`, xmlText.slice(0, 200));
+        continue;
+      }
+
+      const layerNames = parseWmsLayerNames(xmlText);
+      if (layerNames.length === 0) {
+        console.warn(`[WMS检测] ⚠️ version=${version} 未提取到图层名称`);
+        continue;
+      }
+
+      // 解析时间维度 — 优先匹配目标子图层自己的 Dimension
+      // ArcGIS Server WMS：图层 0 是空容器层，数据从 1 开始。如有多个图层且首层为 "0"，跳过它
+      let targetLayer = layerNames[0];
+      if (targetLayer === '0' && layerNames.length > 1) {
+        targetLayer = layerNames[1];
+        console.log(`[WMS检测] 🔄 ArcGIS Server：跳过空容器层 "0"，使用 "${targetLayer}"`);
+      }
+      let timeExtent = parseWmsTimeDimension(xmlText, targetLayer)
+                       || parseWmsTimeDimension(xmlText); // 回退到根图层
+      let latestTime = timeExtent ? getLatestTimeFromExtent(timeExtent) : null;
+
+      // best 复合图层：父层时间维度通常是过期聚合值（如 /2026-04-01/P1M），
+      // 子层才有准确的近实时时间。从所有子层中找最新时间作为回退
+      const allLayersLatest = parseLatestTimeFromAllLayers(xmlText);
+      if (allLayersLatest) {
+        const targetDate = latestTime ? new Date(latestTime) : null;
+        const allDate = new Date(allLayersLatest);
+        if (!targetDate || allDate > targetDate) {
+          console.log(`[WMS检测] 🔄 子层时间 (${allLayersLatest}) > 目标层时间 (${latestTime || '无'})，采用子层时间`);
+          latestTime = allLayersLatest;
+          timeExtent = allLayersLatest;
+        }
+      }
+
+      const result = {
+        layerName: targetLayer,
+        allLayers: layerNames,
+        version: version,
+        timeExtent: timeExtent,
+        latestTime: latestTime
+      };
+
+      console.log(`[WMS检测] ✅ 检测结果: layer="${result.layerName}" version=${version}` +
+        (latestTime ? ` time=${latestTime}` : ' (无时间维度)'));
+
+      if (layerNames.length > 0) {
+        console.log(`[WMS检测] 📋 可用图层 (前10):`, layerNames.slice(0, 10));
+      }
+
+      return result;
+    } catch (err) {
+      if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+        console.warn(`[WMS检测] ⏱️ version=${version} 请求超时`);
+      } else {
+        console.warn(`[WMS检测] ⚠️ version=${version} 请求失败:`, err.message);
+      }
+    }
+  }
+
+  console.warn('[WMS检测] ❌ 所有 WMS 版本均无法获取图层信息');
+  return null;
 }
 
 /**
@@ -779,11 +1126,14 @@ export default {
   created() {
     configRegistry.registerFromMetadata(this.panelMetadata);
 
-    const dataSourceType = this.panelMetadata.dataSource?.type || 'sqlite';
+    // ⚠️ JSON 优先：确保手动编辑 JSON 文件后能立即生效
+    // 浏览器端 SQLite/IndexedDB 作为离线回退
     this._configStrategy = ConfigStrategyFactory.createWithFallback(
-      [dataSourceType, 'json'],
+      ['json', 'sqlite'],
       { baseURL: 'http://localhost:8081' }
     );
+    // 保留 SQLite 策略引用用于显式保存（JSON 策略的 save 是空操作）
+    this._sqliteStrategy = ConfigStrategyFactory.create('sqlite');
     console.log(`[${this.componentName}] ✅ 树形配置加载策略已初始化: ${this._configStrategy.getName()}`);
     console.log(`[${this.componentName}] 🌳 表名: ${this.panelMetadata.dataSource?.tableName}`);
     console.log(`[${this.componentName}] 🔗 自关联字段: parentId → id`);
@@ -866,7 +1216,9 @@ export default {
           return cleanItem;
         });
 
-        const success = await this._configStrategy.save(this.panelMetadata, saveData);
+        // 使用 SQLite/IndexedDB 策略保存（JSON 策略的 save 是空操作）
+        const saveStrategy = this._sqliteStrategy || this._configStrategy;
+        const success = await saveStrategy.save(this.panelMetadata, saveData);
 
         if (success) {
           console.log(`[${this.componentName}] ✅ 树形配置已保存`);
@@ -990,6 +1342,8 @@ export default {
         nodeType: 'layer',
         url: '',
         mvtSourceLayers: '',
+        wmsLayerName: '',
+        wmsVersion: '',
         sortOrder: 0,
         visible: true,
         description: '',
@@ -1085,6 +1439,8 @@ export default {
         description: node.description || '',
         icon: node.icon || '📄',
         mvtSourceLayers: node.mvtSourceLayers || '',
+        wmsLayerName: node.wmsLayerName || '',
+        wmsVersion: node.wmsVersion || '',
         centerLon: node.centerLon != null ? Number(node.centerLon) : null,
         centerLat: node.centerLat != null ? Number(node.centerLat) : null,
         centerHeight: node.centerHeight != null ? Number(node.centerHeight) : null
@@ -1118,6 +1474,8 @@ export default {
         description: this.editForm.description,
         icon: this.editForm.icon,
         mvtSourceLayers: this.editForm.mvtSourceLayers || '',
+        wmsLayerName: this.editForm.wmsLayerName || '',
+        wmsVersion: this.editForm.wmsVersion || '',
         centerLon: this.editForm.centerLon != null ? Number(this.editForm.centerLon) : undefined,
         centerLat: this.editForm.centerLat != null ? Number(this.editForm.centerLat) : undefined,
         centerHeight: this.editForm.centerHeight != null ? Number(this.editForm.centerHeight) : undefined
@@ -1539,9 +1897,22 @@ export default {
       if (url.includes('tileset.json') || ancestorNames.includes('3d tiles')) return '3dtiles';
       if (url.includes('{z}/{x}/{y}') || url.includes('{z}/{y}/{x}')) return 'xyz';
       if (url.includes('geojson') || url.endsWith('.json')) return 'geojson';
+      // 防止将非 OGC 服务 URL（HTML页面、图片等）误判为 WMS
+      // 只有当 URL 包含明显的 OGC 服务特征时才继承祖先类型
+      const looksLikeOgc = (
+        url.includes('service=') ||
+        url.includes('request=') ||
+        url.includes('getcapabilities') ||
+        url.includes('wmsserver') ||
+        url.includes('wfs') ||
+        url.includes('wmts')
+      );
       // 默认根据祖先判断
       if (ancestorNames.includes('xyz') || ancestorNames.includes('tms')) return 'xyz';
-      if (ancestorNames.includes('wms')) return 'wms';
+      if (ancestorNames.includes('wms') && !url.endsWith('.html') && !url.endsWith('.htm') && looksLikeOgc) return 'wms';
+      if (ancestorNames.includes('wms') && (url.endsWith('.html') || url.endsWith('.htm') || !looksLikeOgc)) {
+        console.warn(`[detectLayerType] ⚠️ URL "${node.url}" 不像是 OGC 服务，无法按 WMS 处理，回退为 XYZ`);
+      }
       return 'xyz'; // 默认按 XYZ 瓦片处理
     },
 
@@ -1692,34 +2063,269 @@ export default {
             break;
           }
           case 'wms': {
-            // 从 URL 中提取 base WMS URL
-            const wmsUrl = node.url.replace(/\?.*$/, '');
-            const provider = new Cesium.WebMapServiceImageryProvider({
-              url: wmsUrl,
-              layers: node.wmsLayerName || '0',
-              parameters: {
-                transparent: true,
-                format: 'image/png'
+            // 从 URL 中提取 base WMS URL（去除查询参数）
+            const baseUrl = node.url.replace(/\?.*$/, '');
+
+            // 从 URL 或配置中确定 WMS 版本
+            const urlVersionMatch = node.url.match(/[Vv][Ee][Rr][Ss][Ii][Oo][Nn]=([\d.]+)/);
+            const preferredVersion = node.wmsVersion || (urlVersionMatch ? urlVersionMatch[1] : null);
+
+            // ArcGIS Server WMS：WMS 1.3.0 + EPSG:4326 存在 bbox 轴序颠倒问题
+            // （规范要求 lat,lon，Cesium 发送 lon,lat），导致返回空图。
+            // 强制使用 1.1.1（SRS=EPSG:4326，bbox 为 lon,lat 顺序）
+            const isArcgisWms = /\/arcgis\/.*\/MapServer\/WMSServer/i.test(node.url);
+
+            // 获取图层名称：优先使用用户配置，否则自动检测
+            let layers = node.wmsLayerName || '';
+            let detectedVersion = preferredVersion || '1.1.1';
+            let latestTime = node.wmsTime || null; // 用户手动指定的时间优先
+            let capInfo = null;
+
+            if (!layers) {
+              // 无预设图层名 → 完整检测（图层 + 时间维度）
+              console.log(`[${this.componentName}] 🔍 自动检测 WMS 图层: ${node.name}`);
+              capInfo = await fetchWmsCapabilitiesInfo(baseUrl, preferredVersion);
+              if (capInfo) {
+                layers = capInfo.layerName;
+                detectedVersion = capInfo.version;
+                if (!latestTime) latestTime = capInfo.latestTime;
+                console.log(`[${this.componentName}] ✅ 自动检测: layer="${layers}" version=${detectedVersion}` +
+                  (latestTime ? ` time=${latestTime}` : ''));
+              } else {
+                // GetCapabilities 失败时的智能回退
+                // 许多 WMS 服务器不开启 CORS，导致 fetch GetCapabilities 被拦截，
+                // 但瓦片本身（通过 <img> 标签加载）不受 CORS 限制，可正常渲染。
+                // 以下按服务器类型逐级回退确定图层名：
+
+                // 1. ArcGIS Server WMS：图层 0 是空容器层，数据从 1 开始
+                const arcgisMatch = baseUrl.match(/\/arcgis\/.*\/MapServer\/WMSServer/i);
+                if (arcgisMatch) {
+                  layers = '1';
+                  console.log(`[${this.componentName}] 🔄 ArcGIS Server 检测到，回退使用图层名 "1"（图层 0 为空容器）`);
+                }
+
+                // 2. MapServer WMS（含 /wms/map、/cgi-bin/mapserv 等路径）：
+                //    默认图层名通常为 "0"
+                if (!layers && /\/wms\/map|\/cgi-bin\/mapserv|mapserv/i.test(baseUrl)) {
+                  layers = '0';
+                  console.log(`[${this.componentName}] 🔄 MapServer WMS 检测到，回退使用默认图层名 "0"`);
+                }
+
+                // 3. 从原始 URL 的 LAYERS 参数提取
+                if (!layers) {
+                  const urlLayersMatch = node.url.match(/[?&]layers=([^&]+)/i);
+                  if (urlLayersMatch) {
+                    layers = decodeURIComponent(urlLayersMatch[1]);
+                    console.log(`[${this.componentName}] 🔄 从 URL 参数提取图层名: "${layers}"`);
+                  }
+                }
+
+                // 4. 所有回退均失败
+                if (!layers) {
+                  throw new Error(
+                    'WMS 图层名未知，无法自动检测。请在节点配置中设置 wmsLayerName 字段。\n' +
+                    '提示: 直接在浏览器中访问以下 URL 查看可用图层列表：\n' +
+                    `  ${baseUrl}?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0`
+                  );
+                }
               }
-            });
-            // WMS 图层默认不可选（避免每像素拾取请求）
-            provider.enablePickFeatures = false;
+            } else if (!latestTime) {
+              // 有图层名但无时间 → 仅检测时间维度（GetCapabilities 可能被 CORS 拦截，降级为警告）
+              console.log(`[${this.componentName}] 🔍 已指定图层 "${layers}"，检测时间维度...`);
+              try {
+                capInfo = await fetchWmsCapabilitiesInfo(baseUrl, preferredVersion);
+                if (capInfo && capInfo.latestTime) {
+                  latestTime = capInfo.latestTime;
+                  if (capInfo.version) detectedVersion = capInfo.version;
+                  console.log(`[${this.componentName}] ⏱️ 检测到时间维度: ${latestTime}`);
+                }
+              } catch (e) {
+                console.warn(`[${this.componentName}] ⚠️ 时间维度检测失败（非阻塞）:`, e.message);
+              }
+            }
+
+            // 构建 WMS 请求参数（参考 forestry-cesium-vue 成功模式）
+            const wmsParams = {
+              version: detectedVersion,
+              transparent: true,
+              format: 'image/png'
+            };
+
+            // ⚠️ 显式指定 SRS/CRS，统一 bbox 轴序为 lon,lat（与 Cesium 一致）：
+            //   - WMS 1.3.0 + EPSG:4326 → bbox 必须是 lat,lon（WMS 规范）→ 轴序颠倒
+            //   - WMS 1.3.0 + CRS:84      → bbox 是 lon,lat（与 Cesium 一致）✅
+            //   - WMS 1.1.1 + EPSG:4326   → bbox 是 lon,lat（与 Cesium 一致）✅
+            if (detectedVersion === '1.3.0') {
+              wmsParams.crs = 'CRS:84';
+            } else {
+              wmsParams.srs = 'EPSG:4326';
+            }
+
+            // ⚠️ 时间维度处理
+            const isBestComposite = /\/best\//i.test(node.url) || /_best$/i.test(layers);
+            if (!isBestComposite && latestTime) {
+              // 普通 WMS 层：使用 GetCapabilities 检测到的时间
+              wmsParams.TIME = latestTime;
+              console.log(`[${this.componentName}] ⏱️ WMS 时间维度: ${latestTime}`);
+            } else if (isBestComposite && node.wmsTime) {
+              // best 层 + 用户手动指定 → 直接信任
+              wmsParams.TIME = node.wmsTime;
+              latestTime = node.wmsTime;
+              console.log(`[${this.componentName}] ⏱️ best 复合图层：使用用户指定的 TIME=${latestTime}`);
+            } else if (isBestComposite) {
+              // best 层：GetCapabilities 时间不可靠（理论覆盖 vs 实际瓦片不符），
+              // 主动发试探 GetMap 从报错中解析精确有效时间
+              console.log(`[${this.componentName}] 🔍 best 复合图层：主动探测有效时间...`);
+              try {
+                const probeTime = await probeBestLayerValidTime(baseUrl, layers, detectedVersion);
+                if (probeTime) {
+                  latestTime = probeTime;
+                  wmsParams.TIME = latestTime;
+                  console.log(`[${this.componentName}] ✅ 探测到有效 TIME: ${latestTime}`);
+                } else {
+                  console.log(`[${this.componentName}] ⏭️ 探测未获取有效时间，不传 TIME`);
+                }
+              } catch (e) {
+                console.warn(`[${this.componentName}] ⚠️ 时间探测失败:`, e.message);
+              }
+            }
+
+            // 构建地理范围（参考 forestry-cesium-vue 的 rectangle 参数）
+            let rectangle;
+            if (node.centerLon != null && node.centerLat != null && node.centerHeight) {
+              const halfDeg = (node.centerHeight / 111000) * 0.5;
+              rectangle = Cesium.Rectangle.fromDegrees(
+                node.centerLon - halfDeg,
+                node.centerLat - halfDeg,
+                node.centerLon + halfDeg,
+                node.centerLat + halfDeg
+              );
+            }
+
+            // 构建 Cesium WMS Provider（参考 forestry-cesium-vue 成功模式）
+            const providerOpts = {
+              url: baseUrl,
+              layers: layers,
+              parameters: wmsParams,
+              enablePickFeatures: false // WMS 图层默认不可选（避免每像素拾取请求）
+            };
+            if (rectangle) {
+              providerOpts.rectangle = rectangle;
+            }
+            const provider = new Cesium.WebMapServiceImageryProvider(providerOpts);
             const layer = viewer.imageryLayers.addImageryProvider(provider);
-            this._cesiumLayers.set(node.id, { type: 'wms', object: layer, provider });
+            this._cesiumLayers.set(node.id, {
+              type: 'wms',
+              object: layer,
+              provider,
+              _detectedLayer: layers,
+              _wmsVersion: detectedVersion,
+              _wmsTime: latestTime
+            });
+            console.log(`[${this.componentName}] ✅ WMS 图层加载成功: ${node.name} (layer="${layers}", version=${detectedVersion})`);
             break;
           }
           case 'wmts': {
-            // WMTS — 尝试从 GetCapabilities XML URL 构建
-            const wmtsUrl = node.url.replace(/\?.*$/, '');
+            // WMTS — 参考 forestry-cesium-vue 成功模式
+            const wmtsUrl = node.url;
+
+            // KVP GetCapabilities URL 的处理：
+            // Cesium WebMapTileServiceImageryProvider 会保留原始 query params
+            // 并追加瓦片参数，导致 URL 中同时出现 request=GetTile 和
+            // REQUEST=GetCapabilities（双重参数冲突）。
+            // 因此：自动检测使用完整 URL，传给 Cesium 时只去掉 GetCapabilities
+            // 专属参数（保留 tk、token、key 等业务参数）
+            const isKvpCaps = /[?&]request=getcapabilities/i.test(wmtsUrl);
+            let wmtsResourceUrl = wmtsUrl;
+            if (isKvpCaps) {
+              const qIdx = wmtsUrl.indexOf('?');
+              const base = qIdx >= 0 ? wmtsUrl.slice(0, qIdx) : wmtsUrl;
+              const params = (qIdx >= 0 ? wmtsUrl.slice(qIdx + 1) : '')
+                .split('&')
+                .filter(p => {
+                  const k = p.split('=')[0].toLowerCase();
+                  return k !== 'service' && k !== 'request' && k !== 'version';
+                });
+              wmtsResourceUrl = params.length > 0
+                ? `${base}?${params.join('&')}`
+                : base;
+            }
+
+            // 检测投影：根据 tileMatrixSetID 决定 tilingScheme
+            const tmSetId = node.wmtsTileMatrixSet || 'EPSG:4326';
+            const isGeographic = /4326|CRS:84|WGS84/i.test(tmSetId);
+            const tilingScheme = isGeographic
+              ? new Cesium.GeographicTilingScheme()
+              : new Cesium.WebMercatorTilingScheme();
+
+            // 确定图层名：优先使用用户配置，否则尝试自动检测
+            let wmtsLayer = node.wmtsLayerName || '';
+            if (!wmtsLayer) {
+              console.log(`[${this.componentName}] 🔍 自动检测 WMTS 图层: ${node.name}`);
+
+              // 1. 从 URL query 参数提取（如 ?layer=xxx）
+              const qLayerMatch = wmtsUrl.match(/[?&]layer=([^&]+)/i);
+              if (qLayerMatch) {
+                wmtsLayer = decodeURIComponent(qLayerMatch[1]);
+                console.log(`[${this.componentName}] 🔄 从 URL 参数提取 WMTS 图层名: "${wmtsLayer}"`);
+              }
+
+              // 2. 从 GetCapabilities XML 提取 <Identifier>
+              if (!wmtsLayer) {
+                try {
+                  const capXml = await fetch(wmtsUrl, {
+                    mode: 'cors',
+                    signal: AbortSignal.timeout(5000)
+                  }).then(r => r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`)));
+                  // WMTS 使用 <ows:Identifier> 作为图层机器标识符
+                  const idMatch = capXml.match(/<ows:Identifier[^>]*>([^<]+)<\/ows:Identifier>/i)
+                               || capXml.match(/<Identifier[^>]*>([^<]+)<\/Identifier>/i);
+                  if (idMatch) {
+                    wmtsLayer = idMatch[1].trim();
+                    console.log(`[${this.componentName}] ✅ 从 GetCapabilities 检测到 WMTS 图层: "${wmtsLayer}"`);
+                  }
+                } catch (e) {
+                  console.warn(`[${this.componentName}] ⚠️ WMTS GetCapabilities 检测失败（非阻塞）:`, e.message);
+                }
+              }
+
+              // 3. 回退：从 URL 路径中提取（排除版本号、服务名等非图层段）
+              if (!wmtsLayer) {
+                const nonLayerPattern = /^(v?\d+([._-]\d+)*|wmts?|gwc|services?|best|default|tiles?|maps?server|features?server|epsg\d+|crs\d+|wgs\d+|arcgis|rest)$/i;
+                const pathParts = wmtsUrl.replace(/\?.*$/, '')
+                  .split('/')
+                  .filter(p => p && !/\.(xml|php|cgi|html?)$/i.test(p) && !nonLayerPattern.test(p));
+                wmtsLayer = pathParts[pathParts.length - 1] || '';
+                if (wmtsLayer && wmtsLayer.length < 50) {
+                  console.log(`[${this.componentName}] 🔄 从 URL 路径回退 WMTS 图层名: "${wmtsLayer}"`);
+                }
+              }
+              // 4. 最终回退：如果实在无法确定图层名，对 Capabilities XML 类型的 URL
+              //    传空字符串让 Cesium 自动从 Capabilities 解析
+              if (!wmtsLayer && /wmtscapabilities|getcapabilities|request=getcapabilities/i.test(wmtsUrl)) {
+                console.log(`[${this.componentName}] 🔄 WMTS Capabilities URL 检测到，留空图层名交由 Cesium 自动解析`);
+                // wmtsLayer 保持空字符串，Cesium 将自动从 Capabilities XML 发现图层
+              }
+            }
+
             const provider = new Cesium.WebMapTileServiceImageryProvider({
-              url: wmtsUrl,
-              layer: node.wmtsLayerName || '',
-              style: 'default',
-              format: 'image/png',
-              tileMatrixSetID: 'EPSG:4326'
+              url: wmtsResourceUrl,
+              layer: wmtsLayer,
+              style: node.wmtsStyle || '',
+              format: node.wmtsFormat || 'image/png',
+              tileMatrixSetID: tmSetId,
+              tilingScheme: tilingScheme
             });
             const layer = viewer.imageryLayers.addImageryProvider(provider);
-            this._cesiumLayers.set(node.id, { type: 'wmts', object: layer, provider });
+            this._cesiumLayers.set(node.id, {
+              type: 'wmts',
+              object: layer,
+              provider,
+              _wmtsLayer: wmtsLayer,
+              _wmtsTileMatrixSet: tmSetId,
+              _wmtsTilingScheme: isGeographic ? 'geographic' : 'webmercator'
+            });
+            console.log(`[${this.componentName}] ✅ WMTS 图层加载成功: ${node.name} (layer="${wmtsLayer}", tileMatrixSet=${tmSetId})`);
             break;
           }
           case 'wfs':

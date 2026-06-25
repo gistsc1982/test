@@ -644,23 +644,41 @@ class DatabaseManager {
   }
 
   /**
-   * 智能同步：只导入文件系统中有但数据库中没有的配置
+   * 智能同步：导入文件系统中有但数据库中没有的配置，并更新已修改的配置
+   *
+   * 逻辑：
+   * - 数据库中不存在的表 → 首次导入（imported）
+   * - 数据库中已存在的表 → 比较文件修改时间与数据库 updated_at
+   *   - 文件更新 → 更新数据库（updated）
+   *   - 数据库更新 → 跳过（skipped）
    */
   async smartSyncFromFilesystem() {
     try {
       const fs = require('fs').promises;
       const results = {
         imported: [],
+        updated: [],
         skipped: [],
         failed: []
       };
 
-      const existingTables = new Set();
+      // 查询已有表及其最后更新时间
+      const existingTables = new Map(); // tableName → updated_at
       const tables = this.db.prepare(`
         SELECT name FROM sqlite_master
         WHERE type='table' AND name NOT LIKE '\\_%' ESCAPE '\\' AND name NOT LIKE 'sqlite_%'
       `).all();
-      tables.forEach(t => existingTables.add(t.name));
+
+      for (const t of tables) {
+        try {
+          const row = this.db.prepare(`SELECT updated_at FROM "${t.name}" WHERE id = 1`).get();
+          const dbTime = row ? new Date(row.updated_at).getTime() : 0;
+          existingTables.set(t.name, dbTime);
+        } catch (e) {
+          // 表可能没有 updated_at 列或 id=1 行
+          existingTables.set(t.name, 0);
+        }
+      }
 
       console.log(`📊 数据库中已有的表: ${existingTables.size} 个`);
 
@@ -691,12 +709,41 @@ class DatabaseManager {
             const tableName = self.pathToTableName(relPath);
 
             if (existingTables.has(tableName)) {
-              results.skipped.push({
-                path: relPath,
-                fileName: fileName,
-                reason: '数据库表已存在'
-              });
-              console.log(`⏭️ 跳过: ${relPath} (表已存在)`);
+              // 表已存在 → 比较文件修改时间
+              try {
+                const fileStat = await fs.stat(fullPath);
+                const fileMtime = fileStat.mtime.getTime();
+                const dbTime = existingTables.get(tableName);
+
+                if (fileMtime > dbTime) {
+                  // 文件比数据库新 → 更新
+                  const content = await fs.readFile(fullPath, 'utf8');
+                  const data = JSON.parse(content);
+                  const saveResult = self.saveConfig(relPath, data);
+
+                  results.updated.push({
+                    path: relPath,
+                    tableName: tableName,
+                    action: saveResult.action
+                  });
+                  console.log(`🔄 已更新: ${relPath} → ${tableName} (文件时间: ${new Date(fileMtime).toISOString()}, 数据库时间: ${new Date(dbTime).toISOString()})`);
+                } else {
+                  // 数据库与文件一致或更新 → 跳过
+                  results.skipped.push({
+                    path: relPath,
+                    fileName: fileName,
+                    reason: '数据已是最新'
+                  });
+                  console.log(`⏭️ 跳过: ${relPath} (已是最新)`);
+                }
+              } catch (statError) {
+                results.failed.push({
+                  path: relPath,
+                  fileName: fileName,
+                  error: statError.message
+                });
+                console.error(`❌ 检查文件状态失败: ${relPath}`, statError.message);
+              }
               continue;
             }
 
@@ -728,6 +775,7 @@ class DatabaseManager {
 
       console.log(`\n📊 智能同步完成:`);
       console.log(`  ✅ 新导入: ${results.imported.length} 个`);
+      console.log(`  🔄 已更新: ${results.updated.length} 个`);
       console.log(`  ⏭️ 跳过: ${results.skipped.length} 个`);
       console.log(`  ❌ 失败: ${results.failed.length} 个`);
 

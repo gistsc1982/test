@@ -15,6 +15,12 @@
       { "value": "layer", "label": "图层节点" }
     ]},
     { "key": "url", "label": "资源URL", "type": "url", "required": false, "placeholder": "图层资源的URL地址（图层节点使用）" },
+    { "key": "wmsLayerName", "label": "WMS图层名", "type": "text", "required": false, "placeholder": "WMS服务指定图层名，留空自动检测", "description": "WMS GetMap请求的LAYERS参数值" },
+    { "key": "wmsVersion", "label": "WMS版本", "type": "select", "required": false, "default": "1.1.1", "options": [
+      { "value": "1.1.1", "label": "WMS 1.1.1 (MapServer兼容)" },
+      { "value": "1.3.0", "label": "WMS 1.3.0" }
+    ]},
+    { "key": "mvtSourceLayers", "label": "MVT源图层", "type": "text", "required": false, "placeholder": "逗号分隔，留空自动检测", "description": "MVT矢量瓦片中要渲染的源图层名称列表" },
     { "key": "sortOrder", "label": "排序序号", "type": "number", "required": false, "default": 0, "description": "同级节点排序依据，数值越小越靠前" },
     { "key": "visible", "label": "是否可见", "type": "boolean", "required": false, "default": true },
     { "key": "description", "label": "描述信息", "type": "text", "required": false, "placeholder": "节点描述" },

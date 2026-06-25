@@ -95,21 +95,30 @@ async function initDatabase() {
     await dbManager.init();
     console.log('✅ 数据库已就绪');
 
-    console.log('📥 检查文件系统中的新配置...');
+    console.log('📥 检查文件系统中的配置变更...');
     try {
       const syncResult = await dbManager.smartSyncFromFilesystem();
 
       if (syncResult.imported.length > 0) {
-        console.log(`✅ 已导入 ${syncResult.imported.length} 个新配置:`);
+        console.log(`✅ 新导入 ${syncResult.imported.length} 个配置:`);
         syncResult.imported.forEach(item => {
           console.log(`   - ${item.path} → ${item.tableName}`);
         });
-      } else {
-        console.log('ℹ️ 没有新的配置需要导入');
+      }
+
+      if (syncResult.updated.length > 0) {
+        console.log(`🔄 已更新 ${syncResult.updated.length} 个已修改配置:`);
+        syncResult.updated.forEach(item => {
+          console.log(`   - ${item.path} → ${item.tableName} (${item.action})`);
+        });
+      }
+
+      if (syncResult.imported.length === 0 && syncResult.updated.length === 0) {
+        console.log('ℹ️ 所有配置均为最新，无需同步');
       }
 
       if (syncResult.skipped.length > 0) {
-        console.log(`⏭️ 跳过 ${syncResult.skipped.length} 个已存在的配置`);
+        console.log(`⏭️ 跳过 ${syncResult.skipped.length} 个配置（已是最新或不符合规范）`);
       }
     } catch (syncError) {
       console.error('⚠️ 智能同步出现问题:', syncError.message);
