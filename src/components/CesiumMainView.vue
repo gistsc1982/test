@@ -3344,10 +3344,30 @@ export default {
     },
 
     init() {
+      // 防止并发初始化
+      if (this._initInProgress) {
+        console.warn('[CesiumMain] ⚠️ 初始化进行中，跳过重复调用');
+        return;
+      }
+      this._initInProgress = true;
+
       performance.mark('cesium-init-start');
       const Cesium = this.Cesium;
 
       console.log('[性能监控] 🌐 Cesium引擎初始化开始');
+
+      // ⚠️ 防御：销毁可能残留的旧 Viewer（页面未刷新重新进入时）
+      if (this.cesiumViewer) {
+        try {
+          if (!this.cesiumViewer.isDestroyed()) {
+            console.warn('[CesiumMain] ⚠️ 检测到未销毁的旧 Viewer，先销毁...');
+            this.cesiumViewer.destroy();
+          }
+        } catch (e) {
+          console.warn('[CesiumMain] ⚠️ 旧 Viewer 销毁异常:', e?.message || e);
+        }
+        this.cesiumViewer = null;
+      }
 
       // 根据环境选择影像服务 URL
       const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -3375,9 +3395,56 @@ export default {
         timeline: false,
         fullscreenButton: false,
         vrButton: false,
+        // ⚠️ 关键修复: 关闭 GPU 性能警告，避免在集成显卡/虚拟机/远程桌面初始化失败
+        // Cesium 默认 failIfMajorPerformanceCaveat=true 会导致 Context 构造时直接抛异常
+        contextOptions: {
+          webgl: {
+            failIfMajorPerformanceCaveat: false
+          }
+        }
       };
 
-      this.cesiumViewer = new Cesium.Viewer("cesiumContainer", config);
+      // ⚠️ 容器尺寸检查：Cesium 要求容器有实际尺寸，否则 WebGL 创建失败
+      const container = document.getElementById('cesiumContainer');
+      if (!container || container.offsetWidth === 0 || container.offsetHeight === 0) {
+        console.error('[CesiumMain] ❌ Cesium 容器尺寸异常:', {
+          exists: !!container,
+          width: container?.offsetWidth,
+          height: container?.offsetHeight
+        });
+        this._initInProgress = false; // 重置，允许重试
+        console.warn('[CesiumMain] ⚠️ 等待容器就绪后重试...');
+        // 延迟重试
+        let retries = 0;
+        const maxRetries = 10;
+        const retryInterval = setInterval(() => {
+          retries++;
+          const c = document.getElementById('cesiumContainer');
+          if (c && c.offsetWidth > 0 && c.offsetHeight > 0) {
+            clearInterval(retryInterval);
+            console.log(`[CesiumMain] 🔄 容器已就绪 (${c.offsetWidth}x${c.offsetHeight})，重新初始化...`);
+            this.init();
+          } else if (retries >= maxRetries) {
+            clearInterval(retryInterval);
+            console.error(`[CesiumMain] ❌ 容器 ${maxRetries * 500}ms 仍未就绪，放弃初始化`);
+          }
+        }, 500);
+        return;
+      }
+
+      try {
+        this.cesiumViewer = new Cesium.Viewer("cesiumContainer", config);
+      } catch (error) {
+        // WebGL 初始化失败（通常是 GPU 资源耗尽或上下文已达上限）
+        console.error('[CesiumMain] ❌ Cesium Viewer 创建失败:', error?.message || error);
+        console.warn('[CesiumMain] ⚠️ 可能原因：WebGL 上下文已达上限、GPU 内存耗尽、或浏览器不支持');
+        console.warn('[CesiumMain] 💡 建议：刷新浏览器页面（F5）释放 GPU 资源后重试');
+        // 不抛出异常 — 页面可以继续渲染其他内容
+        this.cesiumViewer = null;
+        this._initInProgress = false;
+        return;
+      }
+      this._initInProgress = false;
       performance.mark('cesium-viewer-created');
       console.log('[性能监控] ✅ Cesium Viewer创建完成');
 
@@ -10764,6 +10831,24 @@ async loadTestSfcComponent(instanceId) {
 
     // ⭐ 注意：倾斜摄影清理功能已迁移到 ObliquePhotographyPanel 组件
     // 不再在此处清理倾斜摄影数据
+
+    // ⚠️ 关键：销毁 Cesium Viewer 释放 WebGL 上下文
+    // 不销毁会导致 WebGL 上下文泄漏，再次进入页面时初始化失败
+    if (this.cesiumViewer && !this.cesiumViewer.isDestroyed()) {
+      try {
+        console.log('[CesiumMain] 🗑️ 销毁 Cesium Viewer，释放 WebGL 上下文...');
+        this.cesiumViewer.destroy();
+        console.log('[CesiumMain] ✅ Cesium Viewer 已销毁');
+      } catch (error) {
+        console.warn('[CesiumMain] ⚠️ Cesium Viewer 销毁异常（已忽略）:', error?.message || error);
+      }
+    }
+    this.cesiumViewer = null;
+
+    // 移除全局引用
+    if (typeof window !== 'undefined' && window.__cesiumViewer__) {
+      window.__cesiumViewer__ = null;
+    }
   }
 };
 </script>

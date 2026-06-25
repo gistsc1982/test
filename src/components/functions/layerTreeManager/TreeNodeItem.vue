@@ -19,23 +19,30 @@
       <label
         v-if="isLeafWithUrl"
         class="tree-node-checkbox"
+        :class="{ 'tree-node-checkbox-disabled': isLoading }"
         @click.stop
-        :title="isLayerLoaded ? '点击从地图移除' : '点击加载到地图'"
+        :title="checkboxTitle"
       >
-        <input
-          type="checkbox"
-          :checked="isLayerLoaded"
-          @change="onToggleLayer"
-          class="layer-check-input"
-        />
-        <span class="layer-check-indicator" :class="{ checked: isLayerLoaded }"></span>
+        <!-- 加载中旋转图标 -->
+        <span v-if="isLoading" class="layer-loading-spinner" title="正在加载图层...">⏳</span>
+        <template v-else>
+          <input
+            type="checkbox"
+            :checked="isLayerLoaded"
+            @change="onToggleLayer"
+            :disabled="isLoading"
+            class="layer-check-input"
+          />
+          <span class="layer-check-indicator" :class="{ checked: isLayerLoaded }"></span>
+        </template>
       </label>
       <span v-else-if="!hasChildren" class="tree-node-no-check"></span>
 
       <span class="tree-node-icon">{{ nodeIcon }}</span>
       <span class="tree-node-name">{{ node.name }}</span>
 
-      <span v-if="isLayerLoaded" class="tree-node-status loaded" title="已加载到地图">✅</span>
+      <span v-if="isLayerLoaded && !hasError" class="tree-node-status loaded" title="已加载到地图">✅</span>
+      <span v-if="hasError" class="tree-node-status error-status" :title="errorMessage">{{ errorIcon }} {{ errorLabel }}</span>
 
       <span class="tree-node-type-tag" :class="isFolder ? 'tag-folder' : 'tag-layer'">
         {{ isFolder ? '目录' : '图层' }}
@@ -60,6 +67,8 @@
         :expanded-ids="expandedIds"
         :selected-id="selectedId"
         :loaded-layer-ids="loadedLayerIds"
+        :loading-layer-ids="loadingLayerIds"
+        :layer-errors="layerErrors"
         @toggle-expand="(id) => $emit('toggle-expand', id)"
         @select-node="(id) => $emit('select-node', id)"
         @add-child="(n) => $emit('add-child', n)"
@@ -80,7 +89,9 @@ export default {
     allFlatNodes: { type: Array, default: () => [] },
     expandedIds: { type: Set, default: () => new Set() },
     selectedId: { type: String, default: null },
-    loadedLayerIds: { type: Object, default: () => ({}) }
+    loadedLayerIds: { type: Object, default: () => ({}) },
+    loadingLayerIds: { type: Object, default: () => ({}) },
+    layerErrors: { type: Object, default: () => ({}) }
   },
   emits: ['toggle-expand', 'select-node', 'add-child', 'edit-node', 'delete-node', 'toggle-layer'],
   computed: {
@@ -101,6 +112,30 @@ export default {
     },
     isLayerLoaded() {
       return !!this.loadedLayerIds[this.node.id];
+    },
+    isLoading() {
+      return !!this.loadingLayerIds[this.node.id];
+    },
+    hasError() {
+      return !!this.layerErrors[this.node.id];
+    },
+    errorMessage() {
+      const err = this.layerErrors[this.node.id];
+      return err ? (err.message || '') : '';
+    },
+    errorLabel() {
+      const err = this.layerErrors[this.node.id];
+      return err ? (err.label || '加载失败') : '加载失败';
+    },
+    errorIcon() {
+      const err = this.layerErrors[this.node.id];
+      return err ? (err.icon || '❌') : '❌';
+    },
+    checkboxTitle() {
+      if (this.isLoading) return '正在加载图层...';
+      if (this.hasError) return `加载失败: ${this.errorMessage}\n点击重试`;
+      if (this.isLayerLoaded) return '点击从地图移除';
+      return '点击加载到地图';
     },
     nodeVisible() {
       return this.node.visible !== 0 && this.node.visible !== false;
@@ -196,6 +231,46 @@ export default {
 
 .tree-node-status.loaded {
   color: #4CAF50;
+}
+
+.tree-node-status.error-status {
+  color: #FF6B6B;
+  cursor: help;
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 2px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tree-node-status.error-status:hover {
+  background: rgba(255, 107, 107, 0.18);
+}
+
+/* ========== 加载中动画 ========== */
+.layer-loading-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 12px;
+  animation: layer-spin 1s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes layer-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.tree-node-checkbox-disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 /* ========== 树节点容器 ========== */

@@ -50,6 +50,8 @@
               :expanded-ids="expandedIds"
               :selected-id="selectedNodeId"
               :loaded-layer-ids="loadedLayerIds"
+              :loading-layer-ids="loadingLayerIds"
+              :layer-errors="layerErrors"
               @toggle-expand="toggleExpand"
               @select-node="selectNode"
               @add-child="openAddChildDialog"
@@ -400,40 +402,53 @@ function parseLayerMessage(buffer, start, end) {
 /**
  * 检测 MVT 瓦片中的源图层名称
  * 尝试多个 zoom 级别的瓦片，优先使用覆盖范围最广的
+ * ⚠️ 整体超时 8 秒，防止长时间阻塞 UI
  * @param {string} urlTemplate - URL 模板，包含 {z}/{x}/{y}
  * @returns {Promise<string[]>} 图层名称数组
  */
 async function detectMvtSourceLayers(urlTemplate) {
+  const DETECT_TOTAL_TIMEOUT = 8000;  // 总超时 8 秒
+  const PER_TILE_TIMEOUT = 2000;      // 每个瓦片 2 秒
+
   // 优先尝试高 zoom（城市级 mbtiles 通常从 zoom 10+ 开始有数据）
   // 再回退到中低 zoom（全球/国家级数据集）
   const tileCoords = [
     // 优先：高 zoom — 城市/区域级 mbtiles
     { z: 12, x: 3343, y: 1784 },  // 深圳/珠三角
     { z: 12, x: 3342, y: 1783 },
-    { z: 10, x: 835, y: 467 },
-    { z: 11, x: 1671, y: 935 },
-    { z: 14, x: 13370, y: 7140 },
     // 回退：中 zoom — 国家/大陆级
+    { z: 10, x: 835, y: 467 },
     { z: 8, x: 206, y: 98 },      // 中国/东亚
-    { z: 9, x: 413, y: 197 },
     { z: 6, x: 51, y: 24 },       // 欧亚大陆
-    { z: 5, x: 25, y: 12 },
-    // 最后尝试：低 zoom — 全球数据集
+    // 最后尝试：低 zoom
     { z: 2, x: 1, y: 1 },
-    { z: 0, x: 0, y: 0 },
   ];
 
+  const startTime = Date.now();
+
   for (const coord of tileCoords) {
+    // 检查总超时
+    const elapsed = Date.now() - startTime;
+    if (elapsed >= DETECT_TOTAL_TIMEOUT) {
+      console.warn('[MVT检测] ⏱️ 检测总超时，停止继续尝试');
+      break;
+    }
+
     try {
       const url = urlTemplate
         .replace('{z}', coord.z)
         .replace('{x}', coord.x)
         .replace('{y}', coord.y);
 
-      console.log(`[MVT检测] 🔍 尝试获取瓦片: z=${coord.z} x=${coord.x} y=${coord.y} → ${url}`);
+      // 剩余时间不能超过单次超时
+      const remaining = DETECT_TOTAL_TIMEOUT - elapsed;
+      const timeout = Math.min(PER_TILE_TIMEOUT, remaining);
+
+      console.log(`[MVT检测] 🔍 尝试获取瓦片: z=${coord.z} x=${coord.x} y=${coord.y} (超时:${timeout}ms)`);
+
       const response = await fetch(url, {
         mode: 'cors',
-        signal: AbortSignal.timeout(3000)  // 缩短超时到 3 秒
+        signal: AbortSignal.timeout(timeout)
       });
 
       if (!response.ok) continue;
@@ -445,12 +460,16 @@ async function detectMvtSourceLayers(urlTemplate) {
       console.log(`[MVT检测] ✅ 检测到 ${layerNames.length} 个图层:`, layerNames);
       return layerNames;
     } catch (err) {
-      console.warn(`[MVT检测] ⚠️ 瓦片 z=${coord.z} 获取失败:`, err.message);
+      if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+        console.warn(`[MVT检测] ⏱️ 瓦片 z=${coord.z} 请求超时`);
+      } else {
+        console.warn(`[MVT检测] ⚠️ 瓦片 z=${coord.z} 获取失败:`, err.message);
+      }
       continue;
     }
   }
 
-  console.warn('[MVT检测] ⚠️ 所有瓦片坐标均无法获取，将使用通用样式');
+  console.warn('[MVT检测] ⚠️ 所有瓦片坐标均无法获取或已超时');
   return [];
 }
 
@@ -576,6 +595,54 @@ function buildMvtStyleFromLayers(nodeId, nodeName, tileUrl, layerNames) {
 }
 
 // ========================
+// 图层加载错误分类
+// ========================
+
+/**
+ * 根据错误消息分类，返回 { category, label, icon }
+ * 用于在树节点上展示失败原因的简短分类文本
+ */
+function classifyLayerError(errorMsg) {
+  const msg = (errorMsg || '').toLowerCase();
+
+  if (msg.includes('webgl') || msg.includes('上下文') || msg.includes('context')) {
+    return { category: 'webgl_lost', label: 'WebGL丢失需刷新', icon: '🔴' };
+  }
+  if (msg.includes('超时') || msg.includes('timeout') || msg.includes('timed out')) {
+    return { category: 'timeout', label: '加载超时', icon: '⏱️' };
+  }
+  if (msg.includes('cesium') || msg.includes('未就绪')) {
+    return { category: 'system', label: '系统未就绪', icon: '🔧' };
+  }
+  if (msg.includes('url') && (msg.includes('为空') || msg.includes('无效') || msg.includes('空'))) {
+    return { category: 'invalid_config', label: 'URL未配置', icon: '🔗' };
+  }
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('cors') || msg.includes('跨域') || msg.includes('网络') || msg.includes('拦截') || msg.includes('failed to fetch')) {
+    return { category: 'network', label: '网络/CORS错误', icon: '🌐' };
+  }
+  if (msg.includes('404') || msg.includes('not found') || msg.includes('不存在') || msg.includes('unknown_service')) {
+    return { category: 'not_found', label: '服务不可达', icon: '🚫' };
+  }
+  if (msg.includes('parse') || msg.includes('解析') || msg.includes('pbf') || msg.includes('protobuf')) {
+    return { category: 'parse', label: '数据解析失败', icon: '📦' };
+  }
+  if (msg.includes('自动检测')) {
+    return { category: 'warning', label: '部分可用', icon: '⚠️' };
+  }
+  if (msg.includes('为空') || msg.includes('无内容') || msg.includes('空白') || msg.includes('无渲染')) {
+    return { category: 'empty_tiles', label: '瓦片无内容', icon: '👻' };
+  }
+  if (msg.includes('xml') || msg.includes('capabilities') || msg.includes('wmts') || msg.includes('wms')) {
+    return { category: 'service_error', label: '服务响应异常', icon: '📡' };
+  }
+  if (msg.includes('大量失败') || msg.includes('失败') && msg.includes('成功')) {
+    return { category: 'high_failure', label: '瓦片大量失败', icon: '📉' };
+  }
+
+  return { category: 'unknown', label: '加载失败', icon: '❌' };
+}
+
+// ========================
 // LayerTreeManager — 主面板组件
 // ========================
 export default {
@@ -630,7 +697,7 @@ export default {
         { "id": "xyz-esri-img",  "name": "ESRI 全球卫星影像",   "parentId":"root-xyz","nodeType":"layer","url":"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}","sortOrder":2,"visible":1,"description":"ESRI卫星影像底图","icon":"🛰️","centerLon":116.4,"centerLat":39.9,"centerHeight":8000},
         { "id": "root-mvt",      "name": "矢量瓦片(MVT)",      "parentId": null,     "nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "Mapbox Vector Tile矢量瓦片", "icon": "📁" },
         { "id": "mvt-versatiles","name": "VersaTiles 全球矢量瓦片(Shortbread)","parentId":"root-mvt","nodeType":"layer","url":"https://tiles.versatiles.org/tiles/osm/{z}/{x}/{y}","sortOrder":1,"visible":1,"description":"免费全球OSM矢量瓦片，无需API Key","icon":"🌍","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
-        { "id": "mvt-bkg",       "name": "BKG 德国官方矢量底图","parentId":"root-mvt","nodeType":"layer","url":"https://sgx.geodatenzentrum.de/wmts_basemapde_web_vektor/tile/v1/{z}/{x}/{y}.pbf","sortOrder":2,"visible":1,"description":"德国政府官方MVT，无需API Key，覆盖德国全境","icon":"🇩🇪","centerLon":10.45,"centerLat":51.16,"centerHeight":500000},
+        { "id": "mvt-bkg",       "name": "BKG 德国官方矢量底图","parentId":"root-mvt","nodeType":"layer","url":"https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/tiles/v2/bm_web_de_3857/{z}/{x}/{y}.pbf","sortOrder":2,"visible":1,"description":"德国政府官方MVT，无需API Key，覆盖德国全境","icon":"🇩🇪","centerLon":10.45,"centerLat":51.16,"centerHeight":500000},
         { "id": "mvt-openmaptiles","name":"OpenMapTiles 全球矢量瓦片","parentId":"root-mvt","nodeType":"layer","url":"https://free-0.tilehosting.com/data/v3/{z}/{x}/{y}.pbf?key=your-free-api-key","sortOrder":3,"visible":1,"description":"OpenMapTiles schema，需免费注册获取Key","icon":"🧩","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
         { "id": "mvt-geofabrik","name":"Geofabrik Shortbread 矢量瓦片","parentId":"root-mvt","nodeType":"layer","url":"https://tiles.shortbread.geofabrik.de/tiles/shortbread_v1/{z}/{x}/{y}.mvt","sortOrder":4,"visible":1,"description":"德国Geofabrik免费MVT","icon":"🧩","centerLon":8.68,"centerLat":50.11,"centerHeight":500000},
         { "id": "mvt-maptiler-cn","name":"MapTiler 矢量瓦片(全球CDN)","parentId":"root-mvt","nodeType":"layer","url":"https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=get-free-key","sortOrder":5,"visible":1,"description":"MapTiler全球CDN矢量瓦片，OpenMapTiles schema，需免费注册Key替换URL，国内可访问","icon":"🎯","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
@@ -640,6 +707,12 @@ export default {
 
       // Cesium 图层加载状态 — 记录已加载的图层 ID → Cesium 对象
       loadedLayerIds: {},
+
+      // 图层加载中状态（防止重复点击和并发加载）
+      loadingLayerIds: {},
+
+      // 图层加载错误信息（非阻塞式错误提示）
+      layerErrors: {},
 
       // 树交互状态
       expandedIds: new Set(),
@@ -681,6 +754,26 @@ export default {
   beforeCreate() {
     // 非响应式 Cesium 图层对象存储（避免 Vue 响应式序列化 Cesium 对象）
     this._cesiumLayers = new Map();
+    // 非响应式加载中 Promise 存储（防止并发加载同一图层）
+    this._loadLayerPromise = new Map();
+    // 代数计数器：防止超时后 IIFE 过期结果覆盖错误状态
+    this._loadGeneration = new Map();
+    // 图层加载顺序记录（用于超出上限时自动卸载最旧图层）
+    this._layerLoadOrder = [];
+    // 最大同时加载图层数（防止浏览器资源耗尽，MVT 图层尤其消耗 GPU 内存）
+    this._maxActiveLayers = 2;
+    // Cesium 事件监听器引用（用于组件销毁时移除）
+    this._cesiumEventHandlers = [];
+    // WebGL 上下文状态标记
+    this._isWebGLLost = false;
+    this._wasDefaultRenderLoop = false;
+    // Cesium 事件处理器标记
+    this._renderErrorHandlerSet = false;
+    this._webglListenerSet = false;
+    this._cameraMoveHandlerSet = false;
+    this._renderErrorListener = null;
+    this._origShowErrorPanel = null;
+    this._cameraMoveCleanup = null;
   },
 
   created() {
@@ -697,22 +790,17 @@ export default {
   },
 
   mounted() {
-    // ⚠️ 延迟加载机制说明：
-    // 当面板首次打开时，FunctionPanelUIBase 触发 lazy-load → JsonConfigPanelBase.onLazyLoad()
-    // → 基类调用 JsonConfigPanelBase.loadConfig()（基类自身版本）。
-    // 由于 LayerTreeManager 与 JsonConfigPanelBase 是组合关系（非继承），
-    // 基类的 loadConfig() 不会触发此处的覆盖版本。
-    //
-    // 解决方案：在此处始终尝试从后端加载数据。
-    // - 如果后端有数据 → 使用后端数据（覆盖内置示例数据）
-    // - 如果后端无数据 → 保留内置示例数据，并自动保存到后端
     this.$nextTick(() => {
       console.log(`[${this.componentName}] 🚀 主动触发树形数据加载（当前内置数据: ${this.flatNodeList.length} 条）`);
       this.loadConfig();
+
+      // ⚠️ Cesium 资源保护：延迟设置（等待 viewer 就绪）
+      this._setupCesiumProtections();
     });
   },
 
   beforeDestroy() {
+    this._teardownCesiumProtections();
     this.destroyAllCesiumLayers();
   },
 
@@ -1198,6 +1286,236 @@ export default {
       return typeof window !== 'undefined' ? window.Cesium : null;
     },
 
+    // ==================== Cesium 资源保护 ====================
+
+    /**
+     * 设置 Cesium 资源保护：限制并发请求、拦截渲染崩溃、监听 WebGL 丢失
+     * ⚠️ 使用轮询检查 viewer 是否就绪（Cesium 可能在组件之后初始化）
+     */
+    _setupCesiumProtections() {
+      let attempts = 0;
+      const MAX_ATTEMPTS = 30; // 最多等待 30 秒
+      const trySetup = () => {
+        const viewer = this.getViewer();
+        const Cesium = this.getCesium();
+        if (!viewer || !Cesium || !viewer.scene) {
+          if (++attempts < MAX_ATTEMPTS) {
+            setTimeout(trySetup, 1000);
+          }
+          return;
+        }
+
+        // 1. 限制 Cesium 并发请求数（防止 ERR_INSUFFICIENT_RESOURCES）
+        if (Cesium.RequestScheduler) {
+          Cesium.RequestScheduler.maximumRequests = 8;         // 总共最多 8 个并发
+          Cesium.RequestScheduler.maximumRequestsPerServer = 4; // 每个服务最多 4 个
+          console.log(`[${this.componentName}] 🛡️ 请求调度器已配置: maxRequests=8, perServer=4`);
+        }
+
+        // 2. 拦截渲染崩溃 — 阻止 Cesium 默认的全屏阻塞错误面板
+        if (viewer.scene && !this._renderErrorHandlerSet) {
+          this._renderErrorHandlerSet = true;
+
+          // 方法1: 重写 showErrorPanel 为空操作（最可靠）
+          if (typeof viewer.showErrorPanel === 'function') {
+            const origShowErrorPanel = viewer.showErrorPanel.bind(viewer);
+            viewer.showErrorPanel = (error) => {
+              // 标记 WebGL 不可用
+              this._isWebGLLost = true;
+              console.error(`[${this.componentName}] 🔴 Cesium 渲染崩溃已拦截:`, error?.message || error);
+              console.warn(`[${this.componentName}] ⚠️ 请刷新页面恢复`);
+              // 不调用原始方法 → 阻止全屏阻塞面板
+              // 不调用 requestRender → WebGL 上下文可能已损坏
+            };
+            this._origShowErrorPanel = origShowErrorPanel;
+          }
+
+          // 方法2: 监听 renderError 事件
+          if (viewer.scene.renderError && typeof viewer.scene.renderError.addEventListener === 'function') {
+            const onRenderError = (error) => {
+              // 检查是否是真正的 RenderError（而非 Scene 对象被误传）
+              const isRealError = error instanceof Cesium.RuntimeError;
+              if (!isRealError) return; // 忽略非错误事件
+
+              this._isWebGLLost = true;
+              // 清除错误标记，防止后续 showErrorPanel 调用
+              if (viewer._renderError) viewer._renderError = undefined;
+              if (viewer.scene._renderError) viewer.scene._renderError = undefined;
+
+              console.error(`[${this.componentName}] 🔴 渲染错误:`, error?.message || error);
+              // 不要 requestRender — 让 Cesium 自然停止渲染循环
+              // 避免在损坏的 WebGL 上下文中反复尝试编译 shader
+            };
+            viewer.scene.renderError.addEventListener(onRenderError);
+            this._renderErrorListener = onRenderError;
+          }
+
+          console.log(`[${this.componentName}] 🛡️ 渲染错误拦截已启用`);
+        }
+
+        // 3. WebGL 上下文丢失监听
+        const canvas = viewer.canvas || viewer.scene?.canvas;
+        if (canvas && !this._webglListenerSet) {
+          this._webglListenerSet = true;
+
+          const onContextLost = (event) => {
+            event?.preventDefault?.();
+            this._isWebGLLost = true;
+
+            console.warn(`[${this.componentName}] 🔴 WebGL 上下文丢失，清理所有 GPU 资源...`);
+
+            // 彻底清理：移除所有图层和 primitive
+            this.destroyAllCesiumLayers();
+            this.loadedLayerIds = {};
+            if (viewer.scene && !viewer.scene.isDestroyed()) {
+              viewer.scene.primitives.removeAll();
+            }
+
+            // ⚠️ 关键：停止 Cesium 渲染循环，防止在无上下文时编译 shader
+            if (viewer.useDefaultRenderLoop !== false) {
+              viewer.useDefaultRenderLoop = false;
+              this._wasDefaultRenderLoop = true;
+            }
+
+            console.warn(`[${this.componentName}] ⚠️ 渲染循环已停止，请刷新页面恢复 WebGL 上下文`);
+          };
+
+          const onContextRestored = () => {
+            this._isWebGLLost = false;
+            console.log(`[${this.componentName}] ✅ WebGL 上下文已恢复，重新启用渲染`);
+            if (this._wasDefaultRenderLoop) {
+              viewer.useDefaultRenderLoop = true;
+            }
+          };
+
+          canvas.addEventListener('webglcontextlost', onContextLost);
+          canvas.addEventListener('webglcontextrestored', onContextRestored);
+
+          this._cesiumEventHandlers.push(
+            { target: canvas, event: 'webglcontextlost', handler: onContextLost },
+            { target: canvas, event: 'webglcontextrestored', handler: onContextRestored }
+          );
+
+          console.log(`[${this.componentName}] 🛡️ WebGL 上下文监听已启用`);
+        }
+
+        // 4. 地图移动节流 — 移动中暂停新瓦片加载，移动结束后恢复
+        if (viewer.camera && !this._cameraMoveHandlerSet) {
+          this._cameraMoveHandlerSet = true;
+          let moveTimeout = null;
+          let wasThrottled = false;
+
+          viewer.camera.moveStart.addEventListener(() => {
+            // 移动开始：提高请求优先级阈值，暂停低优先级请求
+            if (Cesium.RequestScheduler) {
+              Cesium.RequestScheduler.maximumRequests = 2;         // 移动中降到 2 个
+              Cesium.RequestScheduler.maximumRequestsPerServer = 1; // 每服务 1 个
+              wasThrottled = true;
+            }
+          });
+
+          viewer.camera.moveEnd.addEventListener(() => {
+            // 移动结束：延迟 500ms 后恢复请求限制（防止连续移动时频繁切换）
+            clearTimeout(moveTimeout);
+            moveTimeout = setTimeout(() => {
+              if (Cesium.RequestScheduler) {
+                Cesium.RequestScheduler.maximumRequests = 8;
+                Cesium.RequestScheduler.maximumRequestsPerServer = 4;
+              }
+              wasThrottled = false;
+            }, 500);
+          });
+
+          this._cameraMoveCleanup = () => {
+            clearTimeout(moveTimeout);
+            // Note: Cesium Event removeEventListener 语法不同
+          };
+
+          console.log(`[${this.componentName}] 🛡️ 相机移动节流已启用`);
+        }
+
+        console.log(`[${this.componentName}] 🛡️ Cesium 资源保护全部就绪`);
+      };
+
+      // 延迟 500ms 首试（给 Cesium 初始化时间）
+      setTimeout(trySetup, 500);
+    },
+
+    /**
+     * 移除 Cesium 事件监听器
+     */
+    _teardownCesiumProtections() {
+      // 清理 WebGL 事件监听
+      this._cesiumEventHandlers.forEach(({ target, event, handler }) => {
+        try {
+          if (event === 'removeEventListener') {
+            target.removeEventListener(handler);
+          } else {
+            target.removeEventListener(event, handler);
+          }
+        } catch (e) { /* ignore */ }
+      });
+      this._cesiumEventHandlers = [];
+
+      // 恢复 showErrorPanel
+      const viewer = this.getViewer();
+      if (viewer && this._origShowErrorPanel) {
+        viewer.showErrorPanel = this._origShowErrorPanel;
+        this._origShowErrorPanel = null;
+      }
+
+      // 清理 renderError 监听器
+      if (viewer && viewer.scene && viewer.scene.renderError && this._renderErrorListener) {
+        try {
+          viewer.scene.renderError.removeEventListener(this._renderErrorListener);
+        } catch (e) { /* ignore */ }
+        this._renderErrorListener = null;
+      }
+
+      // 清理相机移动节流 + 恢复请求调度器默认值
+      if (this._cameraMoveCleanup) {
+        try { this._cameraMoveCleanup(); } catch (e) { /* ignore */ }
+        this._cameraMoveCleanup = null;
+      }
+      const Cesium = this.getCesium();
+      if (Cesium && Cesium.RequestScheduler) {
+        Cesium.RequestScheduler.maximumRequests = 12;         // 恢复 Cesium 默认值
+        Cesium.RequestScheduler.maximumRequestsPerServer = 6;
+      }
+      // 恢复渲染循环
+      if (viewer && this._wasDefaultRenderLoop) {
+        viewer.useDefaultRenderLoop = true;
+      }
+
+      this._renderErrorHandlerSet = false;
+      this._webglListenerSet = false;
+      this._cameraMoveHandlerSet = false;
+
+      console.log(`[${this.componentName}] 🧹 Cesium 事件监听已清理`);
+    },
+
+    /**
+     * 记录图层加载顺序（最新的在末尾）
+     */
+    _addToLoadOrder(nodeId) {
+      this._removeFromLoadOrder(nodeId);
+      this._layerLoadOrder.push(nodeId);
+      // 防止无限增长
+      if (this._layerLoadOrder.length > 100) {
+        this._layerLoadOrder = this._layerLoadOrder.slice(-50);
+      }
+    },
+
+    /**
+     * 从加载顺序中移除
+     */
+    _removeFromLoadOrder(nodeId) {
+      const idx = this._layerLoadOrder.indexOf(nodeId);
+      if (idx !== -1) {
+        this._layerLoadOrder.splice(idx, 1);
+      }
+    },
+
     /**
      * 检测图层类型（基于 URL 模式 + 父节点层级）
      */
@@ -1211,7 +1529,13 @@ export default {
       if (url.includes('.pbf') || url.includes('.mvt') || ancestorNames.includes('mvt')) return 'mvt';
       if (url.includes('wmts') || url.includes('wmtscapabilities') || ancestorNames.includes('wmts')) return 'wmts';
       if (url.includes('wms') && url.includes('service=wms')) return 'wms';
+      // WFS 检测：适配多种 WFS URL 模式
+      // 1. 标准 OGC WFS: ?service=wfs
+      // 2. ArcGIS REST WFS: /WFSServer
+      // 3. 路径型 WFS: /wfs/ 或 /wfs?
+      // 4. 父目录标记为 WFS
       if (url.includes('wfs') && url.includes('service=wfs')) return 'wfs';
+      if (url.includes('/wfsserver') || url.includes('/wfs/') || url.includes('/wfs?') || ancestorNames.includes('wfs')) return 'wfs';
       if (url.includes('tileset.json') || ancestorNames.includes('3d tiles')) return '3dtiles';
       if (url.includes('{z}/{x}/{y}') || url.includes('{z}/{y}/{x}')) return 'xyz';
       if (url.includes('geojson') || url.endsWith('.json')) return 'geojson';
@@ -1251,28 +1575,112 @@ export default {
      * @param {Object} node — 树节点数据
      */
     toggleLayerLoad(node) {
+      console.log(
+        `[${this.componentName}] 🔄 toggleLayerLoad: "${node.name}"` +
+        ` (inMap=${this._cesiumLayers.has(node.id)}, loaded=${!!this.loadedLayerIds[node.id]}, loading=${!!this.loadingLayerIds[node.id]})`
+      );
+
+      // WebGL 上下文已丢失，拒绝所有加载操作
+      if (this._isWebGLLost) {
+        console.warn(`[${this.componentName}] ⚠️ WebGL 上下文已丢失，无法加载图层。请刷新页面。`);
+        this.layerErrors[node.id] = {
+          message: 'WebGL 上下文已丢失，请刷新页面',
+          ...classifyLayerError('WebGL 上下文丢失')
+        };
+        return;
+      }
+
+      // 防抖：正在加载中则忽略点击
+      if (this.loadingLayerIds[node.id]) {
+        console.warn(`[${this.componentName}] ⏳ 图层 "${node.name}" 正在加载中，忽略重复操作`);
+        return;
+      }
+
       if (this._cesiumLayers.has(node.id)) {
         this.unloadCesiumLayer(node);
       } else {
+        // 清除上一次的错误状态
+        delete this.layerErrors[node.id];
         this.loadCesiumLayer(node);
       }
     },
 
     /**
      * 将图层添加到 Cesium
+     * ⚠️ 整体超时保护：15 秒内未完成则自动取消，防止控件卡死
      */
     async loadCesiumLayer(node) {
       const viewer = this.getViewer();
       const Cesium = this.getCesium();
+
+      // 前置检查：Cesium 未就绪
       if (!viewer || !Cesium) {
         console.warn(`[${this.componentName}] ⚠️ Cesium 未就绪，无法加载图层`);
+        this.layerErrors[node.id] = {
+          message: 'Cesium 未就绪，请刷新页面后重试',
+          ...classifyLayerError('Cesium 未就绪，请刷新页面后重试')
+        };
         return;
       }
+
+      // 前置检查：URL 为空
+      if (!node.url) {
+        console.warn(`[${this.componentName}] ⚠️ 图层 "${node.name}" URL 为空，跳过加载`);
+        this.layerErrors[node.id] = {
+          message: '图层 URL 为空',
+          ...classifyLayerError('图层 URL 为空')
+        };
+        return;
+      }
+
+      // 前置检查：WebGL 上下文是否可用
+      if (this._isWebGLLost) {
+        console.warn(`[${this.componentName}] ⚠️ WebGL 已丢失，拒绝加载 "${node.name}"`);
+        this.layerErrors[node.id] = {
+          message: 'WebGL 上下文已丢失，请刷新页面',
+          ...classifyLayerError('WebGL 上下文丢失')
+        };
+        return;
+      }
+
+      // 设置加载中状态
+      this.loadingLayerIds[node.id] = true;
+
+      // ⚠️ 图层数量上限检查：超出上限时自动卸载最旧的图层，防止浏览器资源耗尽
+      if (this._cesiumLayers.size >= this._maxActiveLayers) {
+        const oldestNodeId = this._layerLoadOrder[0];
+        if (oldestNodeId && this._cesiumLayers.has(oldestNodeId)) {
+          const oldestNode = this.flatNodeList.find(n => n.id === oldestNodeId);
+          if (oldestNode) {
+            console.warn(`[${this.componentName}] 🗑️ 图层数已达上限 (${this._maxActiveLayers})，自动卸载最旧图层: "${oldestNode.name}"`);
+            this.unloadCesiumLayer(oldestNode);
+          }
+        } else {
+          // 顺序记录不一致，重建
+          this._layerLoadOrder = Array.from(this._cesiumLayers.keys());
+        }
+      }
+
+      // 代数计数器：防止超时后 IIFE 仍成功而覆盖错误状态
+      const gen = this._loadGeneration.get(node.id) || 0;
+      this._loadGeneration.set(node.id, gen);
 
       const layerType = this.detectLayerType(node);
       console.log(`[${this.componentName}] 🌐 加载图层: ${node.name} (类型: ${layerType})`);
 
-      try {
+      // 整体超时 Promise（15 秒）
+      const LAYER_LOAD_TIMEOUT = 15000;
+      let timeoutId;
+
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          // 递增代数，使 IIFE 的后续成功操作失效
+          this._loadGeneration.set(node.id, gen + 1);
+          reject(new Error(`图层加载超时 (${LAYER_LOAD_TIMEOUT / 1000}秒)`));
+        }, LAYER_LOAD_TIMEOUT);
+      });
+
+      const actualLoad = (async () => {
         switch (layerType) {
           case 'xyz': {
             const provider = new Cesium.UrlTemplateImageryProvider({
@@ -1319,9 +1727,19 @@ export default {
             const dataSource = await Cesium.GeoJsonDataSource.load(node.url, {
               clampToGround: true
             });
+            // 验证数据源是否包含实际要素（防止 CORS/网络错误导致空数据源被标记为成功）
+            const entityCount = dataSource.entities.values.length;
+            if (entityCount === 0) {
+              // 空数据源：未添加到 viewer，直接抛出明确错误
+              const errMsg = layerType === 'wfs'
+                ? 'WFS 服务未返回任何要素（可能被 CORS 拦截或服务无数据）'
+                : 'GeoJSON 数据为空（可能被 CORS 拦截或 URL 不正确）';
+              throw new Error(errMsg);
+            }
             viewer.dataSources.add(dataSource);
             dataSource.name = node.name;
             this._cesiumLayers.set(node.id, { type: 'geojson', object: dataSource });
+            console.log(`[${this.componentName}] ✅ ${layerType.toUpperCase()} 加载成功: ${entityCount} 个要素`);
             break;
           }
           case '3dtiles': {
@@ -1338,108 +1756,133 @@ export default {
             console.log(`[${this.componentName}] 📦 开始加载 MVT 矢量瓦片: ${node.name}`);
             console.log(`[${this.componentName}] 🔗 瓦片URL模板: ${node.url}`);
             console.log(`[${this.componentName}] 🏷️  节点ID: ${node.id}`);
-            try {
-              // 1. 确定要渲染的源图层
-              let sourceLayers = [];
-              const userSpecified = node.mvtSourceLayers || '';
-              if (userSpecified.trim()) {
-                sourceLayers = userSpecified.split(',').map(s => s.trim()).filter(Boolean);
-                console.log(`[${this.componentName}] 📋 使用用户指定的源图层:`, sourceLayers);
-              } else {
-                console.log(`[${this.componentName}] 🔍 自动检测 MVT 源图层...`);
-                sourceLayers = await detectMvtSourceLayers(node.url);
-                console.log(`[${this.componentName}] 📊 检测结果: ${sourceLayers.length} 个图层 →`, sourceLayers);
-                if (sourceLayers.length === 0) {
-                  console.warn(`[${this.componentName}] ⚠️ 自动检测失败，使用通用图层名称`);
-                  sourceLayers = [
-                    'water', 'land', 'roads', 'buildings', 'places',
-                    'transportation', 'transportation_name', 'building',
-                    'landuse', 'landcover', 'waterway', 'water_name',
-                    'place', 'poi', 'boundary', 'aeroway'
-                  ];
-                }
+
+            // 1. 确定要渲染的源图层（带 8 秒总超时）
+            let sourceLayers = [];
+            const userSpecified = node.mvtSourceLayers || '';
+            if (userSpecified.trim()) {
+              sourceLayers = userSpecified.split(',').map(s => s.trim()).filter(Boolean);
+              console.log(`[${this.componentName}] 📋 使用用户指定的源图层:`, sourceLayers);
+            } else {
+              console.log(`[${this.componentName}] 🔍 自动检测 MVT 源图层...`);
+              sourceLayers = await detectMvtSourceLayers(node.url);
+              console.log(`[${this.componentName}] 📊 检测结果: ${sourceLayers.length} 个图层 →`, sourceLayers);
+              if (sourceLayers.length === 0) {
+                console.warn(`[${this.componentName}] ⚠️ 自动检测失败，将使用内置通用样式（不会阻塞 UI）`);
+                this.layerErrors[node.id] = {
+                  message: '自动检测 MVT 图层失败，已使用默认样式',
+                  ...classifyLayerError('自动检测 MVT 图层失败，已使用默认样式')
+                };
               }
-
-              // 2. 诊断：单独获取一个瓦片，验证 PBF 解析是否正确
-              try {
-                const diagUrl = node.url.replace('{z}', '12').replace('{x}', '3343').replace('{y}', '1784');
-                const diagResp = await fetch(diagUrl, { mode: 'cors', signal: AbortSignal.timeout(5000) });
-                if (diagResp.ok) {
-                  const diagBuf = await diagResp.arrayBuffer();
-                  const diagLayers = parseMvtLayerNames(diagBuf);
-                  console.log(`[${this.componentName}] 🔬 诊断瓦片 (z=12) 包含 ${diagLayers.length} 个图层:`, diagLayers);
-                }
-              } catch (diagErr) {
-                console.warn(`[${this.componentName}] 🔬 诊断瓦片获取失败:`, diagErr.message);
-              }
-
-              // 3. 基于图层名称动态生成 Mapbox Style
-              const mvtStyle = buildMvtStyleFromLayers(
-                node.id,
-                node.name,
-                node.url,
-                sourceLayers
-              );
-
-              console.log(`[${this.componentName}] 🎨 MVT 样式已生成，包含 ${mvtStyle.layers.length} 个图层`);
-              console.log(`[${this.componentName}] 🎨 完整样式JSON:`, JSON.stringify(mvtStyle, null, 2));
-
-              // 根据检测结果调整 zoom 范围（区域数据通常没有低级别瓦片）
-              const detectedZoom = sourceLayers.length > 0 ? 10 : 0;
-              mvtStyle.sources[node.id].minzoom = detectedZoom;
-              console.log(`[${this.componentName}] 🔧 minzoom 调整为: ${detectedZoom}`);
-
-              const provider = await MVTImageryProvider.create({
-                style: mvtStyle,
-                cesiumViewer: viewer,
-                tileSize: 512,
-                maximumLevel: 18,
-                minimumLevel: 0,
-                credit: node.name
-              });
-
-              // 🔬 诊断钩子：监控瓦片请求的结果
-              const compName = this.componentName;
-              const origRequestImage = provider.requestImage.bind(provider);
-              let reqCount = 0;
-              let succCount = 0;
-              provider.requestImage = function(x, y, zoom, releaseTile) {
-                reqCount++;
-                const reqNum = reqCount;
-                if (reqNum <= 3) {
-                  console.log(`[${compName}] 🔬 瓦片请求 #${reqNum}: x=${x} y=${y} zoom=${zoom}`);
-                }
-                return origRequestImage(x, y, zoom, releaseTile).then(
-                  (canvas) => {
-                    succCount++;
-                    if (succCount === 1) {
-                      const ctx = canvas.getContext('2d');
-                      const imgData = ctx.getImageData(0, 0, Math.min(canvas.width, 10), Math.min(canvas.height, 10));
-                      const alphaVals = [];
-                      for (let i = 3; i < imgData.data.length; i += 4) alphaVals.push(imgData.data[i]);
-                      const hasContent = alphaVals.some(v => v > 0);
-                      console.log(`[${compName}] 🔬 首个成功瓦片 ${canvas.width}x${canvas.height}, alpha范围:[${Math.min(...alphaVals)}-${Math.max(...alphaVals)}], 有内容:${hasContent}`);
-                    }
-                    return canvas;
-                  },
-                  (err) => {
-                    if (reqNum <= 3) {
-                      console.warn(`[${compName}] 🔬 瓦片请求 #${reqNum} 失败: x=${x} y=${y} zoom=${zoom} err=`, err);
-                    }
-                    throw err;
-                  }
-                );
-              };
-
-              await provider.readyPromise;
-              const layer = viewer.imageryLayers.addImageryProvider(provider);
-              this._cesiumLayers.set(node.id, { type: 'mvt', object: layer, provider });
-              console.log(`[${this.componentName}] ✅ MVT 矢量瓦片 "${node.name}" 加载成功`);
-            } catch (mvtError) {
-              console.error(`[${this.componentName}] ❌ MVT 矢量瓦片加载失败:`, mvtError);
-              alert(`MVT 矢量瓦片加载失败: ${node.name}\n\n错误信息: ${mvtError.message || mvtError}\n\n可能原因：\n1. 瓦片服务不可达\n2. 瓦片格式不兼容\n3. 需要正确的 Mapbox Style 配置\n4. MVT 源图层名称不匹配（可在编辑时指定 sourceLayers）`);
-              return;
             }
+
+            // 2. 基于图层名称动态生成 Mapbox Style
+            const mvtStyle = buildMvtStyleFromLayers(
+              node.id,
+              node.name,
+              node.url,
+              sourceLayers
+            );
+
+            console.log(`[${this.componentName}] 🎨 MVT 样式已生成，包含 ${mvtStyle.layers.length} 个图层`);
+
+            // 根据检测结果调整 zoom 范围（区域数据通常没有低级别瓦片）
+            const detectedZoom = sourceLayers.length > 0 ? 10 : 0;
+            mvtStyle.sources[node.id].minzoom = detectedZoom;
+            console.log(`[${this.componentName}] 🔧 minzoom 调整为: ${detectedZoom}`);
+
+            const provider = await MVTImageryProvider.create({
+              style: mvtStyle,
+              cesiumViewer: viewer,
+              tileSize: 512,
+              maximumLevel: 18,
+              minimumLevel: 0,
+              credit: node.name
+            });
+
+            // 🔬 瓦片健康检测：监控前 N 秒内的瓦片，检测是否有实际渲染内容
+            const compName = this.componentName;
+            const origRequestImage = provider.requestImage.bind(provider);
+            let reqCount = 0;
+            let succCount = 0;
+            let emptyCount = 0;
+            let failCount = 0;
+            const nodeId = node.id;
+            const nodeName = node.name;
+
+            provider.requestImage = function(x, y, zoom, releaseTile) {
+              reqCount++;
+              const reqNum = reqCount;
+              if (reqNum <= 3) {
+                console.log(`[${compName}] 🔬 瓦片请求 #${reqNum}: x=${x} y=${y} zoom=${zoom}`);
+              }
+              return origRequestImage(x, y, zoom, releaseTile).then(
+                (canvas) => {
+                  succCount++;
+                  // 检测瓦片是否有可见内容
+                  let hasContent = false;
+                  try {
+                    const ctx = canvas.getContext('2d');
+                    const w = Math.min(canvas.width, 10);
+                    const h = Math.min(canvas.height, 10);
+                    const imgData = ctx.getImageData(0, 0, w, h);
+                    for (let i = 3; i < imgData.data.length; i += 4) {
+                      if (imgData.data[i] > 0) { hasContent = true; break; }
+                    }
+                  } catch (e) { /* ignore */ }
+                  if (!hasContent) emptyCount++;
+                  if (succCount <= 2) {
+                    console.log(`[${compName}] 🔬 瓦片 #${reqNum}: 有内容=${hasContent} (空:${emptyCount}/${succCount})`);
+                  }
+                  return canvas;
+                },
+                (err) => {
+                  failCount++;
+                  if (reqNum <= 5) {
+                    console.warn(`[${compName}] 🔬 瓦片 #${reqNum} 失败:`, err?.message || err);
+                  }
+                  throw err;
+                }
+              );
+            };
+
+            // ⏱️ 延迟健康检查：5 秒后评估瓦片内容质量
+            const TILE_HEALTH_DELAY = 5000;
+            setTimeout(() => {
+              // 图层已被卸载或组件已销毁，跳过检查
+              if (!this._cesiumLayers || !this._cesiumLayers.has(nodeId)) return;
+
+              const totalFinished = succCount + failCount;
+              if (totalFinished === 0) {
+                // 没有任何瓦片完成 — 可能加载极慢或服务无响应
+                console.warn(`[${compName}] 🔬 健康检查: "${nodeName}" 5秒内无任何瓦片完成 (已请求${reqCount}个)`);
+                return; // 不立即报错，可能还在加载中
+              }
+              if (succCount > 0 && emptyCount === succCount && failCount === 0) {
+                // 所有成功瓦片都是空白的 — 服务返回了数据但无可渲染内容
+                console.warn(`[${compName}] 🔬 健康检查: "${nodeName}" 全部 ${succCount} 个瓦片无内容`);
+                const errorInfo = classifyLayerError('瓦片无渲染内容，可能 URL 不正确或服务数据为空');
+                this.layerErrors[nodeId] = {
+                  message: `瓦片全部为空 (${succCount}个)，URL可能不正确或服务无数据`,
+                  ...errorInfo
+                };
+              } else if (failCount > succCount) {
+                // 失败数超过成功数
+                console.warn(`[${compName}] 🔬 健康检查: "${nodeName}" 失败${failCount} > 成功${succCount}`);
+                const errorInfo = classifyLayerError('瓦片请求大量失败，服务不可达');
+                this.layerErrors[nodeId] = {
+                  message: `瓦片请求大量失败 (失败:${failCount}, 成功:${succCount})`,
+                  ...errorInfo
+                };
+              } else {
+                console.log(`[${compName}] 🔬 健康检查: "${nodeName}" 正常 (成功:${succCount}, 有内容:${succCount - emptyCount}, 失败:${failCount})`);
+              }
+            }, TILE_HEALTH_DELAY);
+
+            await provider.readyPromise;
+            const layer = viewer.imageryLayers.addImageryProvider(provider);
+            this._cesiumLayers.set(node.id, { type: 'mvt', object: layer, provider });
+            console.log(`[${this.componentName}] ✅ MVT 矢量瓦片 "${node.name}" 加载成功`);
             break;
           }
           default: {
@@ -1453,16 +1896,169 @@ export default {
           }
         }
 
-        // 标记已加载
+        // 标记已加载（检查代数，防止超时后过期结果覆盖错误状态）
+        if (this._loadGeneration.get(node.id) !== gen) {
+          console.warn(`[${this.componentName}] ⚠️ 图层 "${node.name}" 加载结果已过期（已超时），丢弃`);
+          this.cleanupPartialLayer(node.id);
+          return;
+        }
+
         this.loadedLayerIds[node.id] = true;
-        console.log(`[${this.componentName}] ✅ 图层已加载: ${node.name}`);
+        // 清除错误状态（如果之前有）
+        delete this.layerErrors[node.id];
+        // 记录加载顺序（用于超出上限时淘汰最旧图层）
+        this._addToLoadOrder(node.id);
+        console.log(`[${this.componentName}] ✅ 图层已加载: ${node.name} (当前共 ${this._cesiumLayers.size} 个)`);
 
         // 加载后飞至图层位置
         this.flyToLayerNode(node);
+      })();
+
+      try {
+        await Promise.race([actualLoad, timeoutPromise]);
       } catch (error) {
+        // 清理可能已部分创建的 Cesium 对象
+        this.cleanupPartialLayer(node.id);
+
+        // 增强错误信息提取（兼容 Cesium RequestErrorEvent 等非标准 Error）
+        let errorMsg = error.message || '';
+        if (!errorMsg) {
+          // RequestErrorEvent / 网络错误：尝试提取有用信息
+          if (error.statusCode) {
+            errorMsg = `HTTP ${error.statusCode}`;
+          } else if (error.name === 'RequestErrorEvent') {
+            errorMsg = `CORS 跨域或网络请求失败 (${node.url})`;
+          } else if (typeof error === 'object') {
+            errorMsg = `未知错误 (${error.constructor?.name || Object.prototype.toString.call(error)})`;
+          } else {
+            errorMsg = String(error);
+          }
+        }
+        // 如果错误消息中包含 url 信息但缺少 CORS/网络关键词，补充提示
+        if (errorMsg && !/cors|跨域|网络|network|fetch|timeout|超时/i.test(errorMsg)) {
+          // 检查是否来自 Cesium 的 RequestError（通常意味着 CORS 或网络问题）
+          if (error.name === 'RequestErrorEvent' || error.constructor?.name === 'RequestErrorEvent') {
+            errorMsg = `CORS 跨域或网络请求失败: ${errorMsg}`;
+          }
+        }
         console.error(`[${this.componentName}] ❌ 加载图层失败: ${node.name}`, error);
-        alert(`加载图层失败: ${node.name}\n${error.message || error}`);
+        // ⚠️ 关键修复：使用非阻塞式错误记录代替 alert()
+        // 错误信息分类后存储在 layerErrors 对象中，由 TreeNodeItem 展示
+        this.layerErrors[node.id] = {
+          message: errorMsg,
+          ...classifyLayerError(errorMsg)
+        };
+        // 确保 loadedLayerIds 状态正确
+        this.loadedLayerIds[node.id] = false;
+      } finally {
+        clearTimeout(timeoutId);
+        this.loadingLayerIds[node.id] = false;
+        this._loadLayerPromise.delete(node.id);
       }
+    },
+
+    /**
+     * 清理部分创建的图层（加载失败时的回滚操作）
+     */
+    cleanupPartialLayer(nodeId) {
+      const entry = this._cesiumLayers.get(nodeId);
+      if (!entry) return;
+
+      this._removeFromLoadOrder(nodeId);
+
+      try {
+        const viewer = this.getViewer();
+        if (!viewer) return;
+
+        if (entry.type === 'xyz' || entry.type === 'wms' || entry.type === 'wmts' || entry.type === 'mvt') {
+          // 双重保险 + 不销毁
+          entry.object.show = false;
+          entry.object.alpha = 0.0;
+          viewer.imageryLayers.remove(entry.object, false);
+          if (!this._isWebGLLost) viewer.scene.requestRender();
+        } else if (entry.type === 'geojson') {
+          viewer.dataSources.remove(entry.object, false);
+        } else if (entry.type === '3dtiles') {
+          entry.object.show = false;
+          viewer.scene.primitives.remove(entry.object);
+        }
+      } catch (e) {
+        console.warn(`[${this.componentName}] ⚠️ 部分图层清理失败:`, e);
+      }
+
+      this._cesiumLayers.delete(nodeId);
+    },
+
+    /**
+     * 安全销毁影像图层及其 Provider（仅用于组件卸载/WebGL上下文丢失场景）
+     *
+     * ⚠️ 设计决策：unloadCesiumLayer / cleanupPartialLayer 中不调用此方法
+     *   运行时卸载图层仅做 hide + remove，不 destroy GPU 资源。
+     *   原因：ImageryLayer.destroy() 会释放 GPU 纹理，但 Cesium 内部纹理缓存/
+     *   图集可能仍持有引用，后续 map 交互（平移/缩放）触发 UniformArrayFloatVec4.set
+     *   访问已销毁纹理导致 "Cannot read properties of undefined (reading 'red')" 崩溃。
+     *   所有 GPU 资源在组件卸载时由 destroyAllCesiumLayers 统一清理。
+     *
+     * @param {ImageryLayer} imageryLayer - Cesium 影像图层
+     * @param {ImageryProvider} [provider] - 可选 Provider（MVT 需要单独销毁）
+     */
+    _safeDestroyImageryLayer(imageryLayer, provider) {
+      const viewer = this.getViewer();
+      if (!viewer || !viewer.scene || viewer.scene.isDestroyed()) {
+        // 场景已销毁，直接尝试清理
+        try { imageryLayer.destroy(); } catch (e) { /* ignore */ }
+        if (provider && typeof provider.destroy === 'function') {
+          try { provider.destroy(); } catch (e) { /* ignore */ }
+        }
+        return;
+      }
+
+      const doDestroy = () => {
+        try {
+          if (imageryLayer && !imageryLayer.isDestroyed()) {
+            imageryLayer.destroy();
+          }
+          if (provider && typeof provider.destroy === 'function') {
+            try { provider.destroy(); } catch (e) { /* ignore */ }
+          }
+        } catch (e) {
+          // 静默处理销毁异常
+        }
+      };
+
+      // WebGL 上下文丢失：直接销毁（不需要等待渲染）
+      if (this._isWebGLLost) {
+        doDestroy();
+        return;
+      }
+
+      // 策略1: 使用 scene.postRender 等待一帧渲染完成后再销毁
+      let destroyed = false;
+      const postRenderCleanup = () => {
+        if (destroyed) return;
+        destroyed = true;
+        viewer.scene.postRender.removeEventListener(postRenderCleanup);
+        doDestroy();
+      };
+      viewer.scene.postRender.addEventListener(postRenderCleanup);
+
+      // 策略2: 超时回退（2秒后如果 postRender 还未触发，强制销毁）
+      setTimeout(() => {
+        if (!destroyed) {
+          destroyed = true;
+          viewer.scene.postRender.removeEventListener(postRenderCleanup);
+          console.warn(`[${this.componentName}] ⚠️ postRender 超时，强制销毁图层`);
+          // 使用双重 rAF 作为最后的回退
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              doDestroy();
+            });
+          });
+        }
+      }, 2000);
+
+      // 请求新一帧渲染（确保 postRender 事件会触发）
+      viewer.scene.requestRender();
     },
 
     /**
@@ -1471,24 +2067,35 @@ export default {
     unloadCesiumLayer(node) {
       const viewer = this.getViewer();
       const entry = this._cesiumLayers.get(node.id);
-      if (!entry) return;
+      if (!entry) {
+        console.warn(`[${this.componentName}] ⚠️ _cesiumLayers 中未找到 "${node.name}"，跳过卸载`);
+        return;
+      }
 
       try {
         switch (entry.type) {
           case 'xyz':
           case 'wms':
-          case 'wmts': {
-            // ⚠️ 策略：先隐藏 → 立即从集合移除(不销毁) → 下一帧安全销毁
+          case 'wmts':
+          case 'mvt': {
+            const beforeCount = viewer.imageryLayers.length;
+            // 双重保险：show=false + alpha=0 确保图层不可见
             entry.object.show = false;
-            viewer.imageryLayers.remove(entry.object, false);
-            viewer.scene.requestRender();
-            // rAF 确保 Cesium 完成当前帧渲染后再销毁 GPU 纹理
-            const imageryLayer = entry.object;
-            requestAnimationFrame(() => {
-              if (imageryLayer && !imageryLayer.isDestroyed()) {
-                imageryLayer.destroy();
-              }
-            });
+            entry.object.alpha = 0.0;
+            const removed = viewer.imageryLayers.remove(entry.object, false);
+            const afterCount = viewer.imageryLayers.length;
+            console.log(
+              `[${this.componentName}] 🗑️ 图层已移除: ${node.name}` +
+              ` (集合: ${beforeCount}→${afterCount}, remove=${removed}, show=${entry.object.show}, alpha=${entry.object.alpha})`
+            );
+            if (!removed) {
+              console.warn(`[${this.componentName}] ⚠️ remove 返回 false！图层 "${node.name}" 不在 imageryLayers 中`);
+            }
+            if (!this._isWebGLLost) {
+              viewer.scene.requestRender();
+              // 强制同步渲染，立即刷新 GPU 画面（跳过 rAF 队列等待）
+              try { viewer.scene.render(viewer.clock.currentTime); } catch (e) { /* ignore */ }
+            }
             break;
           }
           case 'geojson': {
@@ -1498,43 +2105,14 @@ export default {
           case '3dtiles': {
             entry.object.show = false;
             viewer.scene.primitives.remove(entry.object);
-            viewer.scene.requestRender();
-            break;
-          }
-          case 'mvt': {
-            entry.object.show = false;
-            viewer.imageryLayers.remove(entry.object, false);
-            viewer.scene.requestRender();
-            const imageryLayer = entry.object;
-            const provider = entry.provider;
-            
-            let frameCount = 0;
-            const waitAndDestroy = () => {
-              frameCount++;
-              if (frameCount < 5) {
-                viewer.scene.requestRender();
-                requestAnimationFrame(waitAndDestroy);
-              } else {
-                try {
-                  if (imageryLayer && !imageryLayer.isDestroyed()) {
-                    imageryLayer.destroy();
-                  }
-                  if (provider && typeof provider.destroy === 'function') {
-                    provider.destroy();
-                  }
-                } catch (e) {
-                  console.warn(`[${this.componentName}] ⚠️ MVT 图层销毁警告:`, e);
-                }
-              }
-            };
-            requestAnimationFrame(waitAndDestroy);
+            if (!this._isWebGLLost) viewer.scene.requestRender();
             break;
           }
         }
 
         this._cesiumLayers.delete(node.id);
+        this._removeFromLoadOrder(node.id);
         this.loadedLayerIds[node.id] = false;
-        console.log(`[${this.componentName}] 🗑️ 图层已移除: ${node.name}`);
       } catch (error) {
         console.error(`[${this.componentName}] ❌ 移除图层失败:`, error);
       }
@@ -1603,14 +2181,19 @@ export default {
 
     /**
      * 销毁所有 Cesium 图层（组件卸载时调用）
+     * ⚠️ WebGL 上下文丢失时，跳过 rAF 和 .destroy()（需要有效上下文），仅移除引用让 GC 回收
      */
     destroyAllCesiumLayers() {
       const viewer = this.getViewer();
       if (!viewer) return;
-      this._cesiumLayers.forEach((entry) => {
+
+      this._cesiumLayers.forEach((entry, nodeId) => {
         try {
-          if (entry.type === 'xyz' || entry.type === 'wms' || entry.type === 'wmts') {
+          if (entry.type === 'xyz' || entry.type === 'wms' || entry.type === 'wmts' || entry.type === 'mvt') {
+            entry.object.show = false;
             viewer.imageryLayers.remove(entry.object, false);
+            // 组件卸载时安全销毁所有 GPU 资源
+            this._safeDestroyImageryLayer(entry.object, entry.provider);
           } else if (entry.type === 'geojson') {
             viewer.dataSources.remove(entry.object, false);
           } else if (entry.type === '3dtiles') {
@@ -1620,6 +2203,7 @@ export default {
         } catch (e) { /* ignore */ }
       });
       this._cesiumLayers.clear();
+      this._layerLoadOrder = [];
     },
 
     beforeSaveConfig() {
