@@ -461,7 +461,7 @@ var C = /*#__PURE__*/ y(b, [["render", S]]), w = class {
 			return;
 		}
 		let i = r.classList.contains("hidden");
-		t ? r.classList.remove("hidden") : r.classList.add("hidden"), n.visible = t, n.isClosed = !t, console.log(`[PanelSingletonManager] 🔄 更新 mjs 容器可见性: ${e}, visible: ${t}, hidden: ${i} -> ${r.classList.contains("hidden")}, container:`, r), t && r.classList.contains("hidden") && console.error(`[PanelSingletonManager] ❌ 尝试显示容器但仍有 hidden 类: ${e}`);
+		t ? (r.classList.remove("hidden"), r.style.display = "", r.style.visibility = "", r.style.opacity = "") : r.classList.add("hidden"), n.visible = t, n.isClosed = !t, console.log(`[PanelSingletonManager] 🔄 更新 mjs 容器可见性: ${e}, visible: ${t}, hidden: ${i} -> ${r.classList.contains("hidden")}, container:`, r), t && r.classList.contains("hidden") && console.error(`[PanelSingletonManager] ❌ 尝试显示容器但仍有 hidden 类: ${e}`);
 	}
 	getMjsContainer(e) {
 		return this.mjsContainers.get(e) || null;

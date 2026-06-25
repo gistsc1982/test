@@ -384,6 +384,7 @@ async function loadPanelCSS(componentName, panelConfig) {
     // 例如：@cesiumBaseComponentsFunctions/ObliquePhotographyPanel.vue
     // 对应：@componentsFunctions/lib/ObliquePhotographyPanel.mjs.css
     let cssPath = '';
+    let cssPathAlt = '';
     
     if (panelConfig.file.includes('/examples/')) {
       cssPath = panelConfig.file
@@ -398,16 +399,32 @@ async function loadPanelCSS(componentName, panelConfig) {
         .replace('.vue', '.mjs.css')
         .replace(/\.mjs$/, '.mjs.css');
     } else if (panelConfig.file.endsWith('.mjs')) {
-      // 直接是 .mjs 文件
+      // 直接是 .mjs 文件 — 尝试两种 CSS 命名模式
+      // 模式1: xxx.mjs.css（如 TestPanelModule.mjs.css）
+      // 模式2: xxx.css（如 dual-canvas-viewer.css）
       cssPath = panelConfig.file + '.css';
+      cssPathAlt = panelConfig.file.replace(/\.mjs$/, '.css');
     }
 
     if (cssPath) {
+      // ⭐ 解析 @ 别名路径（浏览器端 import() 无法识别 Vite 别名）
+      const resolvedCssPath = cssPath.startsWith('@') ? resolvePathAlias(cssPath) : cssPath;
       try {
-        await import(cssPath);
-        console.log(`[CesiumMain] ✅ CSS 加载成功: ${cssPath}`);
+        await import(resolvedCssPath);
+        console.log(`[CesiumMain] ✅ CSS 加载成功: ${resolvedCssPath}`);
       } catch (error) {
-        console.warn(`[CesiumMain] ⚠️ CSS 加载失败: ${cssPath}`, error);
+        // ⭐ 主模式失败时尝试备用模式（.mjs.css → .css）
+        if (cssPathAlt && cssPathAlt !== cssPath) {
+          const resolvedCssPathAlt = cssPathAlt.startsWith('@') ? resolvePathAlias(cssPathAlt) : cssPathAlt;
+          try {
+            await import(resolvedCssPathAlt);
+            console.log(`[CesiumMain] ✅ CSS 加载成功（备用模式）: ${resolvedCssPathAlt}`);
+          } catch (error2) {
+            console.warn(`[CesiumMain] ⚠️ CSS 加载失败（两种模式均失败）: ${resolvedCssPath} / ${resolvedCssPathAlt}`, error2);
+          }
+        } else {
+          console.warn(`[CesiumMain] ⚠️ CSS 加载失败: ${resolvedCssPath}`, error);
+        }
       }
     }
   }
@@ -440,9 +457,16 @@ async function loadFunctionPanel(componentName) {
   const isIifeComponent = panelConfig && panelConfig.iifeGlobalVar && panelConfig.singleton !== false;
 
   if (isMjsComponent || isIifeComponent) {
-    const componentType = isIifeComponent ? 'IIFE 全局' : '.mjs';
-    console.log(`[CesiumMain] 📦 检测到 ${componentType} 组件: ${componentName}`);
-    return loadMjsComponent(componentName, panelConfig);
+    // ⭐ 如果是 @ 别名的 .mjs 文件，说明是源代码中已编译的模块，使用 import() 加载
+    // vue3-sfc-loader 只适用于原始 SFC 模板文件，不能处理已编译的 .mjs
+    if (isMjsComponent && panelConfig.file.startsWith('@')) {
+      console.log(`[CesiumMain] 📦 检测到 @别名 .mjs 组件（已编译模块），使用 import() 加载: ${componentName}`);
+      // 继续走下面的 import() 路径，不进入 loadMjsComponent
+    } else {
+      const componentType = isIifeComponent ? 'IIFE 全局' : '.mjs';
+      console.log(`[CesiumMain] 📦 检测到 ${componentType} 组件（SFC 模板），使用 vue3-sfc-loader 加载: ${componentName}`);
+      return loadMjsComponent(componentName, panelConfig);
+    }
   }
 
   // 检查缓存
@@ -471,9 +495,10 @@ async function loadFunctionPanel(componentName) {
       // ⭐ 检查是否为 mjs 文件，如果是则不需要路径解析
       const isMjsFile = rawPath.endsWith('.mjs');
 
-      // ⭐ 解析路径别名（将 @cesiumBaseComponentsFunctions 等转换为相对路径）
-      // 对于 mjs 文件，直接使用别名路径，不进行转换
-      const importPath = isMjsFile ? rawPath : resolvePathAlias(rawPath);
+      // ⭐ 解析路径别名（将 @componentsFunctionsLib 等转换为实际路径）
+      // 对于 mjs 文件中的 @ 别名也要解析，因为浏览器端 import() 无法识别 Vite 别名
+      const needsAliasResolution = isMjsFile ? rawPath.startsWith('@') : true;
+      const importPath = needsAliasResolution ? resolvePathAlias(rawPath) : rawPath;
       console.log(`[CesiumMain] 🔗 路径解析: ${rawPath} -> ${importPath} ${isMjsFile ? '(mjs文件)' : ''}`);
 
       const module = await import(
@@ -591,6 +616,12 @@ async function loadMjsMultiInstance(componentName, panelConfig) {
  * @returns {Promise<string>} 完整路径
  */
 async function resolveMjsResourcePath(fileName) {
+  // ⭐ 如果是 @ 别名路径，通过 PathResolver 解析为实际路径
+  if (fileName.startsWith('@')) {
+    const resolved = resolvePathAlias(fileName);
+    console.log(`[CesiumMain] 🔗 mjs 别名路径解析: ${fileName} -> ${resolved}`);
+    return resolved;
+  }
   // 如果 fileName 包含路径分隔符，认为是完整路径，直接使用
   if (fileName.includes('/')) {
     return `/${fileName}`;
@@ -2386,6 +2417,29 @@ export default {
 
       // ⭐ 优先检查 panelSingletonManager（单例面板的真实状态）
       if (panelSingletonManager.hasPanel(panelId)) {
+        // ⭐ 懒加载 .mjs 单例面板首次点击：容器已预注册但组件未加载和挂载
+        const panelConfig = getPanelConfig(panelId);
+        const isMjsSingletonLazyLoad = action === 'load'
+          && panelConfig?.file?.endsWith('.mjs')
+          && panelConfig?.singleton !== false;
+
+        if (isMjsSingletonLazyLoad) {
+          console.log(`[CesiumMain] 📦 懒加载 .mjs 单例面板首次加载: ${panelId}`);
+          // 1. 先显示容器
+          panelSingletonManager.updatePanelVisible(panelId, true);
+          // 2. 加载并挂载 Vue 应用到容器
+          this.mountMjsSingletonApp(panelId, panelConfig).then(() => {
+            console.log(`[CesiumMain] ✅ ${panelId} 懒加载完成并已挂载`);
+            // 3. 通知工具栏注册面板（用于更新按钮状态）
+            if (this.$refs?.toolbar?.registerPanel) {
+              this.$refs.toolbar.registerPanel(panelId, { visible: true });
+            }
+          }).catch((error) => {
+            console.error(`[CesiumMain] ❌ ${panelId} 懒加载失败:`, error);
+          });
+          return;
+        }
+
         // 已在管理器中注册：更新可见性
         console.log(`[CesiumMain] 🔄 面板已在管理器中，更新可见性: ${panelId} = ${visible}`);
         panelSingletonManager.updatePanelVisible(panelId, visible);

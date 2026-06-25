@@ -45,8 +45,11 @@ export function resolvePathAlias(importPath, basePath = '') {
     return importPath;
   }
 
+  // ⭐ 按别名长度降序排列，确保长别名（如 @componentsFunctionsLib）先于短别名（如 @componentsFunctions）匹配
+  const sortedAliases = Object.entries(PATH_ALIASES).sort((a, b) => b[0].length - a[0].length);
+
   // 检查路径是否以别名开头
-  for (const [alias, realPath] of Object.entries(PATH_ALIASES)) {
+  for (const [alias, realPath] of sortedAliases) {
     if (importPath.startsWith(alias)) {
       // 替换别名为实际路径
       let resolvedPath = importPath.replace(alias, realPath);

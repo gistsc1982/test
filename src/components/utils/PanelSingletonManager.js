@@ -579,6 +579,11 @@ class PanelSingletonManager {
     const oldHiddenState = container.classList.contains('hidden');
     if (visible) {
       container.classList.remove('hidden');
+      // ⭐ 清除 inline 样式（registerMjsContainers 可能设置了 display:none 等）
+      // inline 样式优先级高于 CSS class，必须清除才能让 .dual-canvas-overlay 样式生效
+      container.style.display = '';
+      container.style.visibility = '';
+      container.style.opacity = '';
     } else {
       container.classList.add('hidden');
     }

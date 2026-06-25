@@ -1,0 +1,47 @@
+{
+  "panelId": "layer-tree-manager",
+  "panelName": "图层树管理",
+  "panelIcon": "🌳",
+  "configId": "layer-tree-nodes",
+
+  "featureFolder": "layerTreeManager",
+
+  "fieldDefinitions": [
+    { "key": "id", "label": "节点ID", "type": "text", "required": true, "placeholder": "唯一标识符" },
+    { "key": "name", "label": "节点名称", "type": "text", "required": true, "placeholder": "图层或目录名称" },
+    { "key": "parentId", "label": "父节点ID (自关联)", "type": "text", "required": false, "placeholder": "留空则为根节点，填写父节点ID则为子节点", "description": "自关联外键：引用同一表的id字段，建立树形上下级关系（parentId -> id）" },
+    { "key": "nodeType", "label": "节点类型", "type": "select", "required": true, "options": [
+      { "value": "folder", "label": "目录节点" },
+      { "value": "layer", "label": "图层节点" }
+    ]},
+    { "key": "url", "label": "资源URL", "type": "url", "required": false, "placeholder": "图层资源的URL地址（图层节点使用）" },
+    { "key": "sortOrder", "label": "排序序号", "type": "number", "required": false, "default": 0, "description": "同级节点排序依据，数值越小越靠前" },
+    { "key": "visible", "label": "是否可见", "type": "boolean", "required": false, "default": true },
+    { "key": "description", "label": "描述信息", "type": "text", "required": false, "placeholder": "节点描述" },
+    { "key": "icon", "label": "图标", "type": "text", "required": false, "default": "📄", "placeholder": "节点图标emoji或字符" }
+  ],
+  "defaultFormValues": {
+    "id": "",
+    "name": "",
+    "parentId": null,
+    "nodeType": "layer",
+    "url": "",
+    "sortOrder": 0,
+    "visible": true,
+    "description": "",
+    "icon": "📄"
+  },
+  "toolbarButtons": {
+    "add": true,
+    "import": true,
+    "export": true,
+    "refresh": true
+  },
+  "dataSource": {
+    "type": "sqlite",
+    "tableName": "gis_layertreemanager_layertreemanager",
+    "primaryKey": "id",
+    "fileName": "LayerTreeManager",
+    "relativePath": "gis/layerTreeManager/LayerTreeManager.json"
+  }
+}

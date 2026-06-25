@@ -293,7 +293,7 @@
     },
     {
       "name": "DualCanvasViewer",
-      "file": "test-sfc/sfcLib/dist/dual-canvas-viewer-sfc/lib/dual-canvas-viewer.mjs",
+      "file": "@componentsFunctionsLib/dual-canvas-viewer.mjs",
       "title": "mjs双画布查看器",
       "description": "mjs双画布查看器（单实例）- 需要vue3-sfc-loader支持",
       "enabled": true,
@@ -311,11 +311,11 @@
     },
     {
       "name": "DualCanvasViewerMulti",
-      "file": "test-sfc/sfcLib/dist/dual-canvas-viewer-sfc/lib/dual-canvas-viewer.mjs",
+      "file": "@componentsFunctionsLib/dual-canvas-viewer.mjs",
       "title": "mjs双画布查看器",
       "description": "双画布查看器（多实例模式）- 需要vue3-sfc-loader支持",
       "enabled": true,
-      "visible": false,
+      "visible": true,
       "icon": "🧬",
       "category": "tools",
       "singleton": false,
@@ -434,7 +434,44 @@
         "initialX": "left",
         "initialY": 520
       }
-    },{
+    },
+    {
+      "name": "LayerTreeManager",
+      "file": "@componentsFunctions/layerTreeManager/LayerTreeManager.vue",
+      "title": "图层树管理",
+      "description": "树形图层层级管理，使用SQLite自关联表(parentId->id)存储树形层级关系，支持图层树上节点的增删改查操作（单例模式）",
+      "enabled": true,
+      "visible": false,
+      "icon": "🌳",
+      "category": "tools",
+      "singleton": true,
+      "singletonContainerId": "layerTreeManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 600
+      }
+    },
+    {
+      "name": "LayerTreeManagerMulti",
+      "file": "@componentsFunctions/layerTreeManager/LayerTreeManager.vue",
+      "title": "图层树管理（多实例）",
+      "description": "树形图层层级管理，使用SQLite自关联表(parentId->id)存储树形层级关系（多实例模式）",
+      "enabled": true,
+      "visible": false,
+      "icon": "🌲",
+      "category": "tools",
+      "singleton": false,
+      "singletonContainerId": "layerTreeManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 680
+      }
+    },
+    {
       "name": "MapGuideManager",
       "file": "@componentsFunctions/mapGuideManager/MapGuideManager.vue",
       "title": "百度路书路径引导",
