@@ -131,6 +131,24 @@ export class MVTImageryProvider {
       return queryResult;
     });
   }
+
+  destroy() {
+    this._destroyed = true;
+    if (this.mapboxRenderer) {
+      if (typeof this.mapboxRenderer.destroy === 'function') {
+        this.mapboxRenderer.destroy();
+      }
+      this.mapboxRenderer = null;
+    }
+    this.ready = false;
+    this.errorEvent = null;
+    this.tilingScheme = null;
+    this.rectangle = null;
+  }
+
+  isDestroyed() {
+    return this._destroyed === true;
+  }
 }
 
 export default MVTImageryProvider;

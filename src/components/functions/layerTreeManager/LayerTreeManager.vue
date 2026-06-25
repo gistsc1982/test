@@ -1106,15 +1106,11 @@ export default {
             break;
           }
           case 'mvt': {
-            console.log(`[${this.componentName}] 🗑️ 开始移除 MVT 图层: ${node.name}`);
             entry.object.show = false;
             viewer.imageryLayers.remove(entry.object, false);
             viewer.scene.requestRender();
             const imageryLayer = entry.object;
             const provider = entry.provider;
-            
-            this._cesiumLayers.delete(node.id);
-            this.loadedLayerIds[node.id] = false;
             
             let frameCount = 0;
             const waitAndDestroy = () => {
@@ -1126,10 +1122,9 @@ export default {
                 try {
                   if (imageryLayer && !imageryLayer.isDestroyed()) {
                     imageryLayer.destroy();
-                    console.log(`[${this.componentName}] ✅ MVT 图层已销毁: ${node.name}`);
                   }
-                  if (provider && provider.mapboxRenderer) {
-                    provider.mapboxRenderer = null;
+                  if (provider && typeof provider.destroy === 'function') {
+                    provider.destroy();
                   }
                 } catch (e) {
                   console.warn(`[${this.componentName}] ⚠️ MVT 图层销毁警告:`, e);
@@ -1137,8 +1132,7 @@ export default {
               }
             };
             requestAnimationFrame(waitAndDestroy);
-            console.log(`[${this.componentName}] 🗑️ MVT 图层已从场景移除: ${node.name}`);
-            return;
+            break;
           }
         }
 
