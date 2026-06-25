@@ -120,6 +120,10 @@
                   <label class="tree-form-label">资源URL</label>
                   <input v-model="addChildForm.url" class="tree-form-input" placeholder="图层资源的URL地址" />
                 </div>
+                <div class="tree-form-group" v-if="addChildForm.nodeType === 'layer'">
+                  <label class="tree-form-label">MVT源图层 <span style="font-weight:normal;color:#888;font-size:11px;">(逗号分隔，留空自动检测)</span></label>
+                  <input v-model="addChildForm.mvtSourceLayers" class="tree-form-input" placeholder="如: water,transportation,building" />
+                </div>
                 <div class="tree-form-group">
                   <label class="tree-form-label">图标</label>
                   <input v-model="addChildForm.icon" class="tree-form-input" placeholder="emoji或字符" />
@@ -177,6 +181,18 @@
                   <label class="tree-form-label">资源URL</label>
                   <input v-model="editForm.url" class="tree-form-input" placeholder="图层资源的URL地址" />
                 </div>
+                <div class="tree-form-group" v-if="editForm.nodeType === 'layer'">
+                  <label class="tree-form-label">MVT源图层 <span style="font-weight:normal;color:#888;font-size:11px;">(逗号分隔，留空自动检测)</span></label>
+                  <input v-model="editForm.mvtSourceLayers" class="tree-form-input" placeholder="如: water,transportation,building" />
+                </div>
+                <div class="tree-form-group" v-if="editForm.nodeType === 'layer'">
+                  <label class="tree-form-label">定位坐标 <span style="font-weight:normal;color:#888;font-size:11px;">(选填，用于地图自动定位)</span></label>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <input v-model.number="editForm.centerLon" class="tree-form-input" style="flex:1;min-width:80px;" type="number" placeholder="经度 (如 114.2)" step="any" />
+                    <input v-model.number="editForm.centerLat" class="tree-form-input" style="flex:1;min-width:80px;" type="number" placeholder="纬度 (如 22.6)" step="any" />
+                    <input v-model.number="editForm.centerHeight" class="tree-form-input" style="flex:1;min-width:80px;" type="number" placeholder="高度 (米)" step="any" />
+                  </div>
+                </div>
                 <div class="tree-form-group">
                   <label class="tree-form-label">图标</label>
                   <input v-model="editForm.icon" class="tree-form-input" placeholder="emoji或字符" />
@@ -231,6 +247,333 @@ console.log(`[LayerTreeManager] 📋 配置元数据验证结果:`);
 console.log(formatValidationResult(validationResult));
 
 const panelMetadata = validationResult.safeConfig || rawPanelMetadata;
+
+// ========================
+// MVT PBF 解析工具 — 用于自动检测瓦片中的源图层
+// ========================
+
+/**
+ * 读取 PBF varint（变长整数）
+ * 返回 [value, bytesRead]
+ */
+function readVarint(buffer, offset) {
+  let value = 0;
+  let shift = 0;
+  let bytesRead = 0;
+  while (offset + bytesRead < buffer.length) {
+    const byte = buffer[offset + bytesRead];
+    bytesRead++;
+    value |= (byte & 0x7f) << shift;
+    if (!(byte & 0x80)) break;
+    shift += 7;
+    if (shift > 35) break; // 防止无限循环
+  }
+  return [value, bytesRead];
+}
+
+/**
+ * 从 MVT PBF 数据中解析出所有图层名称
+ * MVT v2.1 结构: Tile { repeated Layer layers = 3; }
+ *               Layer { required string name = 1; ... }
+ *
+ * 备用方法：也尝试将整个 buffer 作为单个 Layer 消息来解析
+ */
+function parseMvtLayerNames(arrayBuffer) {
+  const buffer = new Uint8Array(arrayBuffer);
+  const layerNames = [];
+
+  console.log(`[PBF解析] 📦 总字节数: ${buffer.length}, 前20字节: [${Array.from(buffer.slice(0, 20)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
+
+  // 方法1: 按 Tile message 结构解析 (layers = field 3)
+  const tileLayers = parseTileMessage(buffer);
+  if (tileLayers.length > 0) {
+    console.log(`[PBF解析] ✅ Tile message 模式下检测到 ${tileLayers.length} 个图层`);
+    return tileLayers;
+  }
+
+  // 方法2: 尝试直接解析为 Layer 消息（某些服务可能只返回单个 Layer）
+  const directLayers = parseLayerMessage(buffer, 0, buffer.length);
+  if (directLayers.length > 0) {
+    console.log(`[PBF解析] ✅ 直接 Layer message 模式下检测到 ${directLayers.length} 个图层`);
+    return directLayers;
+  }
+
+  console.warn(`[PBF解析] ⚠️ 无法从 PBF 数据中解析出图层名称`);
+  return layerNames;
+}
+
+/**
+ * 解析 Tile message — 提取 field 3 (layers)
+ * Tile = { repeated Layer layers = 3; }
+ */
+function parseTileMessage(buffer) {
+  const layerNames = [];
+  let pos = 0;
+
+  while (pos < buffer.length) {
+    const [tag, tagBytes] = readVarint(buffer, pos);
+    if (tagBytes === 0) break;
+    pos += tagBytes;
+
+    const fieldNumber = tag >> 3;
+    const wireType = tag & 0x07;
+
+    if (wireType === 2) {
+      const [length, lenBytes] = readVarint(buffer, pos);
+      if (lenBytes === 0) break;
+      pos += lenBytes;
+
+      if (fieldNumber === 3) {
+        // field 3 = layers — 这是序列化的 Layer 消息
+        const names = parseLayerMessage(buffer, pos, pos + length);
+        layerNames.push(...names);
+      }
+      pos += length;
+    } else if (wireType === 0) {
+      // varint — 跳过
+      const [, vBytes] = readVarint(buffer, pos);
+      pos += vBytes;
+    } else if (wireType === 1 || wireType === 5) {
+      pos += wireType === 1 ? 8 : 4;
+    } else {
+      break; // 未知 wire type
+    }
+  }
+
+  return layerNames;
+}
+
+/**
+ * 解析 Layer message — 提取 field 1 (name) 和 field 15 (version)
+ * Layer = { required string name = 1; required uint32 version = 15 [default = 1]; ... }
+ */
+function parseLayerMessage(buffer, start, end) {
+  const names = [];
+  let pos = start;
+
+  while (pos < end) {
+    if (pos >= buffer.length) break;
+
+    const [tag, tagBytes] = readVarint(buffer, pos);
+    if (tagBytes === 0 || pos + tagBytes > end) break;
+    pos += tagBytes;
+
+    const fieldNumber = tag >> 3;
+    const wireType = tag & 0x07;
+
+    if (wireType === 2) {
+      const [length, lenBytes] = readVarint(buffer, pos);
+      if (lenBytes === 0 || pos + lenBytes + length > end + 10) break;
+      pos += lenBytes;
+
+      if (fieldNumber === 1) {
+        // field 1 = name (string)
+        // ⚠️ PBF string 编码：field_length 就是字符串的字节长度
+        // field value 中不包含额外的 varint 长度前缀，直接就是 UTF-8 字节
+        if (length > 0 && length < 256 && pos + length <= end + 10) {
+          const decoder = new TextDecoder('utf-8');
+          const name = decoder.decode(buffer.slice(pos, pos + length));
+          if (name && name.length > 0 && /^[\x20-\x7E一-鿿㐀-䶿_-]+/.test(name)) {
+            names.push(name);
+            console.log(`[PBF解析]   发现图层: "${name}" (${length} 字节)`);
+          }
+        }
+        pos += length;
+      } else {
+        pos += length;
+      }
+    } else if (wireType === 0) {
+      const [, vBytes] = readVarint(buffer, pos);
+      pos += vBytes;
+    } else if (wireType === 1) {
+      pos += 8;
+    } else if (wireType === 5) {
+      pos += 4;
+    } else {
+      break;
+    }
+  }
+
+  return names;
+}
+
+/**
+ * 检测 MVT 瓦片中的源图层名称
+ * 尝试多个 zoom 级别的瓦片，优先使用覆盖范围最广的
+ * @param {string} urlTemplate - URL 模板，包含 {z}/{x}/{y}
+ * @returns {Promise<string[]>} 图层名称数组
+ */
+async function detectMvtSourceLayers(urlTemplate) {
+  // 优先尝试高 zoom（城市级 mbtiles 通常从 zoom 10+ 开始有数据）
+  // 再回退到中低 zoom（全球/国家级数据集）
+  const tileCoords = [
+    // 优先：高 zoom — 城市/区域级 mbtiles
+    { z: 12, x: 3343, y: 1784 },  // 深圳/珠三角
+    { z: 12, x: 3342, y: 1783 },
+    { z: 10, x: 835, y: 467 },
+    { z: 11, x: 1671, y: 935 },
+    { z: 14, x: 13370, y: 7140 },
+    // 回退：中 zoom — 国家/大陆级
+    { z: 8, x: 206, y: 98 },      // 中国/东亚
+    { z: 9, x: 413, y: 197 },
+    { z: 6, x: 51, y: 24 },       // 欧亚大陆
+    { z: 5, x: 25, y: 12 },
+    // 最后尝试：低 zoom — 全球数据集
+    { z: 2, x: 1, y: 1 },
+    { z: 0, x: 0, y: 0 },
+  ];
+
+  for (const coord of tileCoords) {
+    try {
+      const url = urlTemplate
+        .replace('{z}', coord.z)
+        .replace('{x}', coord.x)
+        .replace('{y}', coord.y);
+
+      console.log(`[MVT检测] 🔍 尝试获取瓦片: z=${coord.z} x=${coord.x} y=${coord.y} → ${url}`);
+      const response = await fetch(url, {
+        mode: 'cors',
+        signal: AbortSignal.timeout(3000)  // 缩短超时到 3 秒
+      });
+
+      if (!response.ok) continue;
+
+      const arrayBuffer = await response.arrayBuffer();
+      if (arrayBuffer.byteLength === 0) continue;
+
+      const layerNames = parseMvtLayerNames(arrayBuffer);
+      console.log(`[MVT检测] ✅ 检测到 ${layerNames.length} 个图层:`, layerNames);
+      return layerNames;
+    } catch (err) {
+      console.warn(`[MVT检测] ⚠️ 瓦片 z=${coord.z} 获取失败:`, err.message);
+      continue;
+    }
+  }
+
+  console.warn('[MVT检测] ⚠️ 所有瓦片坐标均无法获取，将使用通用样式');
+  return [];
+}
+
+/**
+ * 根据图层名称启发式生成 Mapbox Style 图层
+ * 支持 Shortbread、OpenMapTiles 及自定义 schema
+ */
+function buildMvtStyleFromLayers(nodeId, nodeName, tileUrl, layerNames) {
+  const style = {
+    version: 8,
+    name: nodeName,
+    sources: {
+      [nodeId]: {
+        type: 'vector',
+        tiles: [tileUrl],
+        minzoom: 0,
+        maxzoom: 18
+      }
+    },
+    layers: [
+      {
+        id: `${nodeId}-background`,
+        type: 'background',
+        paint: { 'background-color': '#FFFDE7' }  // 淡黄色背景，方便确认瓦片在渲染
+      }
+    ]
+  };
+
+  // 启发式图层匹配规则：[匹配关键词, 图层类型(可数组), 默认paint]
+  const heuristics = [
+    // 水体
+    { match: ['water', 'ocean', 'sea', 'lake', 'river'], type: 'fill', paint: { 'fill-color': '#a9daf8', 'fill-opacity': 0.8 } },
+    // 陆地/地表覆盖
+    { match: ['land', 'landcover', 'landuse', 'park', 'forest', 'wood', 'grass', 'sand', 'glacier'], type: 'fill', paint: { 'fill-color': '#e8e8e0' } },
+    // 建筑
+    { match: ['building', 'buildings', 'structure'], type: 'fill', paint: { 'fill-color': '#d4d4d4', 'fill-outline-color': '#999999' } },
+    // 道路/交通
+    { match: ['road', 'roads', 'transportation', 'highway', 'motorway', 'path', 'track', 'railway', 'transit'], type: 'line', paint: { 'line-color': '#bbbbbb', 'line-width': 1.5 } },
+    // 边界 — 同时生成 fill+line，兼容面状和线状数据
+    { match: ['boundary', 'border', 'admin', 'country', 'gis_link'], type: ['fill', 'line'], paint: [
+      { 'fill-color': '#FF6B35', 'fill-opacity': 0.35, 'fill-outline-color': '#CC3300' },
+      { 'line-color': '#FF3300', 'line-width': 2.5, 'line-opacity': 0.9 }
+    ]},
+    // 地名/标注
+    { match: ['place', 'places', 'label', 'poi', 'city', 'town', 'country_label'], type: 'symbol', paint: {} },
+    // 轮廓线
+    { match: ['contour', 'elevation'], type: 'line', paint: { 'line-color': '#cc9966', 'line-opacity': 0.5 } },
+  ];
+
+  const usedLayers = new Set();
+
+  for (const layerName of layerNames) {
+    const lower = layerName.toLowerCase();
+
+    for (const rule of heuristics) {
+      if (usedLayers.has(layerName)) break;
+
+      for (const keyword of rule.match) {
+        if (lower.includes(keyword) || lower === keyword) {
+          usedLayers.add(layerName);
+
+          // 支持单类型和多类型规则
+          const types = Array.isArray(rule.type) ? rule.type : [rule.type];
+          const paints = Array.isArray(rule.paint) ? rule.paint : [rule.paint];
+
+          types.forEach((type, idx) => {
+            const paint = paints[idx] || paints[0] || {};
+            const styleLayer = {
+              id: `${nodeId}-${layerName}-${type}`,
+              type: type,
+              source: nodeId,
+              'source-layer': layerName,
+              paint: { ...paint }
+            };
+
+            if (type === 'line' && !styleLayer.paint['line-width']) {
+              styleLayer.paint['line-width'] = 1;
+            }
+            if (type === 'circle' && !styleLayer.paint['circle-radius']) {
+              styleLayer.paint['circle-radius'] = 4;
+            }
+
+            style.layers.push(styleLayer);
+          });
+
+          break;
+        }
+      }
+    }
+
+    // 未匹配的图层：同时用 fill + line 确保可见性
+    if (!usedLayers.has(layerName)) {
+      usedLayers.add(layerName);
+      // 面填充 — 半透明亮色
+      style.layers.push({
+        id: `${nodeId}-${layerName}-fill`,
+        type: 'fill',
+        source: nodeId,
+        'source-layer': layerName,
+        paint: { 'fill-color': '#FF6B35', 'fill-opacity': 0.6, 'fill-outline-color': '#CC3300' }
+      });
+      // 线条 — 确保线数据也可见
+      style.layers.push({
+        id: `${nodeId}-${layerName}-line`,
+        type: 'line',
+        source: nodeId,
+        'source-layer': layerName,
+        paint: { 'line-color': '#FF6B35', 'line-width': 3, 'line-opacity': 0.9 }
+      });
+      // 点 — 圆形，覆盖点数据
+      style.layers.push({
+        id: `${nodeId}-${layerName}-circle`,
+        type: 'circle',
+        source: nodeId,
+        'source-layer': layerName,
+        paint: { 'circle-color': '#FF0000', 'circle-radius': 5, 'circle-opacity': 0.9 }
+      });
+    }
+  }
+
+  console.log(`[MVT样式] 🎨 为节点 "${nodeName}" 生成了 ${style.layers.length} 个样式图层`);
+  return style;
+}
 
 // ========================
 // LayerTreeManager — 主面板组件
@@ -288,10 +631,10 @@ export default {
         { "id": "root-mvt",      "name": "矢量瓦片(MVT)",      "parentId": null,     "nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "Mapbox Vector Tile矢量瓦片", "icon": "📁" },
         { "id": "mvt-versatiles","name": "VersaTiles 全球矢量瓦片(Shortbread)","parentId":"root-mvt","nodeType":"layer","url":"https://tiles.versatiles.org/tiles/osm/{z}/{x}/{y}","sortOrder":1,"visible":1,"description":"免费全球OSM矢量瓦片，无需API Key","icon":"🌍","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
         { "id": "mvt-bkg",       "name": "BKG 德国官方矢量底图","parentId":"root-mvt","nodeType":"layer","url":"https://sgx.geodatenzentrum.de/wmts_basemapde_web_vektor/tile/v1/{z}/{x}/{y}.pbf","sortOrder":2,"visible":1,"description":"德国政府官方MVT，无需API Key，覆盖德国全境","icon":"🇩🇪","centerLon":10.45,"centerLat":51.16,"centerHeight":500000},
-        { "id": "mvt-openmaptiles","name":"OpenMapTiles 全球矢量瓦片","parentId":"root-mvt","nodeType":"layer","url":"https://free-0.tilehosting.com/data/v3/{z}/{x}/{y}.pbf?key=your-free-api-key","sortOrder":3,"visible":1,"description":"OpenMapTiles schema，需免费注册获取Key","icon":"🧩"},
+        { "id": "mvt-openmaptiles","name":"OpenMapTiles 全球矢量瓦片","parentId":"root-mvt","nodeType":"layer","url":"https://free-0.tilehosting.com/data/v3/{z}/{x}/{y}.pbf?key=your-free-api-key","sortOrder":3,"visible":1,"description":"OpenMapTiles schema，需免费注册获取Key","icon":"🧩","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
         { "id": "mvt-geofabrik","name":"Geofabrik Shortbread 矢量瓦片","parentId":"root-mvt","nodeType":"layer","url":"https://tiles.shortbread.geofabrik.de/tiles/shortbread_v1/{z}/{x}/{y}.mvt","sortOrder":4,"visible":1,"description":"德国Geofabrik免费MVT","icon":"🧩","centerLon":8.68,"centerLat":50.11,"centerHeight":500000},
-        { "id": "mvt-maptiler-cn","name":"MapTiler 矢量瓦片(全球CDN)","parentId":"root-mvt","nodeType":"layer","url":"https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=get-free-key","sortOrder":5,"visible":1,"description":"MapTiler全球CDN矢量瓦片，OpenMapTiles schema，需免费注册Key替换URL，国内可访问","icon":"🎯"},
-        { "id": "mvt-planet",    "name":"OpenFreeMap 全球矢量瓦片","parentId":"root-mvt","nodeType":"layer","url":"https://tiles.openfreemap.org/planet/{z}/{x}/{y}.pbf","sortOrder":6,"visible":1,"description":"OpenFreeMap免费全球MVT，无需API Key","icon":"🌏"},
+        { "id": "mvt-maptiler-cn","name":"MapTiler 矢量瓦片(全球CDN)","parentId":"root-mvt","nodeType":"layer","url":"https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=get-free-key","sortOrder":5,"visible":1,"description":"MapTiler全球CDN矢量瓦片，OpenMapTiles schema，需免费注册Key替换URL，国内可访问","icon":"🎯","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
+        { "id": "mvt-planet",    "name":"OpenFreeMap 全球矢量瓦片","parentId":"root-mvt","nodeType":"layer","url":"https://tiles.openfreemap.org/planet/{z}/{x}/{y}.pbf","sortOrder":6,"visible":1,"description":"OpenFreeMap免费全球MVT，无需API Key","icon":"🌏","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
         { "id": "xyz-versatiles-raster","name":"VersaTiles 浅色栅格底图(XYZ)","parentId":"root-xyz","nodeType":"layer","url":"https://tiles.versatiles.org/tiles/versatiles-light/{z}/{x}/{y}.png","sortOrder":9,"visible":1,"description":"VersaTiles免费浅色栅格瓦片，XYZ格式，全球覆盖，直接可用","icon":"🎨","centerLon":116.4,"centerLat":39.9,"centerHeight":50000}
       ],
 
@@ -354,19 +697,18 @@ export default {
   },
 
   mounted() {
-    // 延迟加载由 FunctionPanelUIBase 的 lazy-load 事件触发
-    // 当面板首次打开时，基类 onLazyLoad 内部会调用 this.loadConfig()
-    // 由于当前组件与 JsonConfigPanelBase 是组合关系（非继承），
-    // 基类内部的 this.loadConfig() 调用的是基类自身版本，不会触发这里的覆盖。
-    // 因此使用 $nextTick 确保 refs 就绪后主动加载数据。
+    // ⚠️ 延迟加载机制说明：
+    // 当面板首次打开时，FunctionPanelUIBase 触发 lazy-load → JsonConfigPanelBase.onLazyLoad()
+    // → 基类调用 JsonConfigPanelBase.loadConfig()（基类自身版本）。
+    // 由于 LayerTreeManager 与 JsonConfigPanelBase 是组合关系（非继承），
+    // 基类的 loadConfig() 不会触发此处的覆盖版本。
+    //
+    // 解决方案：在此处始终尝试从后端加载数据。
+    // - 如果后端有数据 → 使用后端数据（覆盖内置示例数据）
+    // - 如果后端无数据 → 保留内置示例数据，并自动保存到后端
     this.$nextTick(() => {
-      // 如果基类已加载过数据则跳过（缓存的 configList 非空）
-      if (!this.flatNodeList || this.flatNodeList.length === 0) {
-        console.log(`[${this.componentName}] 🚀 主动触发树形数据加载`);
-        this.loadConfig();
-      } else {
-        console.log(`[${this.componentName}] ✅ 已有 ${this.flatNodeList.length} 条数据，跳过重复加载`);
-      }
+      console.log(`[${this.componentName}] 🚀 主动触发树形数据加载（当前内置数据: ${this.flatNodeList.length} 条）`);
+      this.loadConfig();
     });
   },
 
@@ -391,7 +733,7 @@ export default {
         console.log(`[${this.componentName}] 📦 加载到原始数据: ${rawData ? rawData.length : 0} 条`);
 
         if (rawData && rawData.length > 0) {
-          // ⭐ 写入本地响应式数据（驱动 treeData 更新）
+          // 后端有数据 → 使用后端数据
           this.flatNodeList = rawData.map(item => ({
             ...item,
             visible: item.visible !== undefined ? item.visible : 1,
@@ -404,14 +746,22 @@ export default {
           }
           console.log(`[${this.componentName}] ✅ 树形配置加载完成，共 ${this.flatNodeList.length} 条`);
         } else {
-          console.warn(`[${this.componentName}] ⚠️ 未加载到数据，初始化空列表`);
-          this.flatNodeList = [];
+          // 后端无数据 → 保留内置数据，并尝试将内置数据初始化到后端
+          console.warn(`[${this.componentName}] ⚠️ 后端无数据，保留内置示例数据（${this.flatNodeList.length} 条）`);
+          if (this.flatNodeList.length > 0) {
+            // 将内置数据自动保存到后端（首次初始化）
+            this.saveConfig().then(() => {
+              console.log(`[${this.componentName}] 💾 内置示例数据已初始化到后端`);
+            });
+          }
         }
 
         this.onConfigLoadedHandler();
       } catch (error) {
+        // 加载失败时保留现有数据（内置示例或用户已添加的数据）
         console.error(`[${this.componentName}] ❌ 配置加载失败:`, error);
-        this.flatNodeList = [];
+        console.warn(`[${this.componentName}] ⚠️ 保留现有数据（${this.flatNodeList.length} 条），不清空`);
+        // 不执行 this.flatNodeList = [] — 保留现有数据
       }
     },
 
@@ -551,6 +901,7 @@ export default {
         parentId: null,
         nodeType: 'layer',
         url: '',
+        mvtSourceLayers: '',
         sortOrder: 0,
         visible: true,
         description: '',
@@ -623,6 +974,12 @@ export default {
       }
 
       console.log(`[${this.componentName}] ✅ 已添加节点: ${newNode.name} (parentId: ${newNode.parentId || '根节点'})`);
+
+      // 立即持久化保存，确保新增节点不丢失
+      this.saveConfig().then(() => {
+        console.log(`[${this.componentName}] 💾 新增节点已持久化: ${newNode.name}`);
+      });
+
       this.closeAddChildDialog();
     },
 
@@ -638,7 +995,11 @@ export default {
         sortOrder: node.sortOrder || 0,
         visible: node.visible !== undefined ? (node.visible === 1 || node.visible === true) : true,
         description: node.description || '',
-        icon: node.icon || '📄'
+        icon: node.icon || '📄',
+        mvtSourceLayers: node.mvtSourceLayers || '',
+        centerLon: node.centerLon != null ? Number(node.centerLon) : null,
+        centerLat: node.centerLat != null ? Number(node.centerLat) : null,
+        centerHeight: node.centerHeight != null ? Number(node.centerHeight) : null
       };
       this.showEditDialog = true;
     },
@@ -667,12 +1028,22 @@ export default {
         sortOrder: this.editForm.sortOrder,
         visible: this.editForm.visible ? 1 : 0,
         description: this.editForm.description,
-        icon: this.editForm.icon
+        icon: this.editForm.icon,
+        mvtSourceLayers: this.editForm.mvtSourceLayers || '',
+        centerLon: this.editForm.centerLon != null ? Number(this.editForm.centerLon) : undefined,
+        centerLat: this.editForm.centerLat != null ? Number(this.editForm.centerLat) : undefined,
+        centerHeight: this.editForm.centerHeight != null ? Number(this.editForm.centerHeight) : undefined
       };
       // 强制触发响应式更新
       this.flatNodeList = [...this.flatNodeList];
 
-      console.log(`[${this.componentName}] ✅ 已更新节点: ${updated.name}`);
+      console.log(`[${this.componentName}] ✅ 已更新节点: ${this.editForm.name}`);
+
+      // 立即持久化保存
+      this.saveConfig().then(() => {
+        console.log(`[${this.componentName}] 💾 节点修改已持久化: ${this.editForm.name}`);
+      });
+
       this.closeEditDialog();
     },
 
@@ -709,6 +1080,11 @@ export default {
       }
 
       console.log(`[${this.componentName}] 🗑️ 已删除节点及其 ${allIdsToRemove.size - 1} 个子节点`);
+
+      // 立即持久化保存
+      this.saveConfig().then(() => {
+        console.log(`[${this.componentName}] 💾 节点删除已持久化`);
+      });
     },
 
     // ==================== 工具方法 ====================
@@ -960,80 +1336,100 @@ export default {
           }
           case 'mvt': {
             console.log(`[${this.componentName}] 📦 开始加载 MVT 矢量瓦片: ${node.name}`);
+            console.log(`[${this.componentName}] 🔗 瓦片URL模板: ${node.url}`);
+            console.log(`[${this.componentName}] 🏷️  节点ID: ${node.id}`);
             try {
-              const mvtStyle = {
-                version: 8,
-                name: node.name,
-                sources: {
-                  [node.id]: {
-                    type: 'vector',
-                    tiles: [node.url],
-                    minzoom: 0,
-                    maxzoom: 18
-                  }
-                },
-                layers: [
-                  {
-                    id: `${node.id}-background`,
-                    type: 'background',
-                    paint: {
-                      'background-color': '#f8f8f8'
-                    }
-                  },
-                  {
-                    id: `${node.id}-water`,
-                    type: 'fill',
-                    source: node.id,
-                    'source-layer': 'water',
-                    paint: {
-                      'fill-color': '#a9daf8'
-                    }
-                  },
-                  {
-                    id: `${node.id}-land`,
-                    type: 'fill',
-                    source: node.id,
-                    'source-layer': 'land',
-                    paint: {
-                      'fill-color': '#f0f0f0'
-                    }
-                  },
-                  {
-                    id: `${node.id}-roads`,
-                    type: 'line',
-                    source: node.id,
-                    'source-layer': 'roads',
-                    paint: {
-                      'line-color': '#888888',
-                      'line-width': {
-                        base: 1.5,
-                        stops: [
-                          [12, 1],
-                          [22, 10]
-                        ]
-                      }
-                    }
-                  },
-                  {
-                    id: `${node.id}-buildings`,
-                    type: 'fill',
-                    source: node.id,
-                    'source-layer': 'buildings',
-                    paint: {
-                      'fill-color': '#d4d4d4',
-                      'fill-outline-color': '#999999'
-                    }
-                  }
-                ]
-              };
+              // 1. 确定要渲染的源图层
+              let sourceLayers = [];
+              const userSpecified = node.mvtSourceLayers || '';
+              if (userSpecified.trim()) {
+                sourceLayers = userSpecified.split(',').map(s => s.trim()).filter(Boolean);
+                console.log(`[${this.componentName}] 📋 使用用户指定的源图层:`, sourceLayers);
+              } else {
+                console.log(`[${this.componentName}] 🔍 自动检测 MVT 源图层...`);
+                sourceLayers = await detectMvtSourceLayers(node.url);
+                console.log(`[${this.componentName}] 📊 检测结果: ${sourceLayers.length} 个图层 →`, sourceLayers);
+                if (sourceLayers.length === 0) {
+                  console.warn(`[${this.componentName}] ⚠️ 自动检测失败，使用通用图层名称`);
+                  sourceLayers = [
+                    'water', 'land', 'roads', 'buildings', 'places',
+                    'transportation', 'transportation_name', 'building',
+                    'landuse', 'landcover', 'waterway', 'water_name',
+                    'place', 'poi', 'boundary', 'aeroway'
+                  ];
+                }
+              }
+
+              // 2. 诊断：单独获取一个瓦片，验证 PBF 解析是否正确
+              try {
+                const diagUrl = node.url.replace('{z}', '12').replace('{x}', '3343').replace('{y}', '1784');
+                const diagResp = await fetch(diagUrl, { mode: 'cors', signal: AbortSignal.timeout(5000) });
+                if (diagResp.ok) {
+                  const diagBuf = await diagResp.arrayBuffer();
+                  const diagLayers = parseMvtLayerNames(diagBuf);
+                  console.log(`[${this.componentName}] 🔬 诊断瓦片 (z=12) 包含 ${diagLayers.length} 个图层:`, diagLayers);
+                }
+              } catch (diagErr) {
+                console.warn(`[${this.componentName}] 🔬 诊断瓦片获取失败:`, diagErr.message);
+              }
+
+              // 3. 基于图层名称动态生成 Mapbox Style
+              const mvtStyle = buildMvtStyleFromLayers(
+                node.id,
+                node.name,
+                node.url,
+                sourceLayers
+              );
+
+              console.log(`[${this.componentName}] 🎨 MVT 样式已生成，包含 ${mvtStyle.layers.length} 个图层`);
+              console.log(`[${this.componentName}] 🎨 完整样式JSON:`, JSON.stringify(mvtStyle, null, 2));
+
+              // 根据检测结果调整 zoom 范围（区域数据通常没有低级别瓦片）
+              const detectedZoom = sourceLayers.length > 0 ? 10 : 0;
+              mvtStyle.sources[node.id].minzoom = detectedZoom;
+              console.log(`[${this.componentName}] 🔧 minzoom 调整为: ${detectedZoom}`);
 
               const provider = await MVTImageryProvider.create({
                 style: mvtStyle,
                 cesiumViewer: viewer,
                 tileSize: 512,
                 maximumLevel: 18,
+                minimumLevel: 0,
                 credit: node.name
               });
+
+              // 🔬 诊断钩子：监控瓦片请求的结果
+              const compName = this.componentName;
+              const origRequestImage = provider.requestImage.bind(provider);
+              let reqCount = 0;
+              let succCount = 0;
+              provider.requestImage = function(x, y, zoom, releaseTile) {
+                reqCount++;
+                const reqNum = reqCount;
+                if (reqNum <= 3) {
+                  console.log(`[${compName}] 🔬 瓦片请求 #${reqNum}: x=${x} y=${y} zoom=${zoom}`);
+                }
+                return origRequestImage(x, y, zoom, releaseTile).then(
+                  (canvas) => {
+                    succCount++;
+                    if (succCount === 1) {
+                      const ctx = canvas.getContext('2d');
+                      const imgData = ctx.getImageData(0, 0, Math.min(canvas.width, 10), Math.min(canvas.height, 10));
+                      const alphaVals = [];
+                      for (let i = 3; i < imgData.data.length; i += 4) alphaVals.push(imgData.data[i]);
+                      const hasContent = alphaVals.some(v => v > 0);
+                      console.log(`[${compName}] 🔬 首个成功瓦片 ${canvas.width}x${canvas.height}, alpha范围:[${Math.min(...alphaVals)}-${Math.max(...alphaVals)}], 有内容:${hasContent}`);
+                    }
+                    return canvas;
+                  },
+                  (err) => {
+                    if (reqNum <= 3) {
+                      console.warn(`[${compName}] 🔬 瓦片请求 #${reqNum} 失败: x=${x} y=${y} zoom=${zoom} err=`, err);
+                    }
+                    throw err;
+                  }
+                );
+              };
 
               await provider.readyPromise;
               const layer = viewer.imageryLayers.addImageryProvider(provider);
@@ -1041,7 +1437,7 @@ export default {
               console.log(`[${this.componentName}] ✅ MVT 矢量瓦片 "${node.name}" 加载成功`);
             } catch (mvtError) {
               console.error(`[${this.componentName}] ❌ MVT 矢量瓦片加载失败:`, mvtError);
-              alert(`MVT 矢量瓦片加载失败: ${node.name}\n\n错误信息: ${mvtError.message || mvtError}\n\n可能原因：\n1. 瓦片服务不可达\n2. 瓦片格式不兼容\n3. 需要正确的 Mapbox Style 配置`);
+              alert(`MVT 矢量瓦片加载失败: ${node.name}\n\n错误信息: ${mvtError.message || mvtError}\n\n可能原因：\n1. 瓦片服务不可达\n2. 瓦片格式不兼容\n3. 需要正确的 Mapbox Style 配置\n4. MVT 源图层名称不匹配（可在编辑时指定 sourceLayers）`);
               return;
             }
             break;
@@ -1193,6 +1589,11 @@ export default {
               duration: 2
             });
           }
+        } else if (entry.type === 'mvt' && entry.provider) {
+          // MVT 图层的 rectangle 是 WebMercator 全球范围，飞到全球视图没有意义。
+          // 只在节点配置了 centerLon/centerLat 时才飞行（已在前面处理）。
+          // 这里不做任何飞行，用户可手动缩放到数据区域。
+          console.log(`[${this.componentName}] 🎯 MVT 图层 "${node.name}" 无自定义中心坐标，跳过飞行`);
         }
       } catch (e) {
         // 飞行失败不阻塞主流程

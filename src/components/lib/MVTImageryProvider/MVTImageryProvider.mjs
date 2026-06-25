@@ -1,13 +1,15 @@
 import { getMapbox } from './mapbox-gl-wrapper.mjs';
+import { getMaplibre } from './maplibre-gl-wrapper.mjs';
 
 export class MVTImageryProvider {
-  constructor(options, mapbox) {
-    this.mapboxRenderer = new mapbox.BasicRenderer({ style: options.style });
+  constructor(options, rendererLib) {
+    this.rendererLib = rendererLib;
+    this.mapboxRenderer = new rendererLib.BasicRenderer({ style: options.style });
     this.ready = false;
     this.readyPromise = this.mapboxRenderer._style.loadedPromise.then(
       () => (this.ready = true)
     );
-    
+
     const Cesium = this._getCesium();
     this.tilingScheme = new Cesium.WebMercatorTilingScheme();
     this.rectangle = this.tilingScheme.rectangle;
@@ -25,8 +27,29 @@ export class MVTImageryProvider {
   }
 
   static async create(options) {
-    const mapbox = await getMapbox();
-    return new MVTImageryProvider(options, mapbox);
+    // library: 'mapbox' (默认) 或 'maplibre'
+    // mapbox-gl.js 有 BasicRenderer，用于 Cesium 瓦片渲染
+    // maplibre-gl.js 作为备选，与 mbview-master 瓦片服务端保持一致
+    const lib = options.library || 'mapbox';
+    let rendererLib;
+
+    if (lib === 'maplibre') {
+      // 尝试 maplibre-gl.js（可能没有 BasicRenderer，回退到 mapbox-gl.js）
+      try {
+        rendererLib = await getMaplibre();
+        if (!rendererLib.BasicRenderer) {
+          console.warn('[MVTImageryProvider] maplibre-gl.js 不含 BasicRenderer API，回退使用 mapbox-gl.js');
+          rendererLib = await getMapbox();
+        }
+      } catch (err) {
+        console.warn('[MVTImageryProvider] maplibre-gl.js 加载失败，回退使用 mapbox-gl.js:', err.message);
+        rendererLib = await getMapbox();
+      }
+    } else {
+      rendererLib = await getMapbox();
+    }
+
+    return new MVTImageryProvider(options, rendererLib);
   }
 
   _getCesium() {

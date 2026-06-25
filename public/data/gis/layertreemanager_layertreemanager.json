@@ -30,10 +30,7 @@
     "sortOrder": 1,
     "visible": 1,
     "description": "来源：NASA 官方 | 服务类型：WMS 1.3.0 | NASA全球影像浏览服务(GIBS)，提供MODIS/VIIRS等多颗卫星的近实时和科学级影像，覆盖全球，支持时间维度。无需API Key即可访问。",
-    "icon": "🛰️",
-    "centerLon": 0,
-    "centerLat": 20,
-    "centerHeight": 15000000
+    "icon": "🛰️"
   },
   {
     "id": "wms-nasa-gibs-3857",
@@ -55,10 +52,7 @@
     "sortOrder": 3,
     "visible": 1,
     "description": "来源：USGS（美国地质调查局）官方 | 服务类型：WMS 1.3.0 | 全美标准地形图，包含等高线、水系、交通、地名等丰富要素。美国联邦政府长期维护，可靠性极高。",
-    "icon": "🗺️",
-    "centerLon": -98.5,
-    "centerLat": 39.8,
-    "centerHeight": 5000000
+    "icon": "🗺️"
   },
   {
     "id": "wms-noaa-weather",
@@ -69,10 +63,7 @@
     "sortOrder": 4,
     "visible": 1,
     "description": "来源：NOAA（美国海洋和大气管理局）官方 | 服务类型：WMS 1.3.0 | NOAA nowCOAST实时气象水文分析图层，包含降水雷达、风场、海浪、温度等动态气象数据，支持时间序列。",
-    "icon": "☁️",
-    "centerLon": -95,
-    "centerLat": 38,
-    "centerHeight": 6000000
+    "icon": "☁️"
   },
   {
     "id": "wms-noaa-wind",
@@ -171,10 +162,7 @@
     "sortOrder": 1,
     "visible": 1,
     "description": "来源：OpenStreetMap基金会 | 服务类型：XYZ Tiles | 全球最著名的众源开源地图底图，数据由全球志愿者维护更新，覆盖道路、建筑、POI等丰富要素。用于非商业用途免费。",
-    "icon": "🗺️",
-    "centerLon": 116.4,
-    "centerLat": 39.9,
-    "centerHeight": 50000
+    "icon": "🗺️"
   },
   {
     "id": "xyz-esri-imagery",
@@ -185,10 +173,7 @@
     "sortOrder": 2,
     "visible": 1,
     "description": "来源：ESRI（ArcGIS Online）| 服务类型：XYZ Tiles (ArcGIS REST) | 全球1m及更高分辨率卫星/航空影像镶嵌底图，多地分辨率达亚米级。ESRI长期维护，在GIS行业广泛使用。",
-    "icon": "🛰️",
-    "centerLon": 116.4,
-    "centerLat": 39.9,
-    "centerHeight": 8000
+    "icon": "🛰️"
   },
   {
     "id": "xyz-esri-street",
@@ -199,10 +184,7 @@
     "sortOrder": 3,
     "visible": 1,
     "description": "来源：ESRI（ArcGIS Online）| 服务类型：XYZ Tiles (ArcGIS REST) | 全球范围的街道地图底图，包含道路分级、地名标注、行政区划等信息，风格简洁专业，适合各种WebGIS应用。",
-    "icon": "🏙️",
-    "centerLon": 116.4,
-    "centerLat": 39.9,
-    "centerHeight": 50000
+    "icon": "🏙️"
   },
   {
     "id": "xyz-esri-topo",
@@ -213,10 +195,7 @@
     "sortOrder": 4,
     "visible": 1,
     "description": "来源：ESRI（ArcGIS Online）| 服务类型：XYZ Tiles (ArcGIS REST) | 全球地形图底图，叠加等高线、水系、植被等地形要素，适合户外、地质、环境等GIS场景。",
-    "icon": "⛰️",
-    "centerLon": 116.4,
-    "centerLat": 39.9,
-    "centerHeight": 50000
+    "icon": "⛰️"
   },
   {
     "id": "xyz-cartodb-light",
@@ -337,10 +316,7 @@
     "sortOrder": 1,
     "visible": 1,
     "description": "来源：USGS MRData 官方 | 服务类型：WMS 1.3.0 | 美国全国地质图服务，包含各州详细的地层、岩性、构造等地质要素，是地质调查和研究的基础数据源。",
-    "icon": "⛏️",
-    "centerLon": -110,
-    "centerLat": 44,
-    "centerHeight": 5000000
+    "icon": "⛏️"
   },
   {
     "id": "wms-noaa-coral",
@@ -363,5 +339,27 @@
     "visible": 1,
     "description": "来源：NOAA NGDC 官方 | 服务类型：WMS 1.3.0 | NOAA国家地球物理数据中心提供的全球海洋水深(bathymetry)地图服务，展示海底地形地貌，是海洋科学研究的核心数据。",
     "icon": "🌊"
+  },
+  {
+    "id": "shenz_point",
+    "name": "深圳点mvt",
+    "parentId": "root-mvt",
+    "nodeType": "layer",
+    "url": "http://localhost:3000/gis_link_boundary_sz.mbtiles/12/3343/1784.pbf",
+    "sortOrder": "",
+    "visible": true,
+    "description": "",
+    "icon": "📄"
+  },
+  {
+    "id": "shenz-pointmvt",
+    "name": "深圳点mvt",
+    "parentId": "root-mvt",
+    "nodeType": "layer",
+    "url": "http://localhost:3000/gis_link_boundary_sz.mbtiles/12/3343/1784.pbf",
+    "sortOrder": "",
+    "visible": true,
+    "description": "http://localhost:3000/#12/22.60276/114.08701",
+    "icon": "📄"
   }
 ]
