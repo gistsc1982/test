@@ -432,16 +432,17 @@ export default {
         this.updateItemState(item.id, { loading: true });
 
         // 使用构造函数方式创建 tileset
+        // 针对高缩放层级（L17/L18）优化参数以提升清晰度
         const tileset = new Cesium.Cesium3DTileset({
           url: item.url,
           show: true,
-          maximumScreenSpaceError: 16,
+          maximumScreenSpaceError: 8,               // 降低SSE阈值，强制更精细的层级细化（默认16，数值越小越精细）
           skipLevelOfDetail: true,
-          baseScreenSpaceError: 1024,
-          skipScreenSpaceErrorFactor: 16,
-          skipLevels: 1,
-          immediatelyLoadDesiredLevelOfDetail: false,
-          loadSiblings: false,
+          baseScreenSpaceError: 512,                 // 降低基准SSE，让skipLOD从更高精度开始判断
+          skipScreenSpaceErrorFactor: 8,             // 降低跳过因子，减少层级跳跃幅度
+          skipLevels: 0,                             // 不跳过任何层级，确保从根节点开始完整加载
+          immediatelyLoadDesiredLevelOfDetail: true, // 立即加载目标细节层级，避免延迟
+          loadSiblings: true,                        // 加载兄弟瓦片，避免高层级时出现缺失瓦片
           dynamicScreenSpaceError: true,
           dynamicScreenSpaceErrorDensity: 0.00278,
           dynamicScreenSpaceErrorFactor: 4.0,

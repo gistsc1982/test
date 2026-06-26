@@ -4,14 +4,15 @@ import { useRoute } from 'vue-router'
 
 const route = useRoute()
 
+// 显示导航栏和底部信息栏的路由（cesium-main 和 gis 不显示）
+const showNavRoutes = ['/components', '/', '/performance']
+
 const isComponentView = computed(() => {
-  const showNavRoutes = ['/components', '/', '/cesium-main', '/performance']
   return showNavRoutes.includes(route.path)
 })
 
-// 性能监控页面也显示导航栏，方便切换
 const showNav = computed(() => {
-  return isComponentView.value || route.path === '/performance'
+  return showNavRoutes.includes(route.path)
 })
 
 // 🔧 只有 GIS iframe 模式才禁止滚动

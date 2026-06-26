@@ -2259,7 +2259,7 @@ export default {
               : new Cesium.WebMercatorTilingScheme();
 
             // 确定图层名：优先使用用户配置，否则尝试自动检测
-            let wmtsLayer = node.wmtsLayerName || '';
+            let wmtsLayer = node.wmtsLayerName || node.wmsLayerName || '';
             if (!wmtsLayer) {
               console.log(`[${this.componentName}] 🔍 自动检测 WMTS 图层: ${node.name}`);
 
