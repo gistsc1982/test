@@ -185,6 +185,7 @@ export default {
     this._cesiumTilesets = new Map();
     this._cesiumTransforms = new Map();
     this._cesiumHeightOffsets = new Map();
+    this._cesiumErrorHandlers = new Map();
   },
 
   created() {
@@ -299,29 +300,15 @@ export default {
       }
     },
 
+    // ⭐ 禁用状态持久化，与 cesiumBase ObliquePhotographyPanel 行为一致
+    // JsonConfigPanelBase 的序列化/反序列化机制可能在 dual-canvas 触发 re-render 时干扰 tileset
     getCesiumObjects() {
-      return {
-        cesiumTilesets: this._cesiumTilesets,
-        cesiumTransforms: this._cesiumTransforms,
-        cesiumHeightOffsets: this._cesiumHeightOffsets
-      };
+      return null;  // 不保存 Cesium 对象到缓存，避免反序列化时干扰 active tileset
     },
 
     restoreCesiumObjects(cesiumObjects) {
-      if (!cesiumObjects) return;
-
-      this._cesiumTilesets = cesiumObjects.cesiumTilesets || new Map();
-      this._cesiumTransforms = cesiumObjects.cesiumTransforms || new Map();
-      this._cesiumHeightOffsets = cesiumObjects.cesiumHeightOffsets || new Map();
-
-      const viewer = this.getCesiumViewer();
-      if (viewer) {
-        this._cesiumTilesets.forEach((tileset, id) => {
-          if (tileset && !tileset.isDestroyed() && !viewer.scene.primitives.contains(tileset)) {
-            viewer.scene.primitives.add(tileset);
-          }
-        });
-      }
+      // 不做任何恢复操作，避免向 scene.primitives 重新添加已有 tileset
+      console.log(`[${this.componentName}] ⏭️ 跳过 Cesium 对象恢复（与 cesiumBase 行为一致）`);
     },
 
     processLoadedData(data) {
@@ -428,37 +415,43 @@ export default {
 
       console.log(`[${this.componentName}] 📷 加载倾斜摄影: ${item.name}`);
 
-      try {
-        this.updateItemState(item.id, { loading: true });
+      this.updateItemState(item.id, { loading: true });
 
-        // 使用构造函数方式创建 tileset
-        // 针对高缩放层级（L17/L18）优化参数以提升清晰度
+      try {
+
+        // ⭐ 完全对齐 cesiumBase ObliquePhotographyPanel 的加载参数
         const tileset = new Cesium.Cesium3DTileset({
           url: item.url,
           show: true,
-          maximumScreenSpaceError: 8,               // 降低SSE阈值，强制更精细的层级细化（默认16，数值越小越精细）
+          maximumScreenSpaceError: 16,
           skipLevelOfDetail: true,
-          baseScreenSpaceError: 512,                 // 降低基准SSE，让skipLOD从更高精度开始判断
-          skipScreenSpaceErrorFactor: 8,             // 降低跳过因子，减少层级跳跃幅度
-          skipLevels: 0,                             // 不跳过任何层级，确保从根节点开始完整加载
-          immediatelyLoadDesiredLevelOfDetail: true, // 立即加载目标细节层级，避免延迟
-          loadSiblings: true,                        // 加载兄弟瓦片，避免高层级时出现缺失瓦片
+          baseScreenSpaceError: 1024,
+          skipScreenSpaceErrorFactor: 16,
+          skipLevels: 1,
+          immediatelyLoadDesiredLevelOfDetail: false,
+          loadSiblings: false,
           dynamicScreenSpaceError: true,
           dynamicScreenSpaceErrorDensity: 0.00278,
-          dynamicScreenSpaceErrorFactor: 4.0,
-          dynamicScreenSpaceErrorHeightFalloff: 0.25,
-          debugShowBoundingVolume: false,
-          debugShowContentBoundingVolume: false,
-          debugShowViewerRequestVolume: false
+          dynamicScreenSpaceErrorFactor: 4,
+          dynamicScreenSpaceErrorHeightFalloff: 0.25
         });
 
         this._cesiumTilesets.set(item.id, tileset);
         viewer.scene.primitives.add(tileset);
 
-        // 等待 tileset 准备就绪 - 使用兼容方式
-        if (tileset.ready) {
-          // already ready, proceed
-          console.log(`[${this.componentName}] ✅ 加载完成: ${item.name}`);
+        // ⭐ 使用回调方式处理 readyPromise（与 cesiumBase 一致）
+        const onReady = () => {
+          console.log(`[${this.componentName}] ✅ 倾斜摄影加载完成: ${item.name}`);
+
+          if (tileset.boundingSphere) {
+            console.log(`[${this.componentName}] ${item.name} 边界球:`, {
+              中心X: tileset.boundingSphere.center.x.toFixed(2),
+              中心Y: tileset.boundingSphere.center.y.toFixed(2),
+              中心Z: tileset.boundingSphere.center.z.toFixed(2),
+              半径: tileset.boundingSphere.radius.toFixed(2) + '米'
+            });
+          }
+
           this.updateItemState(item.id, { loading: false, loaded: true });
 
           if (tileset.root && tileset.root.transform) {
@@ -468,34 +461,20 @@ export default {
           if (tileset.boundingSphere) {
             viewer.camera.flyToBoundingSphere(tileset.boundingSphere, {
               duration: 2,
-              offset: new Cesium.HeadingPitchRange(0, -45, tileset.boundingSphere.radius * 2.0)
+              offset: new Cesium.HeadingPitchRange(0, -45, tileset.boundingSphere.radius * 2)
             });
+            console.log(`[${this.componentName}] 🎯 已自动定位到 ${item.name}`);
           }
-        } else if (tileset.readyPromise) {
-          // 使用兼容方式处理 readyPromise
-          const onReady = () => {
-            console.log(`[${this.componentName}] ✅ 加载完成: ${item.name}`);
-            this.updateItemState(item.id, { loading: false, loaded: true });
+        };
 
-            if (tileset.root && tileset.root.transform) {
-              this._cesiumTransforms.set(item.id, Cesium.Matrix4.clone(tileset.root.transform));
-            }
+        const onError = (error) => {
+          console.error(`[${this.componentName}] ❌ 倾斜摄影加载失败: ${item.name}`, error);
+          this.updateItemState(item.id, { loading: false, loaded: false });
+        };
 
-            if (tileset.boundingSphere) {
-              viewer.camera.flyToBoundingSphere(tileset.boundingSphere, {
-                duration: 2,
-                offset: new Cesium.HeadingPitchRange(0, -45, tileset.boundingSphere.radius * 2.0)
-              });
-            }
-          };
-
-          const onError = (error) => {
-            console.error(`[${this.componentName}] ❌ 加载失败: ${item.name}`, error);
-            this.updateItemState(item.id, { loading: false, loaded: false });
-          };
-
-          // 兼容标准 Promise 和 Cesium 自定义 Promise
-          if (tileset.readyPromise instanceof Promise) {
+        // ⭐ 兼容标准 Promise 和 Cesium 自定义 Promise（与 cesiumBase 一致）
+        if (tileset.readyPromise) {
+          if (typeof Promise !== 'undefined' && tileset.readyPromise instanceof Promise) {
             tileset.readyPromise.then(onReady).catch(onError);
           } else if (typeof tileset.readyPromise.then === 'function') {
             tileset.readyPromise.then(onReady);
@@ -503,9 +482,17 @@ export default {
               tileset.readyPromise.otherwise(onError);
             }
           }
-        } else {
-          // 无法确定 ready 状态，视为失败
-          throw new Error('tileset.readyPromise not available');
+        }
+
+        // ⭐ 注册 tileFailed 错误处理（与 cesiumBase 一致）
+        this._cesiumErrorHandlers = this._cesiumErrorHandlers || new Map();
+        if (tileset.tileFailed) {
+          const errorHandler = onError;
+          tileset.tileFailed.addEventListener(errorHandler);
+          this._cesiumErrorHandlers.set(item.id, {
+            tileset: tileset,
+            errorHandler: errorHandler
+          });
         }
 
       } catch (error) {
@@ -515,20 +502,35 @@ export default {
     },
 
     unloadItem(item) {
-      const tileset = this._cesiumTilesets.get(item.id);
-      if (tileset) {
-        const viewer = this.getCesiumViewer();
-        if (viewer && viewer.scene.primitives.contains(tileset)) {
-          viewer.scene.primitives.remove(tileset);
-        }
-        tileset.destroy();
-        this._cesiumTilesets.delete(item.id);
-        this._cesiumTransforms.delete(item.id);
-        this._cesiumHeightOffsets.delete(item.id);
+      const viewer = this.getCesiumViewer();
+      if (!viewer) {
+        console.error(`[${this.componentName}] Cesium Viewer 未初始化`);
+        return;
       }
 
-      this.updateItemState(item.id, { loaded: false, loading: false });
-      console.log(`[${this.componentName}] ✅ 卸载成功: ${item.name}`);
+      console.log(`[${this.componentName}] 卸载倾斜摄影: ${item.name}`);
+
+      const tileset = this._cesiumTilesets.get(item.id);
+      if (tileset) {
+        try {
+          viewer.scene.primitives.remove(tileset);
+          this._cesiumTilesets.delete(item.id);
+          this._cesiumTransforms.delete(item.id);
+          this._cesiumHeightOffsets.delete(item.id);
+
+          // ⭐ 清理 tileFailed 事件监听器（与 cesiumBase 一致）
+          const errorHandlerEntry = this._cesiumErrorHandlers?.get(item.id);
+          if (errorHandlerEntry && errorHandlerEntry.tileset.tileFailed) {
+            errorHandlerEntry.tileset.tileFailed.removeEventListener(errorHandlerEntry.errorHandler);
+            this._cesiumErrorHandlers.delete(item.id);
+          }
+
+          this.updateItemState(item.id, { loaded: false, loading: false });
+          console.log(`[${this.componentName}] ✅ 倾斜摄影已卸载: ${item.name}`);
+        } catch (error) {
+          console.error(`[${this.componentName}] ❌ 倾斜摄影卸载失败: ${item.name}`, error);
+        }
+      }
     },
 
     locateToItem(item) {
