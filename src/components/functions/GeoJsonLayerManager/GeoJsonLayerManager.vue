@@ -54,6 +54,19 @@
       </button>
     </template>
 
+    <!-- 工具栏额外按钮：JSON 强制刷新 -->
+    <template #toolbar-extra>
+      <button
+        @click="forceReloadFromJSON"
+        :disabled="refreshLoading"
+        class="geojson-toolbar-refresh-btn"
+        type="button"
+        :title="refreshLoading ? '刷新中...' : '从 JSON 文件强制刷新（忽略缓存）'"
+      >
+        {{ refreshLoading ? '⏳' : '🔄' }}
+      </button>
+    </template>
+
     <template #dialogs></template>
   </JsonConfigPanelBase>
 </template>
@@ -82,7 +95,8 @@ export default {
       componentName: 'GeoJsonLayerManager',
       panelMetadata,
       _cesiumLayers: new Map(),
-      _labelStates: {}
+      _labelStates: {},
+      refreshLoading: false
     };
   },
   computed: {
@@ -94,7 +108,10 @@ export default {
     configRegistry.registerFromMetadata(this.panelMetadata);
     this.initConfigStrategy();
   },
-  beforeDestroy() {
+  mounted() {
+    console.log(`[${this.componentName}] 🚀 GeoJsonLayerManager 已挂载`);
+  },
+  beforeUnmount() {
     this.destroyAllLayers();
   },
   methods: {
@@ -106,6 +123,83 @@ export default {
       ]);
       console.log(`[${this.componentName}] ✅ 配置加载策略已初始化: ${this._configStrategy.getName()}`);
     },
+
+    // ---- JSON 刷新（按钮在 toolbar-extra 插槽中） ----
+
+    /**
+     * 🔄 从 JSON 文件强制刷新配置（绕过 IndexedDB/SQLite 缓存）
+     *
+     * 使用场景：手动编辑了 public/data/gis/GeoJsonLayerManager/GeoJsonLayerManager.json
+     * 后，IndexedDB 中仍有旧缓存。调用此方法直接从 JSON 文件加载并更新缓存。
+     *
+     * 流程：
+     *   1. 直接从 JSON 文件加载数据（跳过 SQLite/IndexedDB）
+     *   2. 卸载全部已加载图层（避免旧样式残留）
+     *   3. 更新 basePanel.configList（UI 刷新，全部标记未加载）
+     *   4. 将 JSON 数据写回 SQLite/IndexedDB（更新缓存）
+     */
+    async forceReloadFromJSON() {
+      const log = (...args) => console.log(`[${this.componentName}] 🔄`, ...args);
+      log('开始从 JSON 文件强制刷新...');
+      this.refreshLoading = true;
+
+      try {
+        // 1. 创建纯 JSON 策略，跳过 SQLite
+        const factory = new ConfigStrategyFactory();
+        const jsonStrategy = factory.createJSONFileStrategy(this.panelMetadata.featureFolder);
+
+        log(`加载 JSON: /data/gis/${this.panelMetadata.featureFolder}/${this.panelMetadata.featureFolder}.json`);
+        const jsonData = await jsonStrategy.load();
+
+        if (!jsonData || jsonData.length === 0) {
+          console.warn(`[${this.componentName}] ⚠️ JSON 文件无数据或加载失败`);
+          this.refreshLoading = false;
+          return;
+        }
+
+        log(`✅ JSON 加载成功，共 ${jsonData.length} 条`);
+
+        // 2. 卸载所有已加载图层（配置已变，旧数据源需清除）
+        const hadLoadedLayers = this._cesiumLayers.size > 0;
+        if (hadLoadedLayers) {
+          log(`🗑️ 卸载 ${this._cesiumLayers.size} 个已加载图层...`);
+          this.destroyAllLayers();
+        }
+
+        // 3. 更新 basePanel 的 configList（触发 UI 刷新）
+        if (this.$refs.basePanel) {
+          this.$refs.basePanel.configList = jsonData.map(item => ({
+            ...item,
+            loaded: false,
+            loading: false
+          }));
+        }
+
+        // 4. 将 JSON 数据写回 SQLite/IndexedDB（失败不影响刷新结果）
+        if (this._configStrategy && typeof this._configStrategy.save === 'function') {
+          try {
+            const saved = await this._configStrategy.save(this.panelMetadata, jsonData);
+            if (saved) {
+              log('💾 JSON 数据已写回缓存');
+            } else {
+              console.warn(`[${this.componentName}] ⚠️ 缓存写入失败 — 下次加载将回退到 JSON 文件`);
+            }
+          } catch (saveErr) {
+            console.warn(`[${this.componentName}] ⚠️ 缓存写入异常 (${saveErr.message}) — 可尝试手动清除 IndexedDB: indexedDB.deleteDatabase('configDB')`);
+          }
+        }
+
+        // 5. 触发 onConfigLoadedHandler 初始化 loaded/loading 状态
+        this.onConfigLoadedHandler();
+
+        log(`🎉 强制刷新完成！请查看图层列表是否已更新`);
+      } catch (err) {
+        console.error(`[${this.componentName}] ❌ JSON 强制刷新失败:`, err);
+      } finally {
+        this.refreshLoading = false;
+      }
+    },
+
     onConfigLoadedHandler() {
       console.log(`[${this.componentName}] ✅ 图层配置加载完成`);
       // 初始化 loaded/loading 状态，并归一化 geoJson 为字符串
@@ -163,13 +257,22 @@ export default {
         if (layer.fillOpacity !== undefined) {
           fillColor.alpha = layer.fillOpacity;
         }
+        // ⭐ markerSymbol 策略（参考 SGKJ_SDK PinBuilder）：
+        //    - 空/未设置 → fromColor() 渐变圆点（性能最优，外观最佳）
+        //    - 单 ASCII 字符 → fromText() PinBuilder 原生文字标记（缓存复用）
+        //    - emoji/SVG → 加载后预生成 canvas 一次，全图层复用同一引用
+        const markerIcon = layer.markerIcon || '';
+        const isSingleAscii = markerIcon.length === 1;
+        const markerSymbol = isSingleAscii ? markerIcon : undefined;
+
         const options = {
           clampToGround: clampToGround,
           fill: fillColor,
           markerColor: Cesium.Color.fromCssColorString(layer.markerColor || '#4169E1'),
           markerSize: layer.markerSize || 48,
           stroke: Cesium.Color.fromCssColorString(layer.strokeColor || '#FF0000'),
-          strokeWidth: effectiveStrokeWidth
+          strokeWidth: effectiveStrokeWidth,
+          markerSymbol: markerSymbol  // undefined → PinBuilder.fromColor() 渐变圆点
         };
         Promise.resolve(Cesium.GeoJsonDataSource.load(geoJsonData, options)).then(dataSource => {
           viewer.dataSources.add(dataSource);
@@ -179,49 +282,61 @@ export default {
           const entities = dataSource.entities.values;
           console.log(`[${this.componentName}] ✅ 图层 "${layer.name}" 加载成功，实体数: ${entities.length}`);
 
-          // ⭐ 加载后用原生 point/polyline/polygon 替换 GeoJsonDataSource 生成的图形
+          // ⭐ 后处理：仅处理 options 无法覆盖的场景
+          //   - clampToGround：Cesium GeoJsonDataSource options 已应用，但 polyline/polygon
+          //     在某些版本中不会自动继承，此处做兜底强制
+          //   - emoji/SVG 图标：预生成 canvas 一次，全图层 entity 共享同一引用（非逐实体创建）
+          const geoType = layer.geoType;
+          const needsClampForce = (geoType === 'LineString' || geoType === 'Polygon');
+
+          // 判断是否需要自定义 emoji/SVG 图标（非单 ASCII，因为单 ASCII 已通过 markerSymbol 处理）
+          const needsCustomIcon = (geoType === 'Point' && markerIcon.length > 1);
+
+          let sharedPinCanvas = null;
+          if (needsCustomIcon) {
+            // ⭐ 预生成 canvas 仅一次，全图层 entity 复用同一引用
+            const cSize = 64;
+            sharedPinCanvas = document.createElement('canvas');
+            sharedPinCanvas.width = cSize;
+            sharedPinCanvas.height = cSize;
+            const ctx = sharedPinCanvas.getContext('2d');
+            ctx.font = `${cSize * 0.6}px serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(markerIcon, cSize / 2, cSize / 2 + 2);
+            console.log(`[${this.componentName}] 🎨 预生成共享 emoji canvas: "${markerIcon}" (${cSize}×${cSize})`);
+          }
+
           entities.forEach((entity, idx) => {
-            const geoType = layer.geoType;
-            if (geoType === 'Point') {
-              const icon = layer.markerIcon || '📍';
-              const markerColor = layer.markerColor || '#4169E1';
-              const markerSize = layer.markerSize || 48;
-              // 生成 emoji canvas
-              const canvas = document.createElement('canvas');
-              const cSize = 64;
-              canvas.width = cSize;
-              canvas.height = cSize;
-              const ctx = canvas.getContext('2d');
-              ctx.font = `${cSize * 0.6}px serif`;
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(icon, cSize / 2, cSize / 2 + 2);
-              // 直接替换 GeoJsonDataSource 自动生成的 billboard 属性
+            if (needsCustomIcon) {
+              // emoji/SVG 路径：仅设置同一個 canvas 引用（极快，无 canvas 创建开销）
               if (entity.billboard) {
-                entity.billboard.image = canvas;
-                entity.billboard.scale = markerSize / cSize * 1.2;
+                entity.billboard.image = sharedPinCanvas;
+                entity.billboard.scale = (layer.markerSize || 48) / 64 * 1.2;
                 entity.billboard.color = Cesium.Color.WHITE;
                 entity.billboard.disableDepthTestDistance = Number.POSITIVE_INFINITY;
               } else {
                 entity.billboard = new Cesium.BillboardGraphics({
-                  image: canvas,
-                  scale: markerSize / cSize * 1.2
+                  image: sharedPinCanvas,
+                  scale: (layer.markerSize || 48) / 64 * 1.2
                 });
               }
-              console.log(`[${this.componentName}]   [${idx}] point: icon="${icon}", size=${markerSize}`);
-            } else if (geoType === 'LineString') {
-              // 确保 polyline 属性正确
-              if (entity.polyline) {
+            } else if (needsClampForce) {
+              // clampToGround 兜底：确保 polyline/polygon 贴地属性生效
+              if (geoType === 'LineString' && entity.polyline) {
                 entity.polyline.clampToGround = new Cesium.ConstantProperty(clampToGround);
-              }
-              console.log(`[${this.componentName}]   [${idx}] line: width=${entity.polyline?.width}, clampToGround=${clampToGround}`);
-            } else if (geoType === 'Polygon') {
-              if (entity.polygon) {
+              } else if (geoType === 'Polygon' && entity.polygon) {
                 entity.polygon.clampToGround = new Cesium.ConstantProperty(clampToGround);
               }
-              console.log(`[${this.componentName}]   [${idx}] polygon: clampToGround=${clampToGround}`);
             }
+            // 默认渐变圆点 / 单字符标记 → 无需后处理，PinBuilder 已经在 load() 时完成
           });
+
+          // 输出标记类型日志
+          const markerDesc = needsCustomIcon
+            ? `emoji canvas 共享 ("${markerIcon}")`
+            : (isSingleAscii ? `PinBuilder.fromText("${markerIcon}")` : 'PinBuilder.fromColor() 渐变圆点');
+          console.log(`[${this.componentName}] 🎯 标记策略: ${markerDesc}, 实体数: ${entities.length}`);
 
           viewer.scene.requestRender();
 
@@ -533,4 +648,26 @@ export default {
 .locate-btn:hover { background: #1976d2; }
 .label-btn { background: #8bc34a; color: white; }
 .label-btn:hover { background: #7cb342; }
+
+/* toolbar-extra 中的 JSON 刷新按钮 */
+.geojson-toolbar-refresh-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 32px; min-width: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(255, 165, 0, 0.15);
+  color: #ffa726;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.geojson-toolbar-refresh-btn:hover:not(:disabled) {
+  background: rgba(255, 165, 0, 0.3);
+  border-color: #ffa726;
+}
+.geojson-toolbar-refresh-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 </style>

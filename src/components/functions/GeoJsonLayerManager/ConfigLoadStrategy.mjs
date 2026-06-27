@@ -374,7 +374,7 @@ export class SQLiteConfigStrategy {
         });
       });
     } catch (error) {
-      console.error(`[SQLiteConfigStrategy] ❌ 保存失败:`, error);
+      console.warn(`[SQLiteConfigStrategy] ⚠️ 保存失败:`, error);
       // 回退到 IndexedDB
       return await this._saveToIndexedDB(configMetadata?.dataSource?.tableName || this._tableName, data);
     }
@@ -390,13 +390,46 @@ export class SQLiteConfigStrategy {
     return new Promise((resolve) => {
       const request = indexedDB.open('configDB', 1);
 
-      request.onerror = () => {
-        console.error('[SQLiteConfigStrategy] ❌ IndexedDB 打开失败');
+      request.onerror = (err) => {
+        console.warn('[SQLiteConfigStrategy] ⚠️ IndexedDB 打开失败:', err?.target?.error?.message || err?.type || '未知错误',
+          '(数据库:', 'configDB', '版本:', 1, ')');
         resolve(false);
       };
 
       request.onsuccess = (event) => {
         const db = event.target.result;
+        // 兜底：store 不存在时升级版本创建（onupgradeneeded 只在版本变化时触发）
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.close();
+          const upgradeRequest = indexedDB.open('configDB', db.version + 1);
+          upgradeRequest.onupgradeneeded = (e) => {
+            if (!e.target.result.objectStoreNames.contains(storeName)) {
+              e.target.result.createObjectStore(storeName, { keyPath: 'id' });
+            }
+          };
+          upgradeRequest.onsuccess = (e2) => {
+            const newDb = e2.target.result;
+            // 递归重试保存
+            const innerSave = (db2) => {
+              const txn = db2.transaction([storeName], 'readwrite');
+              const st = txn.objectStore(storeName);
+              st.clear().onsuccess = () => {
+                if (data.length === 0) { resolve(true); db2.close(); return; }
+                let done = 0;
+                data.forEach(item => {
+                  const clean = { ...item }; delete clean.loaded; delete clean.loading;
+                  st.put(clean).onsuccess = () => { done++; if (done === data.length) { resolve(true); db2.close(); } };
+                });
+              };
+            };
+            innerSave(newDb);
+          };
+          upgradeRequest.onerror = (e) => {
+            console.warn('[SQLiteConfigStrategy] ⚠️ 版本升级后 IndexedDB 打开失败:', e?.target?.error?.message || '未知错误');
+            resolve(false);
+          };
+          return;
+        }
         const transaction = db.transaction([storeName], 'readwrite');
         const store = transaction.objectStore(storeName);
 
@@ -425,7 +458,7 @@ export class SQLiteConfigStrategy {
               }
             };
             putRequest.onerror = () => {
-              console.error('[SQLiteConfigStrategy] ❌ IndexedDB put 失败');
+              console.warn('[SQLiteConfigStrategy] ⚠️ IndexedDB put 失败');
               resolve(false);
               db.close();
             };
@@ -523,7 +556,7 @@ export class FallbackConfigStrategy {
       }
     }
 
-    console.error('[FallbackConfigStrategy] ❌ 所有策略保存失败');
+    console.warn('[FallbackConfigStrategy] ⚠️ 所有策略保存失败（不影响当前会话，下次加载将回退到 JSON 文件）');
     return false;
   }
 }

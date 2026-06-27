@@ -132,7 +132,7 @@
     <!-- ⭐ TestSfc 组件容器 -->
 
     <!-- 地板高度控制面板 -->
-    <div class="floor-height-adjuster" v-if="floorHeightPanel.visible">
+    <div class="floor-height-adjuster" v-if="false">
       <div class="panel-header">
         <h4>地板高度控制</h4>
         <button @click="toggleFloorHeightPanel" class="close-btn">×</button>
