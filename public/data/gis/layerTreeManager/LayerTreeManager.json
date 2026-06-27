@@ -396,6 +396,17 @@
     "icon": "📁"
   },
   {
+    "id": "mvt-myszmvt",
+    "name": "自己发布深圳mvt",
+    "parentId": "root-mvt",
+    "nodeType": "layer",
+    "url": "http://localhost:3000/gis_link_boundary_sz.mbtiles/{z}/{x}/{y}.pbf",
+    "sortOrder": 5,
+    "visible": 1,
+    "description": "自己发布深圳mvt",
+    "icon": "🧩"
+  },
+  {
     "id": "mvt-openmaptiles",
     "name": "OpenMapTiles 全球矢量瓦片",
     "parentId": "root-mvt",

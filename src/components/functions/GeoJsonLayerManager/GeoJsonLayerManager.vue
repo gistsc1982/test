@@ -452,8 +452,12 @@ export default {
       }
     },
     /**
-     * 参考 layerManagement.js addGeoJson 的文本标注实现
-     * 根据配置的 labelField 从 feature.properties 读取文本，显示/隐藏标签
+     * 文本标注显示/隐藏
+     *
+     * 性能策略：
+     *   - 首次显示：逐实体创建 label 对象（仅一次，遍历开销为纯 JS 赋值）
+     *   - 后续切换：仅设置 entity.label.show = true/false（O(n) 但零对象创建）
+     *   - label 对象常驻，不销毁，避免重复构建 Cesium LabelPrimitive
      */
     toggleLabels(item) {
       const Cesium = this.getCesium();
@@ -463,70 +467,88 @@ export default {
       if (!dataSource) return;
 
       const labelField = item.labelField || 'name';
-
       const isShown = this._isLabelsShown(item.id);
+      const entities = dataSource.entities.values;
 
       if (isShown) {
-        // 隐藏标签
-        const entities = dataSource.entities.values;
+        // 隐藏：仅设置 show = false，保留 label 对象避免下次重建
+        let count = 0;
         entities.forEach(entity => {
-          entity.label = undefined;
+          if (entity.label) {
+            entity.label.show = false;
+            count++;
+          }
         });
         this._labelStates = { ...this._labelStates, [item.id]: false };
-        console.log(`[${this.componentName}] 🏷️ 文本标注已隐藏: "${item.name}"`);
+        console.log(`[${this.componentName}] 🏷️ 文本标注已隐藏: "${item.name}" (${count} 个)`);
       } else {
-        // 显示标签 — 参考 layerManagement.js:327-343
-        const entities = dataSource.entities.values;
-        entities.forEach((entity, idx) => {
-          const props = entity.properties?.getValue?.();
-          const text = props ? props[labelField] : null;
-          if (text == null && text === undefined) {
-            console.warn(`[${this.componentName}] ⚠️ entity[${idx}] 缺少字段 "${labelField}"`);
-            return;
-          }
-          // 计算标注位置：点用自身坐标；线/面取几何中心
-          let position = entity.position?.getValue?.();
-          if (!position) {
-            if (entity.polyline) {
-              const positions = entity.polyline.positions?.getValue?.();
-              if (positions?.length >= 2) {
-                const C = Cesium.Cartesian3;
-                const mid = C.lerp(positions[0], positions[1], 0.5, new C());
-                position = mid;
-              }
-            } else if (entity.polygon) {
-              const hierarchy = entity.polygon.hierarchy?.getValue?.();
-              if (hierarchy?.positions?.length) {
-                const center = Cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
-                position = Cesium.Ellipsoid.WGS84.scaleToGeodeticSurface(center);
+        const fontSize = item.labelFontSize || 28;
+        const labelScale = item.labelScale || 1.2;
+        const labelColor = item.labelColor || '#a6fd1c';
+        const visMin = item.labelVisibleMin ?? 0;
+        const visMax = item.labelVisibleMax ?? 50000;
+
+        // 检查是否已有 label（之前创建过，只需 show = true）
+        const firstEntity = entities.length > 0 ? entities[0] : null;
+        const labelsExist = firstEntity && firstEntity.label;
+
+        if (labelsExist) {
+          // 快速路径：已有 label，仅恢复 show = true
+          let count = 0;
+          entities.forEach(entity => {
+            if (entity.label) {
+              entity.label.show = true;
+              count++;
+            }
+          });
+          console.log(`[${this.componentName}] 🏷️ 文本标注已恢复: "${item.name}" (${count} 个，复用已有 label)`);
+        } else {
+          // 首次创建路径：逐实体构建 label 对象
+          let count = 0;
+          entities.forEach((entity, idx) => {
+            const props = entity.properties?.getValue?.();
+            const text = props ? props[labelField] : null;
+            if (text == null) {
+              console.warn(`[${this.componentName}] ⚠️ entity[${idx}] 缺少字段 "${labelField}"`);
+              return;
+            }
+            // 计算标注位置：点用自身坐标；线/面取几何中心
+            let position = entity.position?.getValue?.();
+            if (!position) {
+              if (entity.polyline) {
+                const positions = entity.polyline.positions?.getValue?.();
+                if (positions?.length >= 2) {
+                  position = Cesium.Cartesian3.lerp(positions[0], positions[1], 0.5, new Cesium.Cartesian3());
+                }
+              } else if (entity.polygon) {
+                const hierarchy = entity.polygon.hierarchy?.getValue?.();
+                if (hierarchy?.positions?.length) {
+                  const center = Cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
+                  position = Cesium.Ellipsoid.WGS84.scaleToGeodeticSurface(center);
+                }
               }
             }
-          }
 
-          const fontSize = item.labelFontSize || 28;
-          const labelScale = item.labelScale || 1.2;
-          const labelColor = item.labelColor || '#a6fd1c';
-          const visMin = item.labelVisibleMin ?? 0;
-          const visMax = item.labelVisibleMax ?? 50000;
-
-          entity.label = {
-            text: String(text),
-            font: `normal ${fontSize}px AlibabaPuHuiTi`,
-            showBackground: true,
-            backgroundColor: Cesium.Color.BLACK.withAlpha(0.6),
-            fillColor: Cesium.Color.fromCssColorString(labelColor),
-            scale: labelScale,
-            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-            verticalOrigin: Cesium.VerticalOrigin.CENTER,
-            disableDepthTestDistance: Number.POSITIVE_INFINITY,
-            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(visMin, visMax)
-          };
-          if (position && !entity.position) {
-            entity.position = position;
-          }
-        });
+            entity.label = {
+              text: String(text),
+              font: `normal ${fontSize}px AlibabaPuHuiTi`,
+              showBackground: true,
+              backgroundColor: Cesium.Color.BLACK.withAlpha(0.6),
+              fillColor: Cesium.Color.fromCssColorString(labelColor),
+              scale: labelScale,
+              horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+              verticalOrigin: Cesium.VerticalOrigin.CENTER,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(visMin, visMax)
+            };
+            if (position && !entity.position) {
+              entity.position = position;
+            }
+            count++;
+          });
+          console.log(`[${this.componentName}] 🏷️ 文本标注已创建: "${item.name}", 字段: "${labelField}", 实体数: ${count}`);
+        }
         this._labelStates = { ...this._labelStates, [item.id]: true };
-        console.log(`[${this.componentName}] 🏷️ 文本标注已显示: "${item.name}", 字段: "${labelField}", 实体数: ${entities.length}`);
       }
     },
 
@@ -542,6 +564,7 @@ export default {
         });
       }
       this._cesiumLayers.clear();
+      this._labelStates = {};
     },
     getCesiumViewer() {
       return typeof window !== 'undefined' ? window.__cesiumViewer__ : null;
