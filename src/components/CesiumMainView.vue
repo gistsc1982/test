@@ -3395,6 +3395,10 @@ export default {
         timeline: false,
         fullscreenButton: false,
         vrButton: false,
+        // ⭐ 按需渲染：仅在相机移动/数据变化时才重绘，大幅降低 GPU 持续占用
+        // 避免浏览器合成器因 GPU 压力丢弃 DOM 叠加层（面板 header 闪烁/消失）
+        requestRenderMode: true,
+        maximumRenderTimeChange: Infinity,
         // ⚠️ 关键修复: 关闭 GPU 性能警告，避免在集成显卡/虚拟机/远程桌面初始化失败
         // Cesium 默认 failIfMajorPerformanceCaveat=true 会导致 Context 构造时直接抛异常
         contextOptions: {

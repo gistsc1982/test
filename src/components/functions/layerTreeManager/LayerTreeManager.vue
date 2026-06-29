@@ -19,11 +19,63 @@
     :lazy-load="true"
     @config-loaded="onConfigLoadedHandler"
   >
+    <!-- ===== Header：标题 + 工具按钮（始终可见） ===== -->
+    <template #header>
+      <h3 class="panel-title">{{ panelMetadata.panelName }}</h3>
+      <button
+        @click.stop="toggleSection('showToolbar')"
+        class="header-tool-btn"
+        :class="{ 'sec-btn-on': sectionVisible.showToolbar }"
+        title="显示/隐藏面板工具栏"
+        type="button"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1" y="1.5" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <line x1="2.5" y1="6.5" x2="11.5" y2="6.5" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="2.5" y1="9" x2="8.5" y2="9" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+        工具
+      </button>
+    </template>
+
+    <!-- ===== 分区可见性切换按钮（toolbar-extra 插槽） ===== -->
+    <template #toolbar-extra>
+      <span class="toolbar-sep"></span>
+      <button
+        @click="toggleSection('tree')"
+        class="sec-btn"
+        :class="{ 'sec-btn-on': sectionVisible.tree }"
+        title="显示/隐藏树形区域"
+        type="button"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="3" cy="3" r="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/>
+          <line x1="5.5" y1="3" x2="12" y2="3" stroke="currentColor" stroke-width="1.2"/>
+          <circle cx="3" cy="9" r="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/>
+          <line x1="5.5" y1="9" x2="12" y2="9" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+        树形
+      </button>
+      <button
+        @click="toggleSection('list')"
+        class="sec-btn"
+        :class="{ 'sec-btn-on': sectionVisible.list }"
+        title="显示/隐藏列表区域"
+        type="button"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="1" y="1.5" width="12" height="4" rx="0.5" stroke="currentColor" stroke-width="1.2" fill="none"/>
+          <line x1="2.5" y1="7.5" x2="11.5" y2="7.5" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+        列表
+      </button>
+    </template>
+
     <!-- ===== 树形图层展示区域（before-list 插槽） ===== -->
     <template #before-list>
-      <div class="tree-manager-container">
+      <div class="tree-manager-container" ref="treeContainer">
         <!-- 工具栏：添加根节点 -->
-        <div class="tree-toolbar">
+        <div class="tree-toolbar" :class="{ 'section-hidden': !sectionVisible.tree }">
           <button class="tree-btn tree-btn-primary" @click="addRootNode" type="button">
             <span class="tree-btn-icon">+</span>
             <span>添加根节点</span>
@@ -39,7 +91,7 @@
         </div>
 
         <!-- 树形渲染区域 -->
-        <div class="tree-wrapper" v-if="treeData.length > 0">
+        <div class="tree-wrapper" :class="{ 'section-hidden': !sectionVisible.tree }" v-if="treeData.length > 0">
           <ul class="tree-root">
             <TreeNodeItem
               v-for="node in treeData"
@@ -1107,6 +1159,16 @@ export default {
       // 配置加载策略
       _configStrategy: null,
 
+      // 分区可见性（本地管理，不影响其他面板）
+      // showToolbar: 面板工具栏（添加/导出/导入/刷新 + 树形/列表切换按钮）
+      // tree: 树形区域（添加根节点按钮 + 树形内容）
+      // list: 列表区域
+      sectionVisible: {
+        showToolbar: true,
+        tree: true,
+        list: false
+      },
+
       componentName: 'LayerTreeManager'
     };
   },
@@ -1124,6 +1186,22 @@ export default {
      */
     configList() {
       return this.flatNodeList;
+    },
+
+  },
+
+  watch: {
+    /**
+     * 监听分区可见性变化，同步更新 DOM（面板 toolbar / 列表区域）
+     */
+    'sectionVisible.showToolbar'(val) {
+      this.$nextTick(() => this._applySectionVisibility('showToolbar'));
+    },
+    'sectionVisible.list'(val) {
+      this.$nextTick(() => this._applySectionVisibility('list'));
+    },
+    'sectionVisible.tree'(val) {
+      this.$nextTick(() => this._applySectionVisibility('tree'));
     }
   },
 
@@ -1175,6 +1253,12 @@ export default {
 
       // ⚠️ Cesium 资源保护：延迟设置（等待 viewer 就绪）
       this._setupCesiumProtections();
+
+      // 应用初始分区可见性（列表默认隐藏、面板工具栏默认显示）
+      this.$nextTick(() => {
+        this._applySectionVisibility('showToolbar');
+        this._applySectionVisibility('list');
+      });
     });
   },
 
@@ -1347,6 +1431,41 @@ export default {
 
     collapseAll() {
       this.expandedIds = new Set();
+    },
+
+    toggleSection(section) {
+      if (section in this.sectionVisible) {
+        this.sectionVisible[section] = !this.sectionVisible[section];
+        // 更新对应的 DOM 可见性
+        this.$nextTick(() => this._applySectionVisibility(section));
+      }
+    },
+
+    /**
+     * 将 section 可见性变化应用到 DOM（通过 CSS 控制面板内的 toolbar / config-list）
+     */
+    _applySectionVisibility(section) {
+      // 从树形容器 DOM 向上查找 function-panel（因为 FunctionPanelUIBase 使用了 Teleport）
+      const treeEl = this.$refs.treeContainer;
+      if (!treeEl) return;
+      const panel = treeEl.closest('.function-panel');
+      if (!panel) return;
+
+      if (section === 'showToolbar' || section === 'tree' || section === 'list') {
+        // 1. 面板工具栏（添加/导出/导入/刷新 + 树形/列表切换按钮）
+        const toolbar = panel.querySelector('.toolbar');
+        if (toolbar) {
+          toolbar.style.display = this.sectionVisible.showToolbar ? '' : 'none';
+        }
+      }
+
+      if (section === 'list' || section === 'tree') {
+        // 2. 配置列表区域
+        const configList = panel.querySelector('.config-list');
+        if (configList) {
+          configList.style.display = this.sectionVisible.list ? '' : 'none';
+        }
+      }
     },
 
     selectNode(nodeId) {
@@ -3025,19 +3144,53 @@ export default {
 </script>
 
 <style scoped>
-/* ========== 树形管理容器 ========== */
-.tree-manager-container {
-  padding: 12px 8px;
-  min-height: 200px;
+/* ========== 分区隐藏（本地 scoped，不依赖 FunctionPanelUIBase） ========== */
+.section-hidden {
+  display: none !important;
 }
 
-/* ========== 工具栏 ========== */
+/* ========== 树形管理容器（流式布局，跟随 toolbar 之后） ========== */
+.tree-manager-container {
+  padding: 12px 8px;
+}
+
+/* ========== 树形工具栏 ========== */
 .tree-toolbar {
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
   padding: 0 4px 12px 4px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   margin-bottom: 12px;
+}
+
+/* ========== 树形列表（max-height 限制 + 独立滚动） ========== */
+.tree-wrapper {
+  max-height: calc(75vh - 180px);
+  min-height: 120px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.tree-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+.tree-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+.tree-wrapper::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(76,175,80,0.6), rgba(76,175,80,0.3));
+  border-radius: 3px;
+  border: 1px solid rgba(76,175,80,0.2);
+}
+.tree-wrapper::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(76,175,80,0.8), rgba(76,175,80,0.5));
+}
+
+/* 空状态也是 flex 子元素，居中 */
+.tree-empty {
+  flex: 1 1 0%;
+  min-height: 0;
 }
 
 .tree-btn {
@@ -3075,6 +3228,71 @@ export default {
   background: rgba(255, 255, 255, 0.1);
   color: #e0e0e0;
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ===== 分区切换按钮（匹配工具栏 tool-btn 风格） ===== */
+.sec-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  color: #b0b0b0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sec-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #e0e0e0;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.sec-btn-on {
+  color: #4CAF50 !important;
+  border-color: rgba(76, 175, 80, 0.5) !important;
+  background: rgba(76, 175, 80, 0.15) !important;
+}
+.sec-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.toolbar-sep {
+  display: inline-block;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 4px;
+  align-self: stretch;
+}
+
+/* ========== Header 中的"工具"按钮（始终显示） ========== */
+.header-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #b0b0b0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.header-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e0e0e0;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.header-tool-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .tree-btn-icon {
