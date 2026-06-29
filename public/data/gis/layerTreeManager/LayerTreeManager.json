@@ -404,7 +404,10 @@
     "sortOrder": 5,
     "visible": 1,
     "description": "自己发布深圳mvt",
-    "icon": "🧩"
+    "icon": "🧩",
+    "centerLon": 114.05,
+    "centerLat": 22.55,
+    "centerHeight": 50000
   },
   {
     "id": "mvt-openmaptiles",

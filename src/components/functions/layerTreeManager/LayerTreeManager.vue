@@ -818,8 +818,8 @@ async function detectMvtSourceLayers(urlTemplate) {
 
       const layerNames = parseMvtLayerNames(arrayBuffer);
       console.log(`[MVT检测] ✅ 检测到 ${layerNames.length} 个图层:`, layerNames);
-      // 返回图层名和实际检测到的 zoom 级别
-      return { layerNames, detectedZoom: coord.z };
+      // 返回图层名、检测到的 zoom 级别、以及瓦片坐标（用于后续定位飞行）
+      return { layerNames, detectedZoom: coord.z, detectedX: coord.x, detectedY: coord.y };
     } catch (err) {
       if (err.name === 'TimeoutError' || err.name === 'AbortError') {
         console.warn(`[MVT检测] ⏱️ 瓦片 z=${coord.z} 请求超时`);
@@ -2079,6 +2079,7 @@ export default {
       });
 
       const actualLoad = (async () => {
+        let providerReadyError = false;  // MVT readyPromise 超时标记（需在 switch 外声明以被公共代码访问）
         switch (layerType) {
           case 'xyz': {
             const provider = new Cesium.UrlTemplateImageryProvider({
@@ -2393,6 +2394,8 @@ export default {
             // 1. 确定要渲染的源图层（带 8 秒总超时）
             let sourceLayers = [];
             let detectedDataZoom = 0;  // 实际检测到数据的 zoom 级别
+            let detectedTileX = null;  // 检测到的瓦片坐标（用于定位飞行）
+            let detectedTileY = null;
             const userSpecified = node.mvtSourceLayers || '';
             if (userSpecified.trim()) {
               sourceLayers = userSpecified.split(',').map(s => s.trim()).filter(Boolean);
@@ -2402,7 +2405,10 @@ export default {
               const detectResult = await detectMvtSourceLayers(node.url);
               sourceLayers = detectResult.layerNames || [];
               detectedDataZoom = detectResult.detectedZoom || 0;
-              console.log(`[${this.componentName}] 📊 检测结果: ${sourceLayers.length} 个图层 (z=${detectedDataZoom}) →`, sourceLayers);
+              // 保存检测到的瓦片坐标（用于后续 flyTo 定位到数据区域）
+              detectedTileX = detectResult.detectedX;
+              detectedTileY = detectResult.detectedY;
+              console.log(`[${this.componentName}] 📊 检测结果: ${sourceLayers.length} 个图层 (z=${detectedDataZoom} tile=${detectedTileX}/${detectedTileY}) →`, sourceLayers);
               if (sourceLayers.length === 0) {
                 console.warn(`[${this.componentName}] ⚠️ 自动检测失败，将使用内置通用样式（不会阻塞 UI）`);
                 this.layerErrors[node.id] = {
@@ -2491,34 +2497,34 @@ export default {
               );
             };
 
-            // ⏱️ 延迟健康检查：5 秒后评估瓦片内容质量
-            const TILE_HEALTH_DELAY = 5000;
+            // ⏱️ 延迟健康检查：10 秒后评估瓦片内容质量
+            // ⚠️ 重要：MVT 数据通常只覆盖特定区域（如深圳），相机在数据区外时
+            //   瓦片为空是正常现象，不应标记为错误。只有瓦片请求明确失败才算异常。
+            const TILE_HEALTH_DELAY = 10000;
             setTimeout(() => {
               // 图层已被卸载或组件已销毁，跳过检查
               if (!this._cesiumLayers || !this._cesiumLayers.has(nodeId)) return;
 
               const totalFinished = succCount + failCount;
               if (totalFinished === 0) {
-                // 没有任何瓦片完成 — 可能加载极慢或服务无响应
-                console.warn(`[${compName}] 🔬 健康检查: "${nodeName}" 5秒内无任何瓦片完成 (已请求${reqCount}个)`);
-                return; // 不立即报错，可能还在加载中
+                // 没有任何瓦片完成 — 可能相机在数据区外，或服务极慢
+                console.warn(`[${compName}] 🔬 健康检查: "${nodeName}" ${TILE_HEALTH_DELAY/1000}秒内无任何瓦片完成 (已请求${reqCount}个)` +
+                  ` — 可能相机不在数据覆盖区，或瓦片服务响应极慢`);
+                return; // 不报错，空瓦片是合法的（数据区外）
               }
-              if (succCount > 0 && emptyCount === succCount && failCount === 0) {
-                // 所有成功瓦片都是空白的 — 服务返回了数据但无可渲染内容
-                console.warn(`[${compName}] 🔬 健康检查: "${nodeName}" 全部 ${succCount} 个瓦片无内容`);
-                const errorInfo = classifyLayerError('瓦片无渲染内容，可能 URL 不正确或服务数据为空');
-                this.layerErrors[nodeId] = {
-                  message: `瓦片全部为空 (${succCount}个)，URL可能不正确或服务无数据`,
-                  ...errorInfo
-                };
-              } else if (failCount > succCount) {
-                // 失败数超过成功数
-                console.warn(`[${compName}] 🔬 健康检查: "${nodeName}" 失败${failCount} > 成功${succCount}`);
+              if (failCount > 0 && failCount >= succCount) {
+                // ⚠️ 只有失败数 ≥ 成功数时才报错（明确的服务异常）
+                console.warn(`[${compName}] 🔬 健康检查: "${nodeName}" 失败${failCount} ≥ 成功${succCount}，服务可能不可达`);
                 const errorInfo = classifyLayerError('瓦片请求大量失败，服务不可达');
                 this.layerErrors[nodeId] = {
                   message: `瓦片请求大量失败 (失败:${failCount}, 成功:${succCount})`,
                   ...errorInfo
                 };
+              } else if (succCount > 0 && emptyCount === succCount && failCount === 0) {
+                // 瓦片成功但全部为空 — 相机可能在数据区外，仅警告不报错
+                console.log(`[${compName}] 🔬 健康检查: "${nodeName}" ${succCount} 个瓦片均无内容` +
+                  ` — 相机可能在数据覆盖区外，属正常现象`);
+                // ⚠️ 不清除已加载状态，不设置错误
               } else {
                 console.log(`[${compName}] 🔬 健康检查: "${nodeName}" 正常 (成功:${succCount}, 有内容:${succCount - emptyCount}, 失败:${failCount})`);
               }
@@ -2535,6 +2541,7 @@ export default {
             } catch (readyErr) {
               // readyPromise 超时或失败不阻塞加载 — 图层仍然添加到 Cesium，
               // 瓦片在实际请求时会由 mapbox-gl 按需加载
+              providerReadyError = true;
               console.warn(`[${this.componentName}] ⚠️ MVT provider 未完全就绪，继续加载: ${node.name} —`, readyErr.message);
               this.layerErrors[node.id] = {
                 message: `MVT 样式加载超时，瓦片将按需加载`,
@@ -2543,7 +2550,15 @@ export default {
             }
 
             const layer = viewer.imageryLayers.addImageryProvider(provider);
-            this._cesiumLayers.set(node.id, { type: 'mvt', object: layer, provider });
+            this._cesiumLayers.set(node.id, {
+              type: 'mvt',
+              object: layer,
+              provider,
+              // 保存检测到的瓦片坐标（用于 flyTo 定位到数据区域）
+              _detectedDataZoom: detectedDataZoom,
+              _detectedTileX: detectedTileX,
+              _detectedTileY: detectedTileY
+            });
             console.log(`[${this.componentName}] ✅ MVT 矢量瓦片 "${node.name}" 已添加到 Cesium`);
             break;
           }
@@ -2566,8 +2581,11 @@ export default {
         }
 
         this.loadedLayerIds[node.id] = true;
-        // 清除错误状态（如果之前有）
-        delete this.layerErrors[node.id];
+        // 清除错误状态（MVT 类型除外：readyPromise 超时错误需保留）
+        // ⚠️ MVT readyPromise 超时后仍会添加图层（非阻塞），此时错误提示应保留
+        if (layerType !== 'mvt' || !providerReadyError) {
+          delete this.layerErrors[node.id];
+        }
         // 记录加载顺序（用于超出上限时淘汰最旧图层）
         this._addToLoadOrder(node.id);
         console.log(`[${this.componentName}] ✅ 图层已加载: ${node.name} (当前共 ${this._cesiumLayers.size} 个)`);
@@ -2831,9 +2849,25 @@ export default {
           }
         } else if (entry.type === 'mvt' && entry.provider) {
           // MVT 图层的 rectangle 是 WebMercator 全球范围，飞到全球视图没有意义。
-          // 只在节点配置了 centerLon/centerLat 时才飞行（已在前面处理）。
-          // 这里不做任何飞行，用户可手动缩放到数据区域。
-          console.log(`[${this.componentName}] 🎯 MVT 图层 "${node.name}" 无自定义中心坐标，跳过飞行`);
+          // 尝试使用检测 MVT 源图层时获取的瓦片坐标来定位到数据区域
+          const dz = entry._detectedDataZoom;
+          const dx = entry._detectedTileX;
+          const dy = entry._detectedTileY;
+          if (dz != null && dx != null && dy != null) {
+            // 将瓦片坐标 (x, y, z) 转换为经纬度（WebMercator 投影）
+            const n = Math.PI - (2 * Math.PI * dy) / Math.pow(2, dz);
+            const lon = (dx / Math.pow(2, dz)) * 360 - 180;
+            const lat = (180 / Math.PI) * Math.atan(Math.sinh(n));
+            const height = Math.max(5000, 20000000 / Math.pow(2, dz)); // 根据 zoom 级别估算合理高度
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(lon, lat, height),
+              duration: 2
+            });
+            console.log(`[${this.componentName}] 🎯 飞行至 MVT 数据位置: "${node.name}" (z=${dz} tile=${dx}/${dy} → ${lon.toFixed(4)}, ${lat.toFixed(4)}, h=${Math.round(height)})`);
+          } else {
+            // 无检测坐标，飞到深圳默认位置（常见 MVT 数据区域）
+            console.log(`[${this.componentName}] 🎯 MVT 图层 "${node.name}" 无检测坐标，使用默认视角`);
+          }
         }
       } catch (e) {
         // 飞行失败不阻塞主流程
