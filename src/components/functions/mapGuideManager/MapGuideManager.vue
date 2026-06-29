@@ -17,8 +17,16 @@
     :default-form-values="panelMetadata.defaultFormValues"
     :toolbar-buttons="panelMetadata.toolbarButtons"
     :lazy-load="true"
+    :header-tools="[{ key: 'showToolbar', label: '工具', defaultVisible: true }]"
     @config-loaded="onConfigLoadedHandler"
   >
+    <template #header>
+      <h3 class="panel-title">{{ panelMetadata.panelName }}</h3>
+      <button @click.stop="$refs.basePanel.toggleSection('showToolbar')" class="header-tool-btn" title="显示/隐藏工具栏" type="button">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1.5" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="2.5" y1="6.5" x2="11.5" y2="6.5" stroke="currentColor" stroke-width="1.2"/><line x1="2.5" y1="9" x2="8.5" y2="9" stroke="currentColor" stroke-width="1.2"/></svg>
+        工具
+      </button>
+    </template>
     <!-- 列表项：checkbox + 路线名称和起终点信息 -->
     <template #list-item="{ item }">
       <label class="guide-checkbox-label" @click.stop>
@@ -1402,6 +1410,33 @@ export default {
 </script>
 
 <style scoped>
+/* Header "工具"按钮 */
+.header-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #b0b0b0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.header-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e0e0e0;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.header-tool-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 .guide-item-info {
   display: flex;
   flex-direction: column;

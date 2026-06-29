@@ -503,7 +503,8 @@ var D = typeof window < "u" && window.__panelSingletonManager__ || E, O = {
 		"expand",
 		"lazy-load",
 		"register-panel",
-		"unregister-panel"
+		"unregister-panel",
+		"section-toggle",
 	],
 	inject: {
 		registerPanelComponent: {
@@ -615,6 +616,14 @@ var D = typeof window < "u" && window.__panelSingletonManager__ || E, O = {
 		lazyLoad: {
 			type: Boolean,
 			default: !1
+		},
+		headerTools: {
+			type: Array,
+			default: () => []
+		},
+		sectionToggles: {
+			type: Array,
+			default: () => []
 		}
 	},
 	data() {
@@ -632,7 +641,8 @@ var D = typeof window < "u" && window.__panelSingletonManager__ || E, O = {
 			boundMouseMove: null,
 			boundMouseUp: null,
 			cachedPanelWidth: null,
-			cachedPanelHeight: null
+			cachedPanelHeight: null,
+			sectionVisibleState: {}
 		};
 	},
 	computed: {
@@ -666,6 +676,9 @@ var D = typeof window < "u" && window.__panelSingletonManager__ || E, O = {
 		},
 		fabStyles() {
 			return { transform: `translate(${this.x + this.width / 2 - 40}px, ${this.y}px)` };
+		},
+		sectionVisible() {
+			return { ...this.sectionVisibleState };
 		}
 	},
 	watch: { isClosed(e, t) {
@@ -694,6 +707,7 @@ var D = typeof window < "u" && window.__panelSingletonManager__ || E, O = {
 				effectiveRegistrationKey: this.effectiveRegistrationKey
 			}
 		}), this.autoRegister && this.effectiveRegistrationKey && !this._registryRegistered && this.registerToParent();
+		this._initSectionVisible();
 		let e = this.panelInstanceId != null;
 		if (console.log("[FunctionPanelUIBase] 🔍 多实例面板检查:", {
 			panelName: this.effectiveRegistrationKey,
@@ -890,6 +904,31 @@ var D = typeof window < "u" && window.__panelSingletonManager__ || E, O = {
 		},
 		toggleMinimize() {
 			this.isMinimized = !this.isMinimized, this.$emit(this.isMinimized ? "minimize" : "expand");
+		},
+		toggleSection(e) {
+			if (e in this.sectionVisibleState) {
+				this.sectionVisibleState[e] = !this.sectionVisibleState[e];
+				this.$emit("section-toggle", { key: e, visible: this.sectionVisibleState[e] });
+			}
+		},
+		getSectionVisible(e) {
+			return this.sectionVisibleState[e];
+		},
+		_initSectionVisible() {
+			if (this.sectionToggles && this.sectionToggles.length > 0) {
+				this.sectionToggles.forEach(function(t) {
+					if (!(t.key in this.sectionVisibleState)) {
+						this.sectionVisibleState[t.key] = t.defaultVisible !== false;
+					}
+				}.bind(this));
+			}
+			if (this.headerTools && this.headerTools.length > 0) {
+				this.headerTools.forEach(function(t) {
+					if (!(t.key in this.sectionVisibleState)) {
+						this.sectionVisibleState[t.key] = t.defaultVisible !== false;
+					}
+				}.bind(this));
+			}
 		},
 		close() {
 			let e = this.panelInstanceId || null, t = this.autoRegister && this.registrationKey && !e, n = !t && e !== null;

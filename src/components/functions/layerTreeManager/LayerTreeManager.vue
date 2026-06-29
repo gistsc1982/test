@@ -19,7 +19,7 @@
     :lazy-load="true"
     @config-loaded="onConfigLoadedHandler"
   >
-    <!-- ===== Header：标题 + 工具按钮（始终可见） ===== -->
+    <!-- ===== Header：标题 + 工具按钮（手动渲染，调用基类 toggleSection） ===== -->
     <template #header>
       <h3 class="panel-title">{{ panelMetadata.panelName }}</h3>
       <button
@@ -38,7 +38,7 @@
       </button>
     </template>
 
-    <!-- ===== 分区可见性切换按钮（toolbar-extra 插槽） ===== -->
+    <!-- ===== 分区切换按钮（toolbar-extra 插槽） ===== -->
     <template #toolbar-extra>
       <span class="toolbar-sep"></span>
       <button
@@ -1159,14 +1159,11 @@ export default {
       // 配置加载策略
       _configStrategy: null,
 
-      // 分区可见性（本地管理，不影响其他面板）
-      // showToolbar: 面板工具栏（添加/导出/导入/刷新 + 树形/列表切换按钮）
-      // tree: 树形区域（添加根节点按钮 + 树形内容）
-      // list: 列表区域
+      // 分区可见性（本地管理）
       sectionVisible: {
-        showToolbar: true,
         tree: true,
-        list: false
+        list: false,
+        showToolbar: true
       },
 
       componentName: 'LayerTreeManager'
@@ -1188,21 +1185,6 @@ export default {
       return this.flatNodeList;
     },
 
-  },
-
-  watch: {
-    /**
-     * 监听分区可见性变化，同步更新 DOM（面板 toolbar / 列表区域）
-     */
-    'sectionVisible.showToolbar'(val) {
-      this.$nextTick(() => this._applySectionVisibility('showToolbar'));
-    },
-    'sectionVisible.list'(val) {
-      this.$nextTick(() => this._applySectionVisibility('list'));
-    },
-    'sectionVisible.tree'(val) {
-      this.$nextTick(() => this._applySectionVisibility('tree'));
-    }
   },
 
   beforeCreate() {
@@ -1254,10 +1236,17 @@ export default {
       // ⚠️ Cesium 资源保护：延迟设置（等待 viewer 就绪）
       this._setupCesiumProtections();
 
-      // 应用初始分区可见性（列表默认隐藏、面板工具栏默认显示）
-      this.$nextTick(() => {
-        this._applySectionVisibility('showToolbar');
-        this._applySectionVisibility('list');
+      // 应用初始分区可见性（列表默认隐藏）
+      var self = this;
+      this.$nextTick(function() {
+        self.$nextTick(function() {
+          var treeEl = self.$refs.treeContainer;
+          if (!treeEl) return;
+          var panel = treeEl.closest('.function-panel');
+          if (!panel) return;
+          var configList = panel.querySelector('.config-list');
+          if (configList) configList.style.display = self.sectionVisible.list ? '' : 'none';
+        });
       });
     });
   },
@@ -1436,35 +1425,19 @@ export default {
     toggleSection(section) {
       if (section in this.sectionVisible) {
         this.sectionVisible[section] = !this.sectionVisible[section];
-        // 更新对应的 DOM 可见性
-        this.$nextTick(() => this._applySectionVisibility(section));
-      }
-    },
-
-    /**
-     * 将 section 可见性变化应用到 DOM（通过 CSS 控制面板内的 toolbar / config-list）
-     */
-    _applySectionVisibility(section) {
-      // 从树形容器 DOM 向上查找 function-panel（因为 FunctionPanelUIBase 使用了 Teleport）
-      const treeEl = this.$refs.treeContainer;
-      if (!treeEl) return;
-      const panel = treeEl.closest('.function-panel');
-      if (!panel) return;
-
-      if (section === 'showToolbar' || section === 'tree' || section === 'list') {
-        // 1. 面板工具栏（添加/导出/导入/刷新 + 树形/列表切换按钮）
-        const toolbar = panel.querySelector('.toolbar');
-        if (toolbar) {
-          toolbar.style.display = this.sectionVisible.showToolbar ? '' : 'none';
-        }
-      }
-
-      if (section === 'list' || section === 'tree') {
-        // 2. 配置列表区域
-        const configList = panel.querySelector('.config-list');
-        if (configList) {
-          configList.style.display = this.sectionVisible.list ? '' : 'none';
-        }
+        this.$nextTick(function() {
+          var treeEl = this.$refs.treeContainer;
+          if (!treeEl) return;
+          var panel = treeEl.closest('.function-panel');
+          if (!panel) return;
+          var sv = this.sectionVisible;
+          // 工具栏
+          var toolbar = panel.querySelector('.toolbar');
+          if (toolbar) toolbar.style.display = sv.showToolbar !== false ? '' : 'none';
+          // 列表
+          var configList = panel.querySelector('.config-list');
+          if (configList) configList.style.display = sv.list ? '' : 'none';
+        }.bind(this));
       }
     },
 
@@ -3230,7 +3203,11 @@ export default {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-/* ===== 分区切换按钮（匹配工具栏 tool-btn 风格） ===== */
+.tree-btn-icon {
+  font-size: 14px;
+}
+
+/* ===== 分区切换按钮（toolbar 内） ===== */
 .sec-btn {
   display: inline-flex;
   align-items: center;
@@ -3249,11 +3226,6 @@ export default {
   color: #e0e0e0;
   border-color: rgba(255, 255, 255, 0.28);
 }
-.sec-btn-on {
-  color: #4CAF50 !important;
-  border-color: rgba(76, 175, 80, 0.5) !important;
-  background: rgba(76, 175, 80, 0.15) !important;
-}
 .sec-btn svg {
   width: 14px;
   height: 14px;
@@ -3268,7 +3240,7 @@ export default {
   align-self: stretch;
 }
 
-/* ========== Header 中的"工具"按钮（始终显示） ========== */
+/* ===== Header 中的"工具"按钮 ===== */
 .header-tool-btn {
   display: inline-flex;
   align-items: center;
@@ -3295,8 +3267,11 @@ export default {
   flex-shrink: 0;
 }
 
-.tree-btn-icon {
-  font-size: 14px;
+/* ===== 分区切换按钮 active 状态 ===== */
+.sec-btn-on {
+  color: #4CAF50 !important;
+  border-color: rgba(76, 175, 80, 0.5) !important;
+  background: rgba(76, 175, 80, 0.15) !important;
 }
 
 /* ========== 树容器 ========== */
