@@ -1384,11 +1384,20 @@ var q = /*#__PURE__*/ E(P, [["render", K], ["__scopeId", "data-v-2ca14fbb"]]), J
 		lazyLoad: {
 			type: Boolean,
 			default: !1
+		},
+		sectionToggles: {
+			type: Array,
+			default: () => []
+		},
+		headerTools: {
+			type: Array,
+			default: () => []
 		}
 	},
 	data() {
 		return {
 			configList: [],
+			localSectionVisible: {},
 			showAddDialog: !1,
 			showEditDialog: !1,
 			showDeleteDialog: !1,
@@ -1414,6 +1423,18 @@ var q = /*#__PURE__*/ E(P, [["render", K], ["__scopeId", "data-v-2ca14fbb"]]), J
 			frontend: this.serverBaseURL,
 			api: this.apiServerURL
 		});
+		if (this.sectionToggles) {
+			var self = this;
+			this.sectionToggles.forEach(function(t) {
+				self.localSectionVisible[t.key] = t.defaultVisible !== false;
+			});
+		}
+		if (this.headerTools) {
+			var self2 = this;
+			this.headerTools.forEach(function(t) {
+				self2.localSectionVisible[t.key] = t.defaultVisible !== false;
+			});
+		}
 	},
 	mounted() {
 		let e = Y.getPanelState(this.effectivePanelName);
@@ -1426,6 +1447,8 @@ var q = /*#__PURE__*/ E(P, [["render", K], ["__scopeId", "data-v-2ca14fbb"]]), J
 		i && i.configList && i.configList.length > 0 && (Date.now() - (i.timestamp || 0) < 300 * 1e3 ? (console.log(`[${this.effectivePanelName}] 📦 从缓存恢复配置列表 (${i.configList.length} 条) ${r ? "(多实例)" : "(单例)"}`), this.configList = i.configList, a = !0) : console.log(`[${this.effectivePanelName}] ⏭️ 缓存已过期，将重新加载`)), this.initCesium(() => {
 			n ? console.log(`[${this.effectivePanelName}] Cesium 已就绪，等待延迟加载触发`) : a ? (console.log(`[${this.effectivePanelName}] ✅ 配置已从缓存恢复，跳过重新加载`), this.onConfigLoaded()) : (console.log(`[${this.effectivePanelName}] Cesium 已就绪，开始加载配置`), this.loadConfig());
 		});
+		var _self = this;
+		this.$nextTick(function() { _self.$nextTick(function() { _self.applySectionVisibility(); }); });
 	},
 	beforeUnmount() {
 		let e = this.getCesiumObjects();
@@ -1823,6 +1846,37 @@ var q = /*#__PURE__*/ E(P, [["render", K], ["__scopeId", "data-v-2ca14fbb"]]), J
 		},
 		handleExpand() {
 			console.log(`[${this.panelName}] 面板展开`);
+		},
+		onSectionToggle(e) {
+			this.localSectionVisible = { ...this.localSectionVisible, [e.key]: e.visible };
+			this.$emit("section-toggle", e);
+			this.$nextTick(() => this.applySectionVisibility());
+		},
+		/**
+		 * 对外 API：切换分区可见性（子组件可通过 $refs.basePanel.toggleSection(key) 调用）
+		 */
+		toggleSection(e) {
+			this.localSectionVisible = { ...this.localSectionVisible, [e]: !this.localSectionVisible[e] };
+			this.$emit("section-toggle", { key: e, visible: this.localSectionVisible[e] });
+			this.$nextTick(() => this.applySectionVisibility());
+		},
+		/**
+		 * 对外 API：获取分区可见性
+		 */
+		getSectionVisible(e) {
+			return this.localSectionVisible[e];
+		},
+		applySectionVisibility() {
+			var basePanel = this.$refs.basePanel;
+			if (!basePanel) return;
+			var panel = basePanel.$refs && basePanel.$refs.panelRef;
+			if (!panel || typeof panel.querySelector !== "function") return;
+			var sv = this.localSectionVisible;
+			// 仅在 key 存在时才应用可见性（避免影响未声明该 key 的面板）
+			var toolbar = panel.querySelector(".toolbar");
+			if (toolbar && "showToolbar" in sv) toolbar.style.display = sv.showToolbar !== false ? "" : "none";
+			var configList = panel.querySelector(".config-list");
+			if (configList && "list" in sv) configList.style.display = sv.list ? "" : "none";
 		}
 	}
 }, Z = { class: "toolbar" }, Q = { class: "config-list" }, ne = { class: "item-main" }, re = { class: "item-info" }, ie = { class: "item-name" }, ae = { class: "item-detail" }, oe = { class: "item-actions" }, se = ["onClick", "aria-label"], ce = ["onClick", "aria-label"], le = { class: "dialog-header" }, ue = { class: "dialog-body" }, de = { class: "form-fields" }, fe = [
@@ -1858,8 +1912,12 @@ function Be(u, v, C, w, T, E) {
 		onClose: E.handleClose,
 		onMinimize: E.handleMinimize,
 		onExpand: E.handleExpand,
-		onLazyLoad: E.onLazyLoad
+		onLazyLoad: E.onLazyLoad,
+		"section-toggles": C.sectionToggles,
+		"header-tools": C.headerTools,
+		onSectionToggle: E.onSectionToggle
 	}, {
+		header: y(() => [p(u.$slots, "header", {}, () => [o("h3", I, m(C.panelTitle), 1)])]),
 		default: y(() => [
 			o("div", Z, [
 				C.toolbarButtons.add ? (d(), a("button", {
