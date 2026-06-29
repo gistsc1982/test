@@ -5,6 +5,14 @@
     <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vite App</title>
+    <!-- 🔧 Trusted Types 策略：允许 mapbox-gl 等库通过 blob URL 创建 Web Worker -->
+    <script>
+    if (window.trustedTypes && trustedTypes.createPolicy) {
+      trustedTypes.createPolicy('default', {
+        createScriptURL: function(url) { return url; }
+      });
+    }
+    </script>
     <!-- ⭐ 引入 Cesium 核心库（来自 update-gis 打包的静态资源） -->
     <script src="/gis/Cesium/Cesium.js"></script>
     <!-- ⭐ 引入 Cesium Widgets 样式 -->

@@ -7,8 +7,13 @@ export class MVTImageryProvider {
     this.mapboxRenderer = new rendererLib.BasicRenderer({ style: options.style });
     this.ready = false;
     this.readyPromise = this.mapboxRenderer._style.loadedPromise.then(
-      () => (this.ready = true)
-    );
+      () => {
+        this.ready = true;
+        console.log(`[MVTImageryProvider] ✅ style 加载完成, sources:`, Object.keys(this.mapboxRenderer._style.sourceCaches || {}));
+      }
+    ).catch(err => {
+      console.error(`[MVTImageryProvider] ❌ style 加载失败:`, err);
+    });
 
     const Cesium = this._getCesium();
     this.tilingScheme = new Cesium.WebMercatorTilingScheme();
@@ -49,6 +54,16 @@ export class MVTImageryProvider {
       rendererLib = await getMapbox();
     }
 
+    // ⚠️ 限制 Worker 数量，防止密集矢量瓦片数据（如深圳城市数据）导致浏览器卡死
+    // 默认 mapbox-gl 使用 navigator.hardwareConcurrency - 1 个 Worker，
+    // 对于大尺寸 PBF 瓦片，多个 Worker 同时解析会耗尽 CPU 和内存
+    const maxWorkers = options.maxWorkers || 2;
+    if (typeof rendererLib.workerCount !== 'undefined') {
+      const originalCount = rendererLib.workerCount;
+      rendererLib.workerCount = Math.min(rendererLib.workerCount || 4, maxWorkers);
+      console.log(`[MVTImageryProvider] 🔧 Worker 数量: ${originalCount} → ${rendererLib.workerCount}`);
+    }
+
     return new MVTImageryProvider(options, rendererLib);
   }
 
@@ -75,7 +90,51 @@ export class MVTImageryProvider {
 
     this.mapboxRenderer.filterForZoom(zoom);
     const tilesSpec = [];
-    this.mapboxRenderer.getVisibleSources().forEach((s) => {
+    const visibleSources = this.mapboxRenderer.getVisibleSources();
+
+    // 🔍 首次请求时打印调试信息
+    if (!this._debugLogged) {
+      this._debugLogged = true;
+      console.log(`[MVTImageryProvider] 🔍 首次瓦片请求: zoom=${zoom} x=${x} y=${y}`);
+      console.log(`[MVTImageryProvider] 🔍 可见 sources:`, visibleSources);
+      // 检查 dispatcher / worker 状态
+      const dispatcher = this.mapboxRenderer._style?.dispatcher;
+      if (dispatcher) {
+        console.log(`[MVTImageryProvider] 🔍 dispatcher:`, {
+          numActors: (dispatcher.actors || []).length,
+          actorsReady: (dispatcher.actors || []).map(a => !!a.ready),
+          currentActor: dispatcher.currentActor,
+          id: dispatcher.id,
+          workerPoolActive: Object.keys(dispatcher.workerPool?.active || {}).length
+        });
+      } else {
+        console.warn(`[MVTImageryProvider] ⚠️ 无 dispatcher！瓦片加载需要 worker 线程`);
+      }
+      const sourceCaches = this.mapboxRenderer._style?.sourceCaches || {};
+      Object.entries(sourceCaches).forEach(([id, cache]) => {
+        const src = cache._source || {};
+        const tileIds = Object.keys(cache._tiles || {});
+        const loadedTiles = tileIds.filter(tid => cache._tiles[tid]?.state === 'loaded');
+        const loadingTiles = tileIds.filter(tid => cache._tiles[tid]?.state === 'loading');
+        console.log(`[MVTImageryProvider] 🔍 sourceCache["${id}"]:`, {
+          type: src.type,
+          tiles: src.tiles,
+          scheme: src.scheme,
+          tileBounds: src.tileBounds,
+          minzoom: src.minzoom,
+          maxzoom: src.maxzoom,
+          sourceLoaded: src.loaded?.() ?? src._loaded,
+          sourceErrored: src._sourceErrored,
+          cacheTileCount: tileIds.length,
+          loadedCount: loadedTiles.length,
+          loadingCount: loadingTiles.length,
+          paused: cache._paused,
+          isRenderable: cache._isIdRenderable
+        });
+      });
+    }
+
+    visibleSources.forEach((s) => {
       tilesSpec.push({
         source: s,
         z: zoom,
@@ -86,6 +145,12 @@ export class MVTImageryProvider {
         size: this.tileSize,
       });
     });
+
+    // 无可见 source 时直接失败
+    if (tilesSpec.length === 0) {
+      console.warn(`[MVTImageryProvider] ⚠️ 无可渲染 source (z=${zoom})，已 filterForZoom 过滤`);
+      return Promise.reject(new Error('no visible sources'));
+    }
 
     return new Promise((resolve, reject) => {
       let canv = this.createTile();
@@ -102,14 +167,8 @@ export class MVTImageryProvider {
         tilesSpec,
         (err) => {
           if (!!err) {
-            switch (err) {
-              case "canceled":
-              case "fully-canceled":
-                reject(undefined);
-                break;
-              default:
-                reject(undefined);
-            }
+            console.warn(`[MVTImageryProvider] 瓦片渲染错误 z=${zoom} x=${x} y=${y}:`, err);
+            reject(err);
           } else {
             if (releaseTile) {
               renderRef.consumer.ctx = undefined;

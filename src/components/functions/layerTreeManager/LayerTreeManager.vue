@@ -616,7 +616,7 @@ async function probeBestLayerValidTime(baseUrl, layers, version) {
   try {
     const resp = await fetch(probeUrl, {
       mode: 'cors',
-      signal: AbortSignal.timeout(PROBE_TIMEOUT)
+      signal: createTimeoutSignal(PROBE_TIMEOUT)
     });
 
     const text = await resp.text();
@@ -670,7 +670,7 @@ async function fetchWmsCapabilitiesInfo(wmsUrl, preferredVersion) {
 
       const response = await fetch(url, {
         mode: 'cors',
-        signal: AbortSignal.timeout(WMS_DETECT_TIMEOUT)
+        signal: createTimeoutSignal(WMS_DETECT_TIMEOUT)
       });
 
       if (!response.ok) {
@@ -751,8 +751,21 @@ async function fetchWmsCapabilitiesInfo(wmsUrl, preferredVersion) {
  * 尝试多个 zoom 级别的瓦片，优先使用覆盖范围最广的
  * ⚠️ 整体超时 8 秒，防止长时间阻塞 UI
  * @param {string} urlTemplate - URL 模板，包含 {z}/{x}/{y}
- * @returns {Promise<string[]>} 图层名称数组
+ * @returns {Promise<{layerNames: string[], detectedZoom: number}>} 图层名称数组和检测到的 zoom 级别
  */
+/**
+ * 创建带超时的 AbortSignal（兼容旧浏览器）
+ */
+function createTimeoutSignal(timeoutMs) {
+  if (typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(timeoutMs);
+  }
+  // 回退：手动创建 AbortController + setTimeout
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), timeoutMs);
+  return controller.signal;
+}
+
 async function detectMvtSourceLayers(urlTemplate) {
   const DETECT_TOTAL_TIMEOUT = 8000;  // 总超时 8 秒
   const PER_TILE_TIMEOUT = 2000;      // 每个瓦片 2 秒
@@ -795,7 +808,7 @@ async function detectMvtSourceLayers(urlTemplate) {
 
       const response = await fetch(url, {
         mode: 'cors',
-        signal: AbortSignal.timeout(timeout)
+        signal: createTimeoutSignal(timeout)
       });
 
       if (!response.ok) continue;
@@ -805,7 +818,8 @@ async function detectMvtSourceLayers(urlTemplate) {
 
       const layerNames = parseMvtLayerNames(arrayBuffer);
       console.log(`[MVT检测] ✅ 检测到 ${layerNames.length} 个图层:`, layerNames);
-      return layerNames;
+      // 返回图层名和实际检测到的 zoom 级别
+      return { layerNames, detectedZoom: coord.z };
     } catch (err) {
       if (err.name === 'TimeoutError' || err.name === 'AbortError') {
         console.warn(`[MVT检测] ⏱️ 瓦片 z=${coord.z} 请求超时`);
@@ -817,7 +831,7 @@ async function detectMvtSourceLayers(urlTemplate) {
   }
 
   console.warn('[MVT检测] ⚠️ 所有瓦片坐标均无法获取或已超时');
-  return [];
+  return { layerNames: [], detectedZoom: 0 };
 }
 
 /**
@@ -908,7 +922,20 @@ function buildMvtStyleFromLayers(nodeId, nodeName, tileUrl, layerNames) {
     }
 
     // 未匹配的图层：同时用 fill + line 确保可见性
+    // ⚠️ 限制：最多为前 10 个未匹配图层生成样式（每个 3 层），
+    //   防止源图层过多导致 GPU shader 编译爆炸、浏览器卡死
     if (!usedLayers.has(layerName)) {
+      // 计算已生成的未匹配图层数量
+      const unmatchedCount = Array.from(usedLayers).filter(
+        name => !heuristics.some(rule =>
+          rule.match.some(kw => name.toLowerCase().includes(kw) || name.toLowerCase() === kw)
+        )
+      ).length;
+      if (unmatchedCount >= 10) {
+        console.warn(`[MVT样式] ⚠️ 未匹配图层已达上限(10)，跳过 "${layerName}"（共 ${layerNames.length} 个源图层）`);
+        usedLayers.add(layerName); // 标记已处理，避免重复警告
+        continue;
+      }
       usedLayers.add(layerName);
       // 面填充 — 半透明亮色
       style.layers.push({
@@ -2275,7 +2302,7 @@ export default {
                 try {
                   const capXml = await fetch(wmtsUrl, {
                     mode: 'cors',
-                    signal: AbortSignal.timeout(5000)
+                    signal: createTimeoutSignal(5000)
                   }).then(r => r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`)));
                   // WMTS 使用 <ows:Identifier> 作为图层机器标识符
                   const idMatch = capXml.match(/<ows:Identifier[^>]*>([^<]+)<\/ows:Identifier>/i)
@@ -2365,14 +2392,17 @@ export default {
 
             // 1. 确定要渲染的源图层（带 8 秒总超时）
             let sourceLayers = [];
+            let detectedDataZoom = 0;  // 实际检测到数据的 zoom 级别
             const userSpecified = node.mvtSourceLayers || '';
             if (userSpecified.trim()) {
               sourceLayers = userSpecified.split(',').map(s => s.trim()).filter(Boolean);
               console.log(`[${this.componentName}] 📋 使用用户指定的源图层:`, sourceLayers);
             } else {
               console.log(`[${this.componentName}] 🔍 自动检测 MVT 源图层...`);
-              sourceLayers = await detectMvtSourceLayers(node.url);
-              console.log(`[${this.componentName}] 📊 检测结果: ${sourceLayers.length} 个图层 →`, sourceLayers);
+              const detectResult = await detectMvtSourceLayers(node.url);
+              sourceLayers = detectResult.layerNames || [];
+              detectedDataZoom = detectResult.detectedZoom || 0;
+              console.log(`[${this.componentName}] 📊 检测结果: ${sourceLayers.length} 个图层 (z=${detectedDataZoom}) →`, sourceLayers);
               if (sourceLayers.length === 0) {
                 console.warn(`[${this.componentName}] ⚠️ 自动检测失败，将使用内置通用样式（不会阻塞 UI）`);
                 this.layerErrors[node.id] = {
@@ -2392,22 +2422,30 @@ export default {
 
             console.log(`[${this.componentName}] 🎨 MVT 样式已生成，包含 ${mvtStyle.layers.length} 个图层`);
 
-            // 根据检测结果调整 zoom 范围（区域数据通常没有低级别瓦片）
-            const detectedZoom = sourceLayers.length > 0 ? 10 : 0;
-            mvtStyle.sources[node.id].minzoom = detectedZoom;
-            console.log(`[${this.componentName}] 🔧 minzoom 调整为: ${detectedZoom}`);
+            // 根据检测结果调整 zoom 范围
+            // ⚠️ 关键修复：不能将 minzoom/maxzoom 都设为检测级别
+            // minzoom 应为 0（允许从低级别开始请求），maxzoom 设为检测级别 + 6（允许 overzoom）
+            // Cesium 的 minimumLevel/maximumLevel 仅在 provider 层面限制请求范围
+            // mapbox-gl source 的 minzoom/maxzoom 控制数据源自身的 zoom 范围
+            const detectedMinZoom = 0;
+            const detectedMaxZoom = detectedDataZoom > 0 ? Math.min(detectedDataZoom + 6, 18) : 18;
+            mvtStyle.sources[node.id].minzoom = detectedMinZoom;
+            mvtStyle.sources[node.id].maxzoom = detectedMaxZoom;
+            console.log(`[${this.componentName}] 🔧 zoom 范围: minzoom=${detectedMinZoom} maxzoom=${detectedMaxZoom} (检测到数据在 z=${detectedDataZoom})`);
 
             const provider = await MVTImageryProvider.create({
               style: mvtStyle,
               cesiumViewer: viewer,
               tileSize: 512,
-              maximumLevel: 18,
-              minimumLevel: 0,
-              credit: node.name
+              maximumLevel: detectedMaxZoom,
+              minimumLevel: detectedMinZoom,
+              credit: node.name,
+              maxWorkers: 2  // ⚠️ 限制 Worker 数量，防止密集矢量数据解析导致浏览器卡死
             });
 
             // 🔬 瓦片健康检测：监控前 N 秒内的瓦片，检测是否有实际渲染内容
-            const compName = this.componentName;
+            // ⚠️ 重要：不拦截全局 fetch/XHR（之前这里 monkey-patch 了 window.fetch 和 window.XMLHttpRequest，
+            //   导致 XMLHttpRequest.DONE 等静态常量丢失，使 Cesium 内部请求逻辑异常，是浏览器卡死的根因）
             const origRequestImage = provider.requestImage.bind(provider);
             let reqCount = 0;
             let succCount = 0;
@@ -2415,6 +2453,7 @@ export default {
             let failCount = 0;
             const nodeId = node.id;
             const nodeName = node.name;
+            const compName = this.componentName;  // ⚠️ 从 this 获取，不依赖已删除的 monkey-patch 代码块
 
             provider.requestImage = function(x, y, zoom, releaseTile) {
               reqCount++;
@@ -2485,10 +2524,27 @@ export default {
               }
             }, TILE_HEALTH_DELAY);
 
-            await provider.readyPromise;
+            // ⚠️ 等待 provider 就绪（带独立超时保护，防止 mapbox-gl style 加载无限挂起）
+            const PROVIDER_READY_TIMEOUT = 10000;  // 10 秒，比外层 15 秒短
+            const readyTimeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Provider 就绪超时 (10秒)')), PROVIDER_READY_TIMEOUT);
+            });
+            try {
+              await Promise.race([provider.readyPromise, readyTimeoutPromise]);
+              console.log(`[${this.componentName}] ✅ MVT provider 就绪: ${node.name}`);
+            } catch (readyErr) {
+              // readyPromise 超时或失败不阻塞加载 — 图层仍然添加到 Cesium，
+              // 瓦片在实际请求时会由 mapbox-gl 按需加载
+              console.warn(`[${this.componentName}] ⚠️ MVT provider 未完全就绪，继续加载: ${node.name} —`, readyErr.message);
+              this.layerErrors[node.id] = {
+                message: `MVT 样式加载超时，瓦片将按需加载`,
+                ...classifyLayerError('超时')
+              };
+            }
+
             const layer = viewer.imageryLayers.addImageryProvider(provider);
             this._cesiumLayers.set(node.id, { type: 'mvt', object: layer, provider });
-            console.log(`[${this.componentName}] ✅ MVT 矢量瓦片 "${node.name}" 加载成功`);
+            console.log(`[${this.componentName}] ✅ MVT 矢量瓦片 "${node.name}" 已添加到 Cesium`);
             break;
           }
           default: {
