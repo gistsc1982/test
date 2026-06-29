@@ -12,5 +12,20 @@
     "endCity": "深圳",
     "routeIndex": "0",
     "animationSpeed": "2000"
+  },
+  {
+    "id": "1222",
+    "name": "深圳市委-公安指挥中心",
+    "startLng": "114.006482",
+    "startLat": "22.596454",
+    "startAddr": "深圳市委",
+    "endLng": "114.056031",
+    "endLat": "22.603685",
+    "endAddr": "公安指挥中心",
+    "startCity": "深圳",
+    "endCity": "深圳",
+    "routeIndex": "0",
+    "animationSpeed": "2000",
+    "iconUrl": "🚗"
   }
 ]

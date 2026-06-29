@@ -59,6 +59,9 @@
     "labelFontSize": 22,
     "labelColor": "#00ff88",
     "labelVisibleMin": 0,
-    "labelVisibleMax": 80000
+    "labelVisibleMax": 80000,
+    "clusterEnabled": true,
+    "clusterPixelRange": 80,
+    "clusterMinSize": 2
   }
 ]

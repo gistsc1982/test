@@ -34,7 +34,10 @@
     { "key": "labelScale", "label": "标注缩放", "type": "number", "required": false, "default": 1.2 },
     { "key": "labelColor", "label": "标注颜色", "type": "text", "required": false, "default": "#a6fd1c" },
     { "key": "labelVisibleMin", "label": "标注可见最近距离(m)", "type": "number", "required": false, "default": 0 },
-    { "key": "labelVisibleMax", "label": "标注可见最远距离(m)", "type": "number", "required": false, "default": 50000 }
+    { "key": "labelVisibleMax", "label": "标注可见最远距离(m)", "type": "number", "required": false, "default": 50000 },
+    { "key": "clusterEnabled", "label": "开启点聚类", "type": "boolean", "required": false, "default": false },
+    { "key": "clusterPixelRange", "label": "聚类半径(px)", "type": "number", "required": false, "default": 50 },
+    { "key": "clusterMinSize", "label": "最少聚合点数", "type": "number", "required": false, "default": 3 }
   ],
   "defaultFormValues": {
     "id": "",
@@ -54,7 +57,10 @@
     "labelScale": 1.2,
     "labelColor": "#a6fd1c",
     "labelVisibleMin": 0,
-    "labelVisibleMax": 50000
+    "labelVisibleMax": 50000,
+    "clusterEnabled": false,
+    "clusterPixelRange": 50,
+    "clusterMinSize": 3
   },
   "toolbarButtons": {
     "add": true,

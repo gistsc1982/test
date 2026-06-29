@@ -283,12 +283,59 @@ export default {
           markerSymbol: markerSymbol  // undefined → PinBuilder.fromColor() 渐变圆点
         };
         Promise.resolve(Cesium.GeoJsonDataSource.load(geoJsonData, options)).then(dataSource => {
+          const entities = dataSource.entities.values;
+          console.log(`[${this.componentName}] ✅ 图层 "${layer.name}" 加载成功，实体数: ${entities.length}`);
+
+          // ⭐ 点聚类（EntityCluster）：必须在 add 之前配置
+          console.log(`[${this.componentName}] 🔍 聚类检查: clusterEnabled=${layer.clusterEnabled}, entities=${entities.length}, dataSource.clustering=${!!dataSource.clustering}`);
+          if (layer.clusterEnabled && entities.length > 0) {
+            var cluster = dataSource.clustering;
+            cluster.pixelRange = layer.clusterPixelRange || 80;
+            cluster.minimumClusterSize = layer.clusterMinSize || 2;
+            // 1. 先配置 entity 参与聚类
+            entities.forEach(function(e) {
+              e.clusterShow = true;
+            });
+            // 2. 配置集群事件 — canvas 背景 + 数字
+            if (cluster.clusterEvent && cluster.clusterEvent.addEventListener) {
+              cluster.clusterEvent.addEventListener(function(clusteredEntities, clusterEntity) {
+                var count = clusteredEntities.length;
+                var size = count < 10 ? 44 : count < 100 ? 52 : 60;
+                var canvas = document.createElement('canvas');
+                canvas.width = size; canvas.height = size;
+                var ctx = canvas.getContext('2d');
+                var cx = size / 2, cy = size / 2, r = size / 2 - 2;
+                // SVG 风格渐变背景
+                var grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+                grad.addColorStop(0, '#FF6B35');
+                grad.addColorStop(1, '#CC3300');
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.fillStyle = grad; ctx.fill();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+                // 底部阴影小三角（地图 pin 风格）
+                ctx.beginPath(); ctx.moveTo(cx - 6, cy + r - 4);
+                ctx.lineTo(cx, cy + r + 6); ctx.lineTo(cx + 6, cy + r - 4);
+                ctx.fillStyle = '#CC3300'; ctx.fill();
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+                // 数字
+                ctx.fillStyle = '#fff'; ctx.font = 'bold ' + (size * 0.4) + 'px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(count.toString(), cx, cy - 2);
+                clusterEntity.billboard.show = true;
+                clusterEntity.billboard.image = canvas;
+                clusterEntity.billboard.verticalOrigin = Cesium.VerticalOrigin.BOTTOM;
+                clusterEntity.label.show = false;
+              });
+            }
+            // 3. 最后开启聚类
+            cluster.enabled = true;
+            console.log(`[${this.componentName}] 🔵 点聚类已开启: pixelRange=${cluster.pixelRange}, minSize=${cluster.minimumClusterSize}, hasEvent=${!!cluster.clusterEvent}`);
+            console.log(`[${this.componentName}] 🔵 点聚类已开启: enabled=${dataSource.clustering.enabled}, pixelRange=${dataSource.clustering.pixelRange}, minSize=${dataSource.clustering.minimumClusterSize}`);
+          }
+
           viewer.dataSources.add(dataSource);
           this._cesiumLayers.set(layer.id, dataSource);
           this.updateItemState(layer.id, { loading: false, loaded: true });
-
-          const entities = dataSource.entities.values;
-          console.log(`[${this.componentName}] ✅ 图层 "${layer.name}" 加载成功，实体数: ${entities.length}`);
 
           // ⭐ 后处理：仅处理 options 无法覆盖的场景
           //   - clampToGround：Cesium GeoJsonDataSource options 已应用，但 polyline/polygon
