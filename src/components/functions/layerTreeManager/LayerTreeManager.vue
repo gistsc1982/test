@@ -1064,8 +1064,10 @@ export default {
         { "id": "folder-wms",    "name": "WMS 地图服务",      "parentId": "root-ogc","nodeType": "folder", "sortOrder": 1, "visible": 1, "description": "Web Map Service", "icon": "🗺️" },
         { "id": "wms-nasa",      "name": "NASA GIBS 全球影像(WMS)", "parentId": "folder-wms","nodeType": "layer","url":"https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi","sortOrder":1,"visible":1,"description":"NASA官方WMS服务，无需API Key","icon":"🛰️","centerLon":0,"centerLat":20,"centerHeight":15000000},
         { "id": "wms-usgs",      "name": "USGS 国家地形图(WMS)", "parentId": "folder-wms","nodeType": "layer","url":"https://basemap.nationalmap.gov/arcgis/services/USGSTopo/MapServer/WMSServer","sortOrder":2,"visible":1,"description":"USGS官方WMS","icon":"🗺️","centerLon":-98.5,"centerLat":39.8,"centerHeight":5000000},
-        { "id": "folder-wfs",    "name": "WFS 要素服务",      "parentId": "root-ogc","nodeType": "folder", "sortOrder": 2, "visible": 1, "description": "Web Feature Service", "icon": "📊" },
-        { "id": "wfs-usgs",      "name": "USGS 建筑物要素(WFS)", "parentId": "folder-wfs","nodeType": "layer","url":"https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/WFSServer","sortOrder":1,"visible":1,"description":"USGS官方WFS","icon":"🏗️"},
+        { "id": "folder-wfs",    "name": "WFS 要素服务",      "parentId": "root-ogc","nodeType": "folder", "sortOrder": 2, "visible": 1, "description": "OGC WFS 矢量要素服务（GetFeature + GeoJSON输出）", "icon": "📊" },
+        { "id": "wfs-geoserver","name":"GeoServer 示例要素(WFS 2.0)","parentId":"folder-wfs","nodeType":"layer","url":"https://demo.geo-solutions.it/geoserver/wfs?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0&TYPENAMES=topp%3Astates&OUTPUTFORMAT=application%2Fjson&MAXFEATURES=500","sortOrder":1,"visible":1,"description":"GeoServer官方Demo WFS 2.0，返回美国各州边界GeoJSON。意大利托管，中国大陆可访问","icon":"🌍","centerLon":-98,"centerLat":39,"centerHeight":5000000},
+        { "id": "wfs-emsc-quake","name":"EMSC 全球地震事件(WFS)","parentId":"folder-wfs","nodeType":"layer","url":"https://www.seismicportal.eu/wfs?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0&TYPENAMES=event&OUTPUTFORMAT=application%2Fjson&MAXFEATURES=500","sortOrder":2,"visible":1,"description":"EMSC欧洲地中海地震中心，全球实时地震数据WFS。法国托管，中国大陆可访问","icon":"🌋","centerLon":15,"centerLat":42,"centerHeight":15000000},
+        { "id": "wfs-ingv-quake","name":"INGV 意大利地震(WFS)","parentId":"folder-wfs","nodeType":"layer","url":"https://emidius.mi.ingv.it/geoserver/wfs?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0&TYPENAMES=event&OUTPUTFORMAT=application%2Fjson&MAXFEATURES=500","sortOrder":3,"visible":1,"description":"INGV意大利国家地球物理研究所，地中海区域地震数据WFS。意大利托管，中国大陆可访问","icon":"🇮🇹","centerLon":12.5,"centerLat":42,"centerHeight":5000000},
         { "id": "root-xyz",      "name": "XYZ/TMS 瓦片底图",  "parentId": null,     "nodeType": "folder", "sortOrder": 2, "visible": 1, "description": "互联网标准瓦片底图服务", "icon": "📁" },
         { "id": "xyz-osm",       "name": "OpenStreetMap 标准底图","parentId":"root-xyz","nodeType":"layer","url":"https://tile.openstreetmap.org/{z}/{x}/{y}.png","sortOrder":1,"visible":1,"description":"OSM全球众源地图","icon":"🗺️","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
         { "id": "xyz-esri-img",  "name": "ESRI 全球卫星影像",   "parentId":"root-xyz","nodeType":"layer","url":"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}","sortOrder":2,"visible":1,"description":"ESRI卫星影像底图","icon":"🛰️","centerLon":116.4,"centerLat":39.9,"centerHeight":8000},
@@ -2358,17 +2360,122 @@ export default {
           }
           case 'wfs':
           case 'geojson': {
-            const dataSource = await Cesium.GeoJsonDataSource.load(node.url, {
-              clampToGround: true
+            // ⚠️ WFS/GeoJSON 加载重构：WFS 服务器通常不配置 CORS 响应头，
+            // Cesium.GeoJsonDataSource.load(url) 内部用 fetch 强制 CORS 模式，
+            // 导致浏览器拦截返回 RequestErrorEvent{statusCode:undefined}。
+            // 解决：手动预取数据（带 CORS 代理回退），传入 GeoJSON 对象而非 URL。
+            const WFS_FETCH_TIMEOUT = 8000;
+            const PROXY_FETCH_TIMEOUT = 12000;
+
+            /**
+             * 尝试从 URL 获取 JSON 数据，失败时通过 CORS 代理重试
+             * @param {string} directUrl - 原始 URL
+             * @returns {Promise<Object>} 解析后的 JSON 对象
+             */
+            const fetchJsonWithCorsFallback = async (directUrl) => {
+              // 第一步：直接 fetch（部分 WFS 服务器支持 CORS）
+              try {
+                console.log(`[${this.componentName}] 🔍 直接请求 GeoJSON: ${directUrl.slice(0, 120)}...`);
+                const resp = await fetch(directUrl, {
+                  signal: createTimeoutSignal(WFS_FETCH_TIMEOUT)
+                });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                console.log(`[${this.componentName}] ✅ 直接请求成功`);
+                return data;
+              } catch (directErr) {
+                const errMsg = directErr.message || String(directErr);
+                console.warn(`[${this.componentName}] ⚠️ 直接请求失败: ${errMsg}，尝试 CORS 代理...`);
+              }
+
+              // 第二步：通过 CORS 代理重试（corsproxy.io 全球 CDN，中国大陆可访问）
+              const corsProxies = [
+                `https://corsproxy.io/?${encodeURIComponent(directUrl)}`,
+              ];
+              // 如果节点配置了自定义代理 URL，优先使用
+              if (node.wfsProxyUrl) {
+                corsProxies.unshift(node.wfsProxyUrl + encodeURIComponent(directUrl));
+              }
+
+              for (const proxyUrl of corsProxies) {
+                try {
+                  console.log(`[${this.componentName}] 🔄 通过 CORS 代理请求: ${proxyUrl.slice(0, 120)}...`);
+                  const resp = await fetch(proxyUrl, {
+                    signal: createTimeoutSignal(PROXY_FETCH_TIMEOUT)
+                  });
+                  if (!resp.ok) throw new Error(`代理返回 HTTP ${resp.status}`);
+                  const data = await resp.json();
+                  console.log(`[${this.componentName}] ✅ CORS 代理请求成功`);
+                  return data;
+                } catch (proxyErr) {
+                  console.warn(`[${this.componentName}] ⚠️ CORS 代理失败:`, proxyErr.message || proxyErr);
+                }
+              }
+
+              throw new Error(
+                'WFS 服务无法访问：直接请求被 CORS 拦截，CORS 代理也失败。\n' +
+                '建议：1) 检查网络连接 2) 在节点配置中设置 wfsProxyUrl 使用自建代理'
+              );
+            };
+
+            // 获取 GeoJSON 数据（手动 fetch + CORS 代理回退，绕过 Cesium 内部 fetch 的 CORS 限制）
+            const geojsonData = await fetchJsonWithCorsFallback(node.url);
+
+            // 基本格式校验
+            if (!geojsonData || (geojsonData.type !== 'FeatureCollection' && !geojsonData.type)) {
+              throw new Error(layerType === 'wfs'
+                ? `WFS 返回数据无效：${geojsonData ? 'type=' + geojsonData.type : '空响应'}（非 GeoJSON FeatureCollection）`
+                : 'GeoJSON 数据为空或格式无效');
+            }
+            const rawFeatureCount = geojsonData.features ? geojsonData.features.length : 0;
+            if (rawFeatureCount === 0) {
+              throw new Error(layerType === 'wfs'
+                ? 'WFS 服务返回 0 个要素（可能 TYPENAMES 不存在或无数据）'
+                : 'GeoJSON 文件包含 0 个要素');
+            }
+            console.log(`[${this.componentName}] 📦 获取到 ${rawFeatureCount} 个要素，传入 Cesium...`);
+
+            // ⚠️ 关键：传入 GeoJSON 对象（非 URL），绕过 Cesium 内部 fetch 的 CORS 限制
+            // 样式优先级: JSON配置 wfsStyle > 默认值
+            const s = node.wfsStyle || {};
+            const stroke   = Cesium.Color.fromCssColorString(s.stroke   || '#FF6600');
+            const fill     = Cesium.Color.fromCssColorString(s.fill     || '#FF6600').withAlpha(s.fillOpacity ?? 0.5);
+            const outlineC = Cesium.Color.fromCssColorString(s.outlineColor || '#FF3300');
+            const markerC  = Cesium.Color.fromCssColorString(s.markerColor  || '#FF4400');
+
+            // 不设置 clampToGround（polygon 用 GroundPrimitive 时 outline/fill 都不可靠）
+            const dataSource = await Cesium.GeoJsonDataSource.load(geojsonData, {
+              stroke: stroke,
+              strokeWidth: s.strokeWidth ?? 3,
+              fill: fill,
+              markerColor: markerC,
+              markerSize: s.markerSize ?? 24
             });
-            // 验证数据源是否包含实际要素（防止 CORS/网络错误导致空数据源被标记为成功）
+
+            // 后处理：分面/线设置样式和 clampToGround
+            const ents = dataSource.entities.values;
+            for (let i = 0; i < ents.length; i++) {
+              const e = ents[i];
+              if (e.polygon) {
+                // 面要素：不使用 clampToGround（会变成 GroundPrimitive，outline 无效）
+                e.polygon.material = fill;
+                e.polygon.outline = new Cesium.ConstantProperty(true);
+                e.polygon.outlineColor = new Cesium.ConstantProperty(outlineC);
+                e.polygon.outlineWidth = new Cesium.ConstantProperty(s.outlineWidth ?? 2);
+              }
+              if (e.polyline && !e.polygon) {
+                // 线要素：直接赋值 Color（不用 ConstantProperty，
+                //         GroundPolylinePrimitive 不兼容 ConstantProperty<Color>）
+                e.polyline.material = stroke;
+                e.polyline.width = s.strokeWidth ?? 3;
+              }
+            }
+            console.log(`[${this.componentName}] 🎨 后处理样式完成: ${ents.length} 个实体`);
             const entityCount = dataSource.entities.values.length;
             if (entityCount === 0) {
-              // 空数据源：未添加到 viewer，直接抛出明确错误
-              const errMsg = layerType === 'wfs'
-                ? 'WFS 服务未返回任何要素（可能被 CORS 拦截或服务无数据）'
-                : 'GeoJSON 数据为空（可能被 CORS 拦截或 URL 不正确）';
-              throw new Error(errMsg);
+              throw new Error(layerType === 'wfs'
+                ? `WFS 要素解析失败：${rawFeatureCount} 个要素无法加载到 Cesium（可能几何类型不兼容）`
+                : `GeoJSON 解析失败：${rawFeatureCount} 个要素无法加载到 Cesium`);
             }
             viewer.dataSources.add(dataSource);
             dataSource.name = node.name;
