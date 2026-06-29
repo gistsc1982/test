@@ -1,5 +1,5 @@
 import { Fragment as e, Teleport as t, Transition as n, createBlock as r, createCommentVNode as i, createElementBlock as a, createElementVNode as o, createTextVNode as s, createVNode as c, normalizeClass as l, normalizeStyle as u, openBlock as d, renderList as f, renderSlot as p, resolveComponent as m, toDisplayString as h, vModelText as g, vShow as _, withCtx as v, withDirectives as y, withModifiers as b } from "vue";
-//#region ../../GISBIM/cesiumBase/src/utils/CesiumEventManager.js
+//#region src/utils/CesiumEventManager.js
 var x = class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;
@@ -266,8 +266,8 @@ var w = (e, t) => {
 	class: "sfc-base",
 	style: { display: "none" }
 };
-function E(e, t, n, r, i, o) {
-	return d(), a("div", ee);
+function E(t, n, r, s, c, l) {
+	return d(), a(e, null, [i(" 基础组件无界面元素，仅作为逻辑基类 "), o("div", ee)], 2112);
 }
 var D = /*#__PURE__*/ w(T, [["render", E]]), te = class {
 	constructor() {
@@ -493,7 +493,7 @@ var D = /*#__PURE__*/ w(T, [["render", E]]), te = class {
 }, O = typeof window < "u" && (window.__panelSingletonManager__ || window.panelSingletonManager), k = O || new te();
 !O && typeof window < "u" && (window.__panelSingletonManager__ = k, window.panelSingletonManager = k);
 //#endregion
-//#region ../../GISBIM/cesiumBase/src/components/FunctionPanelUIBase.vue
+//#region src/components/FunctionPanelUIBase.vue
 var A = typeof window < "u" && window.__panelSingletonManager__ || k, ne = {
 	name: "FunctionPanelUIBase",
 	mixins: [D],
@@ -503,7 +503,8 @@ var A = typeof window < "u" && window.__panelSingletonManager__ || k, ne = {
 		"expand",
 		"lazy-load",
 		"register-panel",
-		"unregister-panel"
+		"unregister-panel",
+		"section-toggle"
 	],
 	inject: {
 		registerPanelComponent: {
@@ -615,6 +616,14 @@ var A = typeof window < "u" && window.__panelSingletonManager__ || k, ne = {
 		lazyLoad: {
 			type: Boolean,
 			default: !1
+		},
+		headerTools: {
+			type: Array,
+			default: () => []
+		},
+		sectionToggles: {
+			type: Array,
+			default: () => []
 		}
 	},
 	data() {
@@ -632,7 +641,8 @@ var A = typeof window < "u" && window.__panelSingletonManager__ || k, ne = {
 			boundMouseMove: null,
 			boundMouseUp: null,
 			cachedPanelWidth: null,
-			cachedPanelHeight: null
+			cachedPanelHeight: null,
+			sectionVisibleState: {}
 		};
 	},
 	computed: {
@@ -666,6 +676,9 @@ var A = typeof window < "u" && window.__panelSingletonManager__ || k, ne = {
 		},
 		fabStyles() {
 			return { transform: `translate(${this.x + this.width / 2 - 40}px, ${this.y}px)` };
+		},
+		sectionVisible() {
+			return { ...this.sectionVisibleState };
 		}
 	},
 	watch: { isClosed(e, t) {
@@ -693,7 +706,7 @@ var A = typeof window < "u" && window.__panelSingletonManager__ || k, ne = {
 				registrationKey_value: this.registrationKey,
 				effectiveRegistrationKey: this.effectiveRegistrationKey
 			}
-		}), this.autoRegister && this.effectiveRegistrationKey && !this._registryRegistered && this.registerToParent();
+		}), this.autoRegister && this.effectiveRegistrationKey && !this._registryRegistered && this.registerToParent(), this._initSectionVisible();
 		let e = this.panelInstanceId != null;
 		if (console.log("[FunctionPanelUIBase] 🔍 多实例面板检查:", {
 			panelName: this.effectiveRegistrationKey,
@@ -891,6 +904,22 @@ var A = typeof window < "u" && window.__panelSingletonManager__ || k, ne = {
 		toggleMinimize() {
 			this.isMinimized = !this.isMinimized, this.$emit(this.isMinimized ? "minimize" : "expand");
 		},
+		toggleSection(e) {
+			e in this.sectionVisibleState && (this.sectionVisibleState[e] = !this.sectionVisibleState[e], this.$emit("section-toggle", {
+				key: e,
+				visible: this.sectionVisibleState[e]
+			}));
+		},
+		getSectionVisible(e) {
+			return this.sectionVisibleState[e];
+		},
+		_initSectionVisible() {
+			this.sectionToggles && this.sectionToggles.length > 0 && this.sectionToggles.forEach((e) => {
+				e.key in this.sectionVisibleState || (this.sectionVisibleState[e.key] = e.defaultVisible !== !1);
+			}), this.headerTools && this.headerTools.length > 0 && this.headerTools.forEach((e) => {
+				e.key in this.sectionVisibleState || (this.sectionVisibleState[e.key] = e.defaultVisible !== !1);
+			});
+		},
 		close() {
 			let e = this.panelInstanceId || null, t = this.autoRegister && this.registrationKey && !e, n = !t && e !== null;
 			if (t) {
@@ -977,70 +1006,84 @@ var A = typeof window < "u" && window.__panelSingletonManager__ || k, ne = {
 	"stroke-linecap": "round"
 }, I = ["aria-label"], L = ["title"], R = { class: "fab-icon" }, z = { class: "fab-text" };
 function B(e, s, f, m, g, x) {
-	return d(), r(t, { to: "body" }, [c(n, { name: "panel-fade" }, {
-		default: v(() => [g.isClosed ? i("", !0) : (d(), a("div", {
-			key: 0,
-			class: l(["function-panel", {
-				"is-dragging": g.isDragging,
-				"is-minimized": g.isMinimized,
-				"blur-enabled": f.enableBackdropFilter && f.enableBlur
-			}]),
-			style: u(x.panelStyles),
-			ref: "panelRef",
-			onMousedown: s[3] ||= (...e) => x.onPanelMouseDown && x.onPanelMouseDown(...e)
-		}, [o("div", {
-			class: "panel-header",
-			onMousedown: s[2] ||= (...e) => x.onHeaderMouseDown && x.onHeaderMouseDown(...e)
-		}, [o("div", re, [s[5] ||= o("div", { class: "drag-indicator" }, [
-			o("span", { class: "grip-dot" }),
-			o("span", { class: "grip-dot" }),
-			o("span", { class: "grip-dot" })
-		], -1), p(e.$slots, "header", {}, () => [o("h3", ie, h(f.title), 1)], !0)]), o("div", j, [f.allowMinimize ? (d(), a("button", {
-			key: 0,
-			onClick: s[0] ||= b((...e) => x.toggleMinimize && x.toggleMinimize(...e), ["stop"]),
-			class: "icon-btn minimize-btn",
-			type: "button",
-			"aria-label": g.isMinimized ? "展开" : "最小化"
-		}, [(d(), a("svg", N, [g.isMinimized ? (d(), a("path", F)) : (d(), a("path", P))]))], 8, M)) : i("", !0), o("button", {
-			onClick: s[1] ||= b((...e) => x.close && x.close(...e), ["stop"]),
-			class: "icon-btn close-btn",
-			type: "button",
-			"aria-label": f.closeTooltip
-		}, [...s[6] ||= [o("svg", {
-			width: "14",
-			height: "14",
-			viewBox: "0 0 14 14",
-			fill: "none"
-		}, [o("path", {
-			d: "M2 2L12 12M12 2L2 12",
-			stroke: "currentColor",
-			"stroke-width": "2",
-			"stroke-linecap": "round"
-		})], -1)]], 8, I)])], 32), c(n, { name: "content-slide" }, {
-			default: v(() => [y(o("div", {
-				class: "panel-body",
-				style: u(x.bodyStyles)
-			}, [p(e.$slots, "default", {
-				isClosed: g.isClosed,
-				panelInstanceId: f.panelInstanceId,
-				isSingleton: x.isSingletonByConfig
-			}, void 0, !0)], 4), [[_, !g.isMinimized]])]),
+	return d(), r(t, { to: "body" }, [
+		c(n, { name: "panel-fade" }, {
+			default: v(() => [g.isClosed ? i("v-if", !0) : (d(), a("div", {
+				key: 0,
+				class: l(["function-panel", {
+					"is-dragging": g.isDragging,
+					"is-minimized": g.isMinimized,
+					"blur-enabled": f.enableBackdropFilter && f.enableBlur
+				}]),
+				style: u(x.panelStyles),
+				ref: "panelRef",
+				onMousedown: s[3] ||= (...e) => x.onPanelMouseDown && x.onPanelMouseDown(...e)
+			}, [
+				i(" 面板头部 "),
+				o("div", {
+					class: "panel-header",
+					onMousedown: s[2] ||= (...e) => x.onHeaderMouseDown && x.onHeaderMouseDown(...e)
+				}, [o("div", re, [s[5] ||= o("div", { class: "drag-indicator" }, [
+					o("span", { class: "grip-dot" }),
+					o("span", { class: "grip-dot" }),
+					o("span", { class: "grip-dot" })
+				], -1), p(e.$slots, "header", {}, () => [o("h3", ie, h(f.title), 1)], !0)]), o("div", j, [f.allowMinimize ? (d(), a("button", {
+					key: 0,
+					onClick: s[0] ||= b((...e) => x.toggleMinimize && x.toggleMinimize(...e), ["stop"]),
+					class: "icon-btn minimize-btn",
+					type: "button",
+					"aria-label": g.isMinimized ? "展开" : "最小化"
+				}, [(d(), a("svg", N, [g.isMinimized ? (d(), a("path", F)) : (d(), a("path", P))]))], 8, M)) : i("v-if", !0), o("button", {
+					onClick: s[1] ||= b((...e) => x.close && x.close(...e), ["stop"]),
+					class: "icon-btn close-btn",
+					type: "button",
+					"aria-label": f.closeTooltip
+				}, [...s[6] ||= [o("svg", {
+					width: "14",
+					height: "14",
+					viewBox: "0 0 14 14",
+					fill: "none"
+				}, [o("path", {
+					d: "M2 2L12 12M12 2L2 12",
+					stroke: "currentColor",
+					"stroke-width": "2",
+					"stroke-linecap": "round"
+				})], -1)]], 8, I)])], 32),
+				i(" 面板内容 "),
+				c(n, {
+					name: "content-slide",
+					persisted: ""
+				}, {
+					default: v(() => [y(o("div", {
+						class: "panel-body",
+						style: u(x.bodyStyles)
+					}, [p(e.$slots, "default", {
+						isClosed: g.isClosed,
+						panelInstanceId: f.panelInstanceId,
+						isSingleton: x.isSingletonByConfig,
+						sectionVisible: x.sectionVisible,
+						toggleSection: x.toggleSection
+					}, void 0, !0)], 4), [[_, !g.isMinimized]])]),
+					_: 3
+				})
+			], 38))]),
 			_: 3
-		})], 38))]),
-		_: 3
-	}), c(n, { name: "fab-fade" }, {
-		default: v(() => [!g.isClosed && g.isMinimized ? (d(), a("button", {
-			key: 0,
-			class: "panel-fab",
-			type: "button",
-			style: u(x.fabStyles),
-			onClick: s[4] ||= (...e) => x.toggleMinimize && x.toggleMinimize(...e),
-			title: f.title
-		}, [o("span", R, h(f.titleIcon || "⚙️"), 1), o("span", z, h(f.title), 1)], 12, L)) : i("", !0)]),
-		_: 1
-	})]);
+		}),
+		i(" 最小化时的浮动按钮 "),
+		c(n, { name: "fab-fade" }, {
+			default: v(() => [!g.isClosed && g.isMinimized ? (d(), a("button", {
+				key: 0,
+				class: "panel-fab",
+				type: "button",
+				style: u(x.fabStyles),
+				onClick: s[4] ||= (...e) => x.toggleMinimize && x.toggleMinimize(...e),
+				title: f.title
+			}, [o("span", R, h(f.titleIcon || "⚙️"), 1), o("span", z, h(f.title), 1)], 12, L)) : i("v-if", !0)]),
+			_: 1
+		})
+	]);
 }
-var V = /*#__PURE__*/ w(ne, [["render", B], ["__scopeId", "data-v-2ca14fbb"]]), H = {
+var V = /*#__PURE__*/ w(ne, [["render", B], ["__scopeId", "data-v-35108af7"]]), H = {
 	name: "ObliqueHeightAdjustPanel",
 	components: { FunctionPanelUIBase: V },
 	mixins: [D],
@@ -1166,11 +1209,8 @@ var V = /*#__PURE__*/ w(ne, [["render", B], ["__scopeId", "data-v-2ca14fbb"]]), 
 }, U = {
 	key: 0,
 	class: "recommended-offset-banner"
-}, W = { class: "banner-content" }, G = { class: "banner-text" }, K = { class: "banner-suggestion" }, q = { class: "highlight" }, J = ["disabled"], Y = { class: "current-height-card" }, ae = { class: "height-value" }, oe = { class: "value" }, se = { class: "adjustment-section" }, ce = { class: "slider-container" }, le = ["value"], ue = { class: "precise-input-section" }, de = { class: "input-group" }, fe = ["value"], pe = { class: "preset-section" }, me = { class: "preset-grid" }, he = ["onClick"], ge = {
-	key: 1,
-	class: "empty-state"
-};
-function _e(t, n, c, u, p, g) {
+}, W = { class: "banner-content" }, G = { class: "banner-text" }, K = { class: "banner-suggestion" }, q = { class: "highlight" }, J = ["disabled"], Y = { class: "current-height-card" }, ae = { class: "height-value" }, oe = { class: "value" }, se = { class: "adjustment-section" }, ce = { class: "slider-container" }, le = ["value"], ue = { class: "precise-input-section" }, de = { class: "input-group" }, fe = ["value"], pe = { class: "preset-section" }, me = { class: "preset-grid" }, he = ["onClick"];
+function ge(t, n, c, u, p, g) {
 	let _ = m("FunctionPanelUIBase");
 	return d(), r(_, {
 		title: g.panelTitle,
@@ -1189,6 +1229,7 @@ function _e(t, n, c, u, p, g) {
 		onExpand: g.handleExpand
 	}, {
 		default: v(() => [c.selectedLayer ? (d(), a(e, { key: 0 }, [
+			i(" 推荐偏移值提示 "),
 			c.selectedLayer.loaded && c.selectedLayer.recommendedOffset !== void 0 && c.selectedLayer.recommendedOffset !== null ? (d(), a("div", U, [o("div", W, [
 				n[8] ||= o("svg", {
 					class: "banner-icon",
@@ -1211,7 +1252,8 @@ function _e(t, n, c, u, p, g) {
 					class: "apply-recommended-btn",
 					disabled: Math.abs(c.selectedLayer.heightOffset - c.selectedLayer.recommendedOffset) < .1
 				}, h(Math.abs(c.selectedLayer.heightOffset - c.selectedLayer.recommendedOffset) < .1 ? "已应用" : "应用推荐值"), 9, J)
-			])])) : i("", !0),
+			])])) : i("v-if", !0),
+			i(" 当前高度偏移显示 "),
 			o("div", Y, [n[10] ||= o("div", { class: "card-header" }, [o("h4", { class: "card-title" }, "当前高度偏移"), o("span", {
 				class: "hint-icon",
 				title: "调整倾斜摄影的整体高度，正值向上，负值向下"
@@ -1228,6 +1270,7 @@ function _e(t, n, c, u, p, g) {
 				d: "M12 16v-4M12 8h.01",
 				"stroke-linecap": "round"
 			})])])], -1), o("div", ae, [o("span", oe, h((c.selectedLayer.heightOffset || 0).toFixed(2)), 1), n[9] ||= o("span", { class: "unit" }, "米", -1)])]),
+			i(" 高度调整滑块 "),
 			o("div", se, [
 				n[12] ||= o("div", { class: "section-label" }, [o("span", null, "调整偏移"), o("span", { class: "range-hint" }, "-2000m ~ +2000m")], -1),
 				o("div", ce, [o("input", {
@@ -1242,6 +1285,7 @@ function _e(t, n, c, u, p, g) {
 				}, null, 40, le), n[11] ||= o("div", { class: "slider-track-fill" }, null, -1)]),
 				n[13] ||= o("div", { class: "usage-hint" }, "调整后使倾斜摄影与大坐标模型高度对齐", -1)
 			]),
+			i(" 精确输入 "),
 			o("div", ue, [n[15] ||= o("label", { class: "input-label" }, "精确设置偏移（米）", -1), o("div", de, [o("input", {
 				type: "number",
 				value: c.selectedLayer.heightOffset || 0,
@@ -1262,12 +1306,13 @@ function _e(t, n, c, u, p, g) {
 				"stroke-linecap": "round",
 				"stroke-linejoin": "round"
 			})], -1), s(" 重置 ", -1)]])])]),
+			i(" 快捷预设 "),
 			o("div", pe, [n[16] ||= o("div", { class: "section-label" }, "快捷预设", -1), o("div", me, [(d(!0), a(e, null, f(p.presets, (e) => (d(), a("button", {
 				key: e.value,
 				onClick: (t) => g.applyPreset(e.value),
 				class: l(["preset-btn", { active: Math.abs(c.selectedLayer.heightOffset - e.value) < .1 }])
 			}, h(e.label), 11, he))), 128))])])
-		], 64)) : (d(), a("div", ge, [...n[17] ||= [o("svg", {
+		], 64)) : (d(), a(e, { key: 1 }, [i(" 无选中图层提示 "), n[17] ||= o("div", { class: "empty-state" }, [o("svg", {
 			class: "empty-icon",
 			viewBox: "0 0 24 24",
 			fill: "none",
@@ -1277,7 +1322,7 @@ function _e(t, n, c, u, p, g) {
 			d: "M9 20H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v12a2 2 0 01-2 2h-4M9 20v-6M9 20l6-6M9 20l6 6",
 			"stroke-linecap": "round",
 			"stroke-linejoin": "round"
-		})], -1), o("div", { class: "empty-text" }, "请先在倾斜摄影面板中选择一个已加载的图层", -1)]]))]),
+		})]), o("div", { class: "empty-text" }, "请先在倾斜摄影面板中选择一个已加载的图层")], -1)], 2112))]),
 		_: 1
 	}, 8, [
 		"title",
@@ -1291,7 +1336,7 @@ function _e(t, n, c, u, p, g) {
 		"onExpand"
 	]);
 }
-var ve = /*#__PURE__*/ w(H, [["render", _e], ["__scopeId", "data-v-80456ab5"]]), X = new class {
+var _e = /*#__PURE__*/ w(H, [["render", ge], ["__scopeId", "data-v-80456ab5"]]), X = new class {
 	constructor() {
 		this.configDefinitions = new Map([["oblique-photography", {
 			id: "oblique-photography",
@@ -1307,7 +1352,9 @@ var ve = /*#__PURE__*/ w(H, [["render", _e], ["__scopeId", "data-v-80456ab5"]]),
 			dataAPI: "api/data",
 			syncAPI: "api/sync",
 			timeout: 3e4
-		}, console.log("[DataManager] 初始化完成"), console.log("[DataManager] 服务器配置:", this.serverConfig);
+		}, typeof window < "u" && window.__pendingConfigDefinitions__ && window.__pendingConfigDefinitions__.forEach((e, t) => {
+			this.configDefinitions.has(t) || (this.configDefinitions.set(t, e), console.log(`[DataManager] ✅ 加载待注册配置: ${t}`));
+		}), typeof window < "u" && (window.__dataManager__ = this), console.log("[DataManager] 初始化完成"), console.log("[DataManager] 服务器配置:", this.serverConfig);
 	}
 	detectServerURL() {
 		if (typeof window > "u") return "http://192.168.31.146:8080";
@@ -1539,11 +1586,11 @@ var ve = /*#__PURE__*/ w(H, [["render", _e], ["__scopeId", "data-v-80456ab5"]]),
 			return console.error("[DataManager] ❌ 获取目录结构失败:", e), {};
 		}
 	}
-}(), Z = typeof window < "u" && window.__panelSingletonManager__ || k, ye = "/data/gis/oblique_photography.json", Q = "oblique-photography", be = {
+}(), Z = typeof window < "u" && window.__panelSingletonManager__ || k, ve = "/data/gis/oblique_photography.json", Q = "oblique-photography", ye = {
 	name: "ObliquePhotographyPanel",
 	components: {
 		FunctionPanelUIBase: V,
-		ObliqueHeightAdjustPanel: ve
+		ObliqueHeightAdjustPanel: _e
 	},
 	mixins: [D],
 	props: {
@@ -1749,7 +1796,7 @@ var ve = /*#__PURE__*/ w(H, [["render", _e], ["__scopeId", "data-v-80456ab5"]]),
 					e = await X.loadFromServer(Q), t = "API服务器（数据库）", console.log(`[${this.componentName}] ✅ 从 API 服务器加载数据成功`);
 				} catch (n) {
 					console.warn(`[${this.componentName}] ⚠️ API 服务器加载失败，尝试静态文件:`, n.message);
-					let r = await fetch(ye, { cache: "no-cache" });
+					let r = await fetch(ve, { cache: "no-cache" });
 					if (!r.ok) throw Error(`HTTP error! status: ${r.status}`);
 					e = await r.json(), t = "静态文件", console.log(`[${this.componentName}] ✅ 从静态文件加载数据成功`);
 				}
@@ -2091,419 +2138,452 @@ var ve = /*#__PURE__*/ w(H, [["render", _e], ["__scopeId", "data-v-80456ab5"]]),
 			}
 		}
 	}
-}, xe = { class: "toolbar" }, Se = { class: "oblique-list" }, Ce = { class: "item-main" }, we = { class: "oblique-checkbox" }, Te = [
+}, be = { class: "toolbar" }, xe = { class: "oblique-list" }, Se = { class: "item-main" }, Ce = { class: "oblique-checkbox" }, we = [
 	"checked",
 	"onChange",
 	"disabled"
-], Ee = { class: "item-info" }, De = { class: "oblique-name" }, Oe = {
+], Te = { class: "item-info" }, Ee = { class: "oblique-name" }, De = {
 	key: 0,
 	class: "loading-text"
-}, ke = {
+}, Oe = {
 	key: 1,
 	class: "status-text loaded"
-}, Ae = {
+}, ke = {
 	key: 2,
 	class: "status-text unloaded"
-}, je = { class: "item-actions" }, Me = [
+}, Ae = { class: "item-actions" }, je = [
 	"onClick",
 	"disabled",
 	"aria-label"
-], Ne = ["onClick", "aria-label"], Pe = ["onClick", "aria-label"], Fe = ["onClick", "aria-label"], Ie = {
+], Me = ["onClick", "aria-label"], Ne = ["onClick", "aria-label"], Pe = ["onClick", "aria-label"], Fe = {
 	key: 0,
 	class: "empty-state"
-}, Le = { class: "dialog-header" }, Re = { class: "dialog-title" }, ze = { class: "dialog-body" }, Be = { class: "form-group" }, Ve = ["disabled"], He = { class: "form-group" }, Ue = { class: "form-group" }, We = { class: "dialog-footer" }, Ge = { class: "dialog-body" }, Ke = { class: "delete-warning" }, qe = { class: "warning-text" }, Je = { class: "dialog-footer" }, Ye = { class: "dialog-header" }, Xe = { class: "dialog-body" }, Ze = { class: "server-info" }, Qe = { class: "server-url" }, $e = { class: "file-browser" }, et = { class: "directory-nav" }, tt = { class: "nav-path" }, $ = {
+}, Ie = { class: "dialog-header" }, Le = { class: "dialog-title" }, Re = { class: "dialog-body" }, ze = { class: "form-group" }, Be = ["disabled"], Ve = { class: "form-group" }, He = { class: "form-group" }, Ue = { class: "dialog-footer" }, We = { class: "dialog-body" }, Ge = { class: "delete-warning" }, Ke = { class: "warning-text" }, qe = { class: "dialog-footer" }, Je = { class: "dialog-header" }, Ye = { class: "dialog-body" }, Xe = { class: "server-info" }, Ze = { class: "server-url" }, Qe = { class: "file-browser" }, $e = { class: "directory-nav" }, et = { class: "nav-path" }, tt = {
 	key: 0,
 	class: "file-list"
-}, nt = ["onClick"], rt = { class: "file-info" }, it = { class: "file-name" }, at = ["onClick"], ot = { class: "file-info" }, st = { class: "file-name" }, ct = { class: "file-path" }, lt = { class: "file-meta" }, ut = { class: "file-size" }, dt = { class: "file-date" }, ft = {
-	key: 1,
-	class: "file-list loading"
-}, pt = {
+}, $ = ["onClick"], nt = { class: "file-info" }, rt = { class: "file-name" }, it = ["onClick"], at = { class: "file-info" }, ot = { class: "file-name" }, st = { class: "file-path" }, ct = { class: "file-meta" }, lt = { class: "file-size" }, ut = { class: "file-date" }, dt = {
 	key: 2,
 	class: "empty-state"
-}, mt = { class: "dialog-footer" }, ht = ["disabled"];
-function gt(u, p, _, x, S, C) {
+}, ft = { class: "dialog-footer" }, pt = ["disabled"];
+function mt(u, p, _, x, S, C) {
 	let w = m("FunctionPanelUIBase"), T = m("ObliqueHeightAdjustPanel");
-	return d(), a(e, null, [c(w, {
-		ref: "basePanel",
-		title: "倾斜摄影加载",
-		"title-icon": "📷",
-		width: 420,
-		"max-height": "70vh",
-		"initial-x": _.initialX,
-		"initial-y": _.initialY,
-		"allow-minimize": !0,
-		"registration-key": _.registrationKey || "ObliquePhotographyPanel",
-		"panel-instance-id": _.panelInstanceId,
-		"auto-register": _.autoRegister === void 0 ? !0 : _.autoRegister,
-		"lazy-load": _.lazyLoad || C.getConfigLazyLoad(),
-		"close-event-name": "obliquePhotographyPanelClose",
-		onClose: C.handleClose,
-		onMinimize: C.handleMinimize,
-		onExpand: C.handleExpand,
-		onLazyLoad: C.onLazyLoad
-	}, {
-		default: v(() => [
-			o("div", xe, [
-				o("button", {
-					onClick: p[0] ||= (e) => S.showAddDialog = !0,
-					class: "tool-btn add-btn",
-					title: "添加倾斜摄影数据"
-				}, [...p[23] ||= [o("svg", {
-					viewBox: "0 0 24 24",
-					fill: "none",
-					stroke: "currentColor",
-					"stroke-width": "2"
-				}, [o("path", {
-					d: "M12 5v14M5 12h14",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				})], -1), s(" 添加 ", -1)]]),
-				o("button", {
-					onClick: p[1] ||= (...e) => C.exportConfig && C.exportConfig(...e),
-					class: "tool-btn export-btn",
-					title: "导出配置到服务器 JSON 文件"
-				}, [...p[24] ||= [o("svg", {
-					viewBox: "0 0 24 24",
-					fill: "none",
-					stroke: "currentColor",
-					"stroke-width": "2"
-				}, [o("path", {
-					d: "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				})], -1), s(" 导出 ", -1)]]),
-				o("button", {
-					onClick: p[2] ||= (...e) => C.importConfig && C.importConfig(...e),
-					class: "tool-btn import-btn",
-					title: "从服务器 JSON 文件导入配置"
-				}, [...p[25] ||= [o("svg", {
-					viewBox: "0 0 24 24",
-					fill: "none",
-					stroke: "currentColor",
-					"stroke-width": "2"
-				}, [o("path", {
-					d: "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				})], -1), s(" 导入 ", -1)]]),
-				o("button", {
-					onClick: p[3] ||= (...e) => C.refreshFromJson && C.refreshFromJson(...e),
-					class: "tool-btn refresh-btn",
-					title: "从服务器刷新 JSON 数据"
-				}, [...p[26] ||= [o("svg", {
-					viewBox: "0 0 24 24",
-					fill: "none",
-					stroke: "currentColor",
-					"stroke-width": "2"
-				}, [o("path", {
-					d: "M23 4v6h-6M1 20v-6h6",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				}), o("path", {
-					d: "M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				})], -1), s(" 刷新 ", -1)]])
-			]),
-			o("div", Se, [(d(!0), a(e, null, f(S.obliquePhotographyList, (e) => (d(), a("div", {
-				key: e.id,
-				class: l(["oblique-item", {
-					"is-loaded": e.loaded,
-					"is-loading": e.loading,
-					"is-selected": S.selectedItemId === e.id
-				}])
-			}, [o("div", Ce, [o("label", we, [
-				o("input", {
-					type: "checkbox",
-					checked: e.loaded || !1,
-					onChange: (t) => C.toggleObliquePhotography(e),
-					disabled: e.loading || !1,
-					class: "checkbox-input"
-				}, null, 40, Te),
-				p[27] ||= o("span", { class: "check-indicator" }, null, -1),
-				o("div", Ee, [o("span", De, h(e.name || "未知"), 1), e.loading ? (d(), a("span", Oe, "加载中...")) : e.loaded ? (d(), a("span", ke, "已加载")) : (d(), a("span", Ae, "未加载"))])
-			])]), o("div", je, [
-				o("button", {
-					onClick: (t) => C.locateToObliquePhotography(e),
-					class: "action-btn locate-btn",
-					type: "button",
-					disabled: !e.loaded,
-					"aria-label": `定位到 ${e.name}`,
-					title: "定位到3D Tiles位置"
-				}, [...p[28] ||= [o("svg", {
-					viewBox: "0 0 24 24",
-					fill: "none",
-					stroke: "currentColor",
-					"stroke-width": "2"
-				}, [o("path", {
-					d: "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				}), o("circle", {
-					cx: "12",
-					cy: "10",
-					r: "3",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				})], -1)]], 8, Me),
-				e.loaded ? (d(), a("button", {
-					key: 0,
-					onClick: (t) => C.openHeightAdjust(e),
-					class: "action-btn height-btn",
-					type: "button",
-					"aria-label": `调整 ${e.name} 高度`,
-					title: "高度调整"
-				}, [...p[29] ||= [o("svg", {
-					viewBox: "0 0 24 24",
-					fill: "none",
-					stroke: "currentColor",
-					"stroke-width": "2"
-				}, [o("path", {
-					d: "M12 19V5M5 12l7-7 7 7",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				})], -1)]], 8, Ne)) : i("", !0),
-				o("button", {
-					onClick: (t) => C.openEditDialog(e),
-					class: "action-btn edit-btn",
-					type: "button",
-					"aria-label": `编辑 ${e.name}`,
-					title: "编辑"
-				}, [...p[30] ||= [o("svg", {
-					viewBox: "0 0 24 24",
-					fill: "none",
-					stroke: "currentColor",
-					"stroke-width": "2"
-				}, [o("path", {
-					d: "M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				}), o("path", {
-					d: "M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				})], -1)]], 8, Pe),
-				o("button", {
-					onClick: (t) => C.confirmDelete(e),
-					class: "action-btn delete-btn",
-					type: "button",
-					"aria-label": `删除 ${e.name}`,
-					title: "删除"
-				}, [...p[31] ||= [o("svg", {
-					viewBox: "0 0 24 24",
-					fill: "none",
-					stroke: "currentColor",
-					"stroke-width": "2"
-				}, [o("path", {
-					d: "M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				})], -1)]], 8, Fe)
-			])], 2))), 128))]),
-			S.obliquePhotographyList.length === 0 ? (d(), a("div", Ie, [...p[32] ||= [
-				o("svg", {
-					class: "empty-icon",
-					viewBox: "0 0 24 24",
-					fill: "none",
-					stroke: "currentColor",
-					"stroke-width": "2"
-				}, [o("path", {
-					d: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z",
-					"stroke-linecap": "round",
-					"stroke-linejoin": "round"
-				})], -1),
-				o("div", { class: "empty-title" }, "暂无倾斜摄影数据", -1),
-				o("div", { class: "empty-hint" }, "点击\"添加\"按钮导入倾斜摄影配置", -1)
-			]])) : i("", !0),
-			(d(), r(t, { to: "body" }, [c(n, { name: "dialog-fade" }, {
-				default: v(() => [S.showAddDialog || S.showEditDialog ? (d(), a("div", {
-					key: 0,
-					class: "dialog-overlay",
-					onClick: p[11] ||= b((...e) => C.closeDialog && C.closeDialog(...e), ["self"])
-				}, [o("div", {
-					class: "dialog",
-					onClick: p[10] ||= b(() => {}, ["stop"])
-				}, [
-					o("div", Le, [o("h3", Re, h(S.showEditDialog ? "编辑倾斜摄影" : "添加倾斜摄影"), 1), o("button", {
-						onClick: p[4] ||= (...e) => C.closeDialog && C.closeDialog(...e),
-						class: "dialog-close",
-						"aria-label": "关闭对话框"
-					}, [...p[33] ||= [o("svg", {
-						viewBox: "0 0 24 24",
-						fill: "none",
-						stroke: "currentColor",
-						"stroke-width": "2"
-					}, [o("path", {
-						d: "M18 6L6 18M6 6l12 12",
-						"stroke-linecap": "round",
-						"stroke-linejoin": "round"
-					})], -1)]])]),
-					o("div", ze, [
-						o("div", Be, [p[34] ||= o("label", { class: "form-label" }, [s("ID "), o("span", { class: "required" }, "*")], -1), y(o("input", {
-							"onUpdate:modelValue": p[5] ||= (e) => S.formData.id = e,
-							type: "text",
-							class: "form-input",
-							placeholder: "输入唯一标识符",
-							disabled: S.showEditDialog
-						}, null, 8, Ve), [[g, S.formData.id]])]),
-						o("div", He, [p[35] ||= o("label", { class: "form-label" }, [s("名称 "), o("span", { class: "required" }, "*")], -1), y(o("input", {
-							"onUpdate:modelValue": p[6] ||= (e) => S.formData.name = e,
-							type: "text",
-							class: "form-input",
-							placeholder: "输入显示名称"
-						}, null, 512), [[g, S.formData.name]])]),
-						o("div", Ue, [p[36] ||= o("label", { class: "form-label" }, [s("URL "), o("span", { class: "required" }, "*")], -1), y(o("textarea", {
-							"onUpdate:modelValue": p[7] ||= (e) => S.formData.url = e,
-							class: "form-textarea",
-							rows: "3",
-							placeholder: "输入倾斜摄影数据URL"
-						}, null, 512), [[g, S.formData.url]])])
-					]),
-					o("div", We, [o("button", {
-						onClick: p[8] ||= (...e) => C.closeDialog && C.closeDialog(...e),
-						class: "dialog-btn cancel-btn"
-					}, "取消"), o("button", {
-						onClick: p[9] ||= (...e) => C.saveItem && C.saveItem(...e),
-						class: "dialog-btn confirm-btn"
-					}, "保存")])
-				])])) : i("", !0)]),
-				_: 1
-			})])),
-			(d(), r(t, { to: "body" }, [c(n, { name: "dialog-fade" }, {
-				default: v(() => [S.showDeleteDialog ? (d(), a("div", {
-					key: 0,
-					class: "dialog-overlay",
-					onClick: p[15] ||= b((e) => S.showDeleteDialog = !1, ["self"])
-				}, [o("div", {
-					class: "dialog dialog-small",
-					onClick: p[14] ||= b(() => {}, ["stop"])
-				}, [
-					p[38] ||= o("div", { class: "dialog-header" }, [o("h3", { class: "dialog-title" }, "确认删除")], -1),
-					o("div", Ge, [o("div", Ke, [p[37] ||= o("svg", {
-						class: "warning-icon",
-						viewBox: "0 0 24 24",
-						fill: "none",
-						stroke: "currentColor",
-						"stroke-width": "2"
-					}, [o("path", {
-						d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
-						"stroke-linecap": "round",
-						"stroke-linejoin": "round"
-					})], -1), o("div", qe, " 确定要删除 \"" + h(S.deleteTarget?.name) + "\" 吗？此操作无法撤销。 ", 1)])]),
-					o("div", Je, [o("button", {
-						onClick: p[12] ||= (e) => S.showDeleteDialog = !1,
-						class: "dialog-btn cancel-btn"
-					}, "取消"), o("button", {
-						onClick: p[13] ||= (...e) => C.executeDelete && C.executeDelete(...e),
-						class: "dialog-btn danger-btn"
-					}, "删除")])
-				])])) : i("", !0)]),
-				_: 1
-			})])),
-			(d(), r(t, { to: "body" }, [c(n, { name: "dialog-fade" }, {
-				default: v(() => [S.showImportDialog ? (d(), a("div", {
-					key: 0,
-					class: "dialog-overlay",
-					onClick: p[21] ||= b((...e) => C.closeImportDialog && C.closeImportDialog(...e), ["self"])
-				}, [o("div", {
-					class: "dialog dialog-large",
-					onClick: p[20] ||= b(() => {}, ["stop"])
-				}, [
-					o("div", Ye, [p[39] ||= o("h3", { class: "dialog-title" }, "📂 从服务器导入配置", -1), o("button", {
-						onClick: p[16] ||= (...e) => C.closeImportDialog && C.closeImportDialog(...e),
-						class: "close-btn",
-						"aria-label": "关闭"
-					}, "×")]),
-					o("div", Xe, [o("div", Ze, [p[40] ||= o("span", { class: "server-label" }, "服务器：", -1), o("span", Qe, h(S.apiServerURL), 1)]), o("div", $e, [
-						o("div", et, [
-							C.canGoBack ? (d(), a("button", {
-								key: 0,
-								onClick: p[17] ||= (...e) => C.navigateToParentDirectory && C.navigateToParentDirectory(...e),
-								class: "nav-btn back-btn",
-								title: "返回上级目录"
-							}, [...p[41] ||= [o("svg", {
-								viewBox: "0 0 24 24",
-								fill: "none",
-								stroke: "currentColor",
-								"stroke-width": "2"
-							}, [o("path", {
-								d: "M19 12H5M12 19l-7-7 7-7",
-								"stroke-linecap": "round",
-								"stroke-linejoin": "round"
-							})], -1), s(" 返回 ", -1)]])) : i("", !0),
-							p[42] ||= o("span", { class: "nav-label" }, "目录：", -1),
-							o("span", tt, h(C.currentDirectoryDisplay), 1)
-						]),
-						S.loadingServerFiles ? (d(), a("div", ft, [...p[48] ||= [o("div", { class: "loading-spinner" }, null, -1), o("p", null, "正在加载服务器文件...", -1)]])) : (d(), a("div", $, [(d(!0), a(e, null, f(C.currentSubdirectories, (e) => (d(), a("div", {
-							key: "dir-" + e,
-							class: "file-item directory-item",
-							onClick: (t) => C.navigateToDirectory(e)
-						}, [
-							p[44] ||= o("div", { class: "file-icon" }, "📁", -1),
-							o("div", rt, [o("div", it, h(e), 1), p[43] ||= o("div", { class: "file-path" }, "目录", -1)]),
-							p[45] ||= o("div", { class: "file-action" }, "📂", -1)
-						], 8, nt))), 128)), (d(!0), a(e, null, f(C.currentDirectoryFiles, (e) => (d(), a("div", {
-							key: e.path || e.filePath,
-							class: l(["file-item", { "is-selected": S.selectedServerFile === e }]),
-							onClick: (t) => C.selectServerFile(e)
-						}, [
-							p[46] ||= o("div", { class: "file-icon" }, "📄", -1),
-							o("div", ot, [
-								o("div", st, h(e.fileName || e.name), 1),
-								o("div", ct, h(e.filePath || e.path), 1),
-								o("div", lt, [o("span", ut, h(C.formatFileSize(e.fileSize || e.size)), 1), o("span", dt, h(C.formatDate(e.modifiedTime || e.modified)), 1)])
-							]),
-							p[47] ||= o("div", { class: "file-action" }, "📥", -1)
-						], 10, at))), 128))])),
-						!S.loadingServerFiles && S.serverFiles.length === 0 ? (d(), a("div", pt, [...p[49] ||= [
-							o("div", { class: "empty-icon" }, "📁", -1),
-							o("div", { class: "empty-title" }, "服务器上没有找到配置文件", -1),
-							o("div", { class: "empty-hint" }, "请确保 API 服务器已启动", -1)
-						]])) : i("", !0)
-					])]),
-					o("div", mt, [o("button", {
-						onClick: p[18] ||= (...e) => C.closeImportDialog && C.closeImportDialog(...e),
-						class: "dialog-btn cancel-btn"
-					}, "取消"), o("button", {
-						onClick: p[19] ||= (e) => C.loadServerFiles(),
-						class: "dialog-btn secondary-btn",
-						disabled: S.loadingServerFiles
-					}, " 🔄 刷新 ", 8, ht)])
-				])])) : i("", !0)]),
-				_: 1
-			})]))
-		]),
-		_: 1
-	}, 8, [
-		"initial-x",
-		"initial-y",
-		"registration-key",
-		"panel-instance-id",
-		"auto-register",
-		"lazy-load",
-		"onClose",
-		"onMinimize",
-		"onExpand",
-		"onLazyLoad"
-	]), (d(), r(t, { to: "body" }, [c(n, { name: "height-panel-fade" }, {
-		default: v(() => [S.showHeightPanel && S.selectedLayer ? (d(), r(T, {
-			key: 0,
-			"initial-x": C.computedHeightPanelX,
+	return d(), a(e, null, [
+		i(" 主面板 "),
+		c(w, {
+			ref: "basePanel",
+			title: "倾斜摄影加载",
+			"title-icon": "📷",
+			width: 420,
+			"max-height": "70vh",
+			"initial-x": _.initialX,
 			"initial-y": _.initialY,
-			"selected-layer": S.selectedLayer,
-			onClose: p[22] ||= (e) => S.showHeightPanel = !1,
-			onHeightPreview: C.onHeightPreview,
-			onHeightChange: C.onHeightChange
-		}, null, 8, [
+			"allow-minimize": !0,
+			"registration-key": _.registrationKey || "ObliquePhotographyPanel",
+			"panel-instance-id": _.panelInstanceId,
+			"auto-register": _.autoRegister === void 0 ? !0 : _.autoRegister,
+			"lazy-load": _.lazyLoad || C.getConfigLazyLoad(),
+			"close-event-name": "obliquePhotographyPanelClose",
+			onClose: C.handleClose,
+			onMinimize: C.handleMinimize,
+			onExpand: C.handleExpand,
+			onLazyLoad: C.onLazyLoad
+		}, {
+			default: v(() => [
+				i(" 工具栏 "),
+				o("div", be, [
+					o("button", {
+						onClick: p[0] ||= (e) => S.showAddDialog = !0,
+						class: "tool-btn add-btn",
+						title: "添加倾斜摄影数据"
+					}, [...p[23] ||= [o("svg", {
+						viewBox: "0 0 24 24",
+						fill: "none",
+						stroke: "currentColor",
+						"stroke-width": "2"
+					}, [o("path", {
+						d: "M12 5v14M5 12h14",
+						"stroke-linecap": "round",
+						"stroke-linejoin": "round"
+					})], -1), s(" 添加 ", -1)]]),
+					i(" ⭐ 导出配置到服务器 JSON 文件（通过 HTTP API 写入 SQLite → 自动同步到 FTP 目录） "),
+					o("button", {
+						onClick: p[1] ||= (...e) => C.exportConfig && C.exportConfig(...e),
+						class: "tool-btn export-btn",
+						title: "导出配置到服务器 JSON 文件"
+					}, [...p[24] ||= [o("svg", {
+						viewBox: "0 0 24 24",
+						fill: "none",
+						stroke: "currentColor",
+						"stroke-width": "2"
+					}, [o("path", {
+						d: "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3",
+						"stroke-linecap": "round",
+						"stroke-linejoin": "round"
+					})], -1), s(" 导出 ", -1)]]),
+					i(" ⭐ 从服务器 JSON 文件导入配置（通过 HTTP API 读取） "),
+					o("button", {
+						onClick: p[2] ||= (...e) => C.importConfig && C.importConfig(...e),
+						class: "tool-btn import-btn",
+						title: "从服务器 JSON 文件导入配置"
+					}, [...p[25] ||= [o("svg", {
+						viewBox: "0 0 24 24",
+						fill: "none",
+						stroke: "currentColor",
+						"stroke-width": "2"
+					}, [o("path", {
+						d: "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12",
+						"stroke-linecap": "round",
+						"stroke-linejoin": "round"
+					})], -1), s(" 导入 ", -1)]]),
+					i(" ⭐ 从服务器刷新 JSON 数据 "),
+					o("button", {
+						onClick: p[3] ||= (...e) => C.refreshFromJson && C.refreshFromJson(...e),
+						class: "tool-btn refresh-btn",
+						title: "从服务器刷新 JSON 数据"
+					}, [...p[26] ||= [o("svg", {
+						viewBox: "0 0 24 24",
+						fill: "none",
+						stroke: "currentColor",
+						"stroke-width": "2"
+					}, [o("path", {
+						d: "M23 4v6h-6M1 20v-6h6",
+						"stroke-linecap": "round",
+						"stroke-linejoin": "round"
+					}), o("path", {
+						d: "M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15",
+						"stroke-linecap": "round",
+						"stroke-linejoin": "round"
+					})], -1), s(" 刷新 ", -1)]])
+				]),
+				i(" 倾斜摄影列表 "),
+				o("div", xe, [(d(!0), a(e, null, f(S.obliquePhotographyList, (e) => (d(), a("div", {
+					key: e.id,
+					class: l(["oblique-item", {
+						"is-loaded": e.loaded,
+						"is-loading": e.loading,
+						"is-selected": S.selectedItemId === e.id
+					}])
+				}, [
+					i(" 复选框和名称 "),
+					o("div", Se, [o("label", Ce, [
+						o("input", {
+							type: "checkbox",
+							checked: e.loaded || !1,
+							onChange: (t) => C.toggleObliquePhotography(e),
+							disabled: e.loading || !1,
+							class: "checkbox-input"
+						}, null, 40, we),
+						p[27] ||= o("span", { class: "check-indicator" }, null, -1),
+						o("div", Te, [o("span", Ee, h(e.name || "未知"), 1), e.loading ? (d(), a("span", De, "加载中...")) : e.loaded ? (d(), a("span", Oe, "已加载")) : (d(), a("span", ke, "未加载"))])
+					])]),
+					i(" 操作按钮组 "),
+					o("div", Ae, [
+						i(" 定位按钮：始终显示，定位到3D Tiles位置 "),
+						o("button", {
+							onClick: (t) => C.locateToObliquePhotography(e),
+							class: "action-btn locate-btn",
+							type: "button",
+							disabled: !e.loaded,
+							"aria-label": `定位到 ${e.name}`,
+							title: "定位到3D Tiles位置"
+						}, [...p[28] ||= [o("svg", {
+							viewBox: "0 0 24 24",
+							fill: "none",
+							stroke: "currentColor",
+							"stroke-width": "2"
+						}, [o("path", {
+							d: "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z",
+							"stroke-linecap": "round",
+							"stroke-linejoin": "round"
+						}), o("circle", {
+							cx: "12",
+							cy: "10",
+							r: "3",
+							"stroke-linecap": "round",
+							"stroke-linejoin": "round"
+						})], -1)]], 8, je),
+						i(" 高度调整按钮：只在已加载时显示 "),
+						e.loaded ? (d(), a("button", {
+							key: 0,
+							onClick: (t) => C.openHeightAdjust(e),
+							class: "action-btn height-btn",
+							type: "button",
+							"aria-label": `调整 ${e.name} 高度`,
+							title: "高度调整"
+						}, [...p[29] ||= [o("svg", {
+							viewBox: "0 0 24 24",
+							fill: "none",
+							stroke: "currentColor",
+							"stroke-width": "2"
+						}, [o("path", {
+							d: "M12 19V5M5 12l7-7 7 7",
+							"stroke-linecap": "round",
+							"stroke-linejoin": "round"
+						})], -1)]], 8, Me)) : i("v-if", !0),
+						i(" 编辑按钮 "),
+						o("button", {
+							onClick: (t) => C.openEditDialog(e),
+							class: "action-btn edit-btn",
+							type: "button",
+							"aria-label": `编辑 ${e.name}`,
+							title: "编辑"
+						}, [...p[30] ||= [o("svg", {
+							viewBox: "0 0 24 24",
+							fill: "none",
+							stroke: "currentColor",
+							"stroke-width": "2"
+						}, [o("path", {
+							d: "M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7",
+							"stroke-linecap": "round",
+							"stroke-linejoin": "round"
+						}), o("path", {
+							d: "M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z",
+							"stroke-linecap": "round",
+							"stroke-linejoin": "round"
+						})], -1)]], 8, Ne),
+						i(" 删除按钮 "),
+						o("button", {
+							onClick: (t) => C.confirmDelete(e),
+							class: "action-btn delete-btn",
+							type: "button",
+							"aria-label": `删除 ${e.name}`,
+							title: "删除"
+						}, [...p[31] ||= [o("svg", {
+							viewBox: "0 0 24 24",
+							fill: "none",
+							stroke: "currentColor",
+							"stroke-width": "2"
+						}, [o("path", {
+							d: "M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2",
+							"stroke-linecap": "round",
+							"stroke-linejoin": "round"
+						})], -1)]], 8, Pe)
+					])
+				], 2))), 128))]),
+				i(" 空状态 "),
+				S.obliquePhotographyList.length === 0 ? (d(), a("div", Fe, [...p[32] ||= [
+					o("svg", {
+						class: "empty-icon",
+						viewBox: "0 0 24 24",
+						fill: "none",
+						stroke: "currentColor",
+						"stroke-width": "2"
+					}, [o("path", {
+						d: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z",
+						"stroke-linecap": "round",
+						"stroke-linejoin": "round"
+					})], -1),
+					o("div", { class: "empty-title" }, "暂无倾斜摄影数据", -1),
+					o("div", { class: "empty-hint" }, "点击\"添加\"按钮导入倾斜摄影配置", -1)
+				]])) : i("v-if", !0),
+				i(" 添加/编辑对话框 "),
+				(d(), r(t, { to: "body" }, [c(n, { name: "dialog-fade" }, {
+					default: v(() => [S.showAddDialog || S.showEditDialog ? (d(), a("div", {
+						key: 0,
+						class: "dialog-overlay",
+						onClick: p[11] ||= b((...e) => C.closeDialog && C.closeDialog(...e), ["self"])
+					}, [o("div", {
+						class: "dialog",
+						onClick: p[10] ||= b(() => {}, ["stop"])
+					}, [
+						o("div", Ie, [o("h3", Le, h(S.showEditDialog ? "编辑倾斜摄影" : "添加倾斜摄影"), 1), o("button", {
+							onClick: p[4] ||= (...e) => C.closeDialog && C.closeDialog(...e),
+							class: "dialog-close",
+							"aria-label": "关闭对话框"
+						}, [...p[33] ||= [o("svg", {
+							viewBox: "0 0 24 24",
+							fill: "none",
+							stroke: "currentColor",
+							"stroke-width": "2"
+						}, [o("path", {
+							d: "M18 6L6 18M6 6l12 12",
+							"stroke-linecap": "round",
+							"stroke-linejoin": "round"
+						})], -1)]])]),
+						o("div", Re, [
+							o("div", ze, [p[34] ||= o("label", { class: "form-label" }, [s("ID "), o("span", { class: "required" }, "*")], -1), y(o("input", {
+								"onUpdate:modelValue": p[5] ||= (e) => S.formData.id = e,
+								type: "text",
+								class: "form-input",
+								placeholder: "输入唯一标识符",
+								disabled: S.showEditDialog
+							}, null, 8, Be), [[g, S.formData.id]])]),
+							o("div", Ve, [p[35] ||= o("label", { class: "form-label" }, [s("名称 "), o("span", { class: "required" }, "*")], -1), y(o("input", {
+								"onUpdate:modelValue": p[6] ||= (e) => S.formData.name = e,
+								type: "text",
+								class: "form-input",
+								placeholder: "输入显示名称"
+							}, null, 512), [[g, S.formData.name]])]),
+							o("div", He, [p[36] ||= o("label", { class: "form-label" }, [s("URL "), o("span", { class: "required" }, "*")], -1), y(o("textarea", {
+								"onUpdate:modelValue": p[7] ||= (e) => S.formData.url = e,
+								class: "form-textarea",
+								rows: "3",
+								placeholder: "输入倾斜摄影数据URL"
+							}, null, 512), [[g, S.formData.url]])])
+						]),
+						o("div", Ue, [o("button", {
+							onClick: p[8] ||= (...e) => C.closeDialog && C.closeDialog(...e),
+							class: "dialog-btn cancel-btn"
+						}, "取消"), o("button", {
+							onClick: p[9] ||= (...e) => C.saveItem && C.saveItem(...e),
+							class: "dialog-btn confirm-btn"
+						}, "保存")])
+					])])) : i("v-if", !0)]),
+					_: 1
+				})])),
+				i(" 删除确认对话框 "),
+				(d(), r(t, { to: "body" }, [c(n, { name: "dialog-fade" }, {
+					default: v(() => [S.showDeleteDialog ? (d(), a("div", {
+						key: 0,
+						class: "dialog-overlay",
+						onClick: p[15] ||= b((e) => S.showDeleteDialog = !1, ["self"])
+					}, [o("div", {
+						class: "dialog dialog-small",
+						onClick: p[14] ||= b(() => {}, ["stop"])
+					}, [
+						p[38] ||= o("div", { class: "dialog-header" }, [o("h3", { class: "dialog-title" }, "确认删除")], -1),
+						o("div", We, [o("div", Ge, [p[37] ||= o("svg", {
+							class: "warning-icon",
+							viewBox: "0 0 24 24",
+							fill: "none",
+							stroke: "currentColor",
+							"stroke-width": "2"
+						}, [o("path", {
+							d: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
+							"stroke-linecap": "round",
+							"stroke-linejoin": "round"
+						})], -1), o("div", Ke, " 确定要删除 \"" + h(S.deleteTarget?.name) + "\" 吗？此操作无法撤销。 ", 1)])]),
+						o("div", qe, [o("button", {
+							onClick: p[12] ||= (e) => S.showDeleteDialog = !1,
+							class: "dialog-btn cancel-btn"
+						}, "取消"), o("button", {
+							onClick: p[13] ||= (...e) => C.executeDelete && C.executeDelete(...e),
+							class: "dialog-btn danger-btn"
+						}, "删除")])
+					])])) : i("v-if", !0)]),
+					_: 1
+				})])),
+				i(" ⭐ 服务器文件浏览对话框（导入配置） "),
+				(d(), r(t, { to: "body" }, [c(n, { name: "dialog-fade" }, {
+					default: v(() => [S.showImportDialog ? (d(), a("div", {
+						key: 0,
+						class: "dialog-overlay",
+						onClick: p[21] ||= b((...e) => C.closeImportDialog && C.closeImportDialog(...e), ["self"])
+					}, [o("div", {
+						class: "dialog dialog-large",
+						onClick: p[20] ||= b(() => {}, ["stop"])
+					}, [
+						o("div", Je, [p[39] ||= o("h3", { class: "dialog-title" }, "📂 从服务器导入配置", -1), o("button", {
+							onClick: p[16] ||= (...e) => C.closeImportDialog && C.closeImportDialog(...e),
+							class: "close-btn",
+							"aria-label": "关闭"
+						}, "×")]),
+						o("div", Ye, [
+							i(" 服务器信息 "),
+							o("div", Xe, [p[40] ||= o("span", { class: "server-label" }, "服务器：", -1), o("span", Ze, h(S.apiServerURL), 1)]),
+							i(" 文件列表 "),
+							o("div", Qe, [
+								i(" 目录导航 "),
+								o("div", $e, [
+									C.canGoBack ? (d(), a("button", {
+										key: 0,
+										onClick: p[17] ||= (...e) => C.navigateToParentDirectory && C.navigateToParentDirectory(...e),
+										class: "nav-btn back-btn",
+										title: "返回上级目录"
+									}, [...p[41] ||= [o("svg", {
+										viewBox: "0 0 24 24",
+										fill: "none",
+										stroke: "currentColor",
+										"stroke-width": "2"
+									}, [o("path", {
+										d: "M19 12H5M12 19l-7-7 7-7",
+										"stroke-linecap": "round",
+										"stroke-linejoin": "round"
+									})], -1), s(" 返回 ", -1)]])) : i("v-if", !0),
+									p[42] ||= o("span", { class: "nav-label" }, "目录：", -1),
+									o("span", et, h(C.currentDirectoryDisplay), 1)
+								]),
+								i(" 子目录列表 "),
+								S.loadingServerFiles ? (d(), a(e, { key: 1 }, [i(" 加载状态 "), p[48] ||= o("div", { class: "file-list loading" }, [o("div", { class: "loading-spinner" }), o("p", null, "正在加载服务器文件...")], -1)], 2112)) : (d(), a("div", tt, [
+									i(" 子目录 "),
+									(d(!0), a(e, null, f(C.currentSubdirectories, (e) => (d(), a("div", {
+										key: "dir-" + e,
+										class: "file-item directory-item",
+										onClick: (t) => C.navigateToDirectory(e)
+									}, [
+										p[44] ||= o("div", { class: "file-icon" }, "📁", -1),
+										o("div", nt, [o("div", rt, h(e), 1), p[43] ||= o("div", { class: "file-path" }, "目录", -1)]),
+										p[45] ||= o("div", { class: "file-action" }, "📂", -1)
+									], 8, $))), 128)),
+									i(" 文件 "),
+									(d(!0), a(e, null, f(C.currentDirectoryFiles, (e) => (d(), a("div", {
+										key: e.path || e.filePath,
+										class: l(["file-item", { "is-selected": S.selectedServerFile === e }]),
+										onClick: (t) => C.selectServerFile(e)
+									}, [
+										p[46] ||= o("div", { class: "file-icon" }, "📄", -1),
+										o("div", at, [
+											o("div", ot, h(e.fileName || e.name), 1),
+											o("div", st, h(e.filePath || e.path), 1),
+											o("div", ct, [o("span", lt, h(C.formatFileSize(e.fileSize || e.size)), 1), o("span", ut, h(C.formatDate(e.modifiedTime || e.modified)), 1)])
+										]),
+										p[47] ||= o("div", { class: "file-action" }, "📥", -1)
+									], 10, it))), 128))
+								])),
+								i(" 空状态 "),
+								!S.loadingServerFiles && S.serverFiles.length === 0 ? (d(), a("div", dt, [...p[49] ||= [
+									o("div", { class: "empty-icon" }, "📁", -1),
+									o("div", { class: "empty-title" }, "服务器上没有找到配置文件", -1),
+									o("div", { class: "empty-hint" }, "请确保 API 服务器已启动", -1)
+								]])) : i("v-if", !0)
+							])
+						]),
+						o("div", ft, [o("button", {
+							onClick: p[18] ||= (...e) => C.closeImportDialog && C.closeImportDialog(...e),
+							class: "dialog-btn cancel-btn"
+						}, "取消"), o("button", {
+							onClick: p[19] ||= (e) => C.loadServerFiles(),
+							class: "dialog-btn secondary-btn",
+							disabled: S.loadingServerFiles
+						}, " 🔄 刷新 ", 8, pt)])
+					])])) : i("v-if", !0)]),
+					_: 1
+				})]))
+			]),
+			_: 1
+		}, 8, [
 			"initial-x",
 			"initial-y",
-			"selected-layer",
-			"onHeightPreview",
-			"onHeightChange"
-		])) : i("", !0)]),
-		_: 1
-	})]))], 64);
+			"registration-key",
+			"panel-instance-id",
+			"auto-register",
+			"lazy-load",
+			"onClose",
+			"onMinimize",
+			"onExpand",
+			"onLazyLoad"
+		]),
+		i(" 高度调整面板（独立渲染，避免嵌套Teleport冲突） "),
+		(d(), r(t, { to: "body" }, [c(n, { name: "height-panel-fade" }, {
+			default: v(() => [S.showHeightPanel && S.selectedLayer ? (d(), r(T, {
+				key: 0,
+				"initial-x": C.computedHeightPanelX,
+				"initial-y": _.initialY,
+				"selected-layer": S.selectedLayer,
+				onClose: p[22] ||= (e) => S.showHeightPanel = !1,
+				onHeightPreview: C.onHeightPreview,
+				onHeightChange: C.onHeightChange
+			}, null, 8, [
+				"initial-x",
+				"initial-y",
+				"selected-layer",
+				"onHeightPreview",
+				"onHeightChange"
+			])) : i("v-if", !0)]),
+			_: 1
+		})]))
+	], 64);
 }
-var _t = /*#__PURE__*/ w(be, [["render", gt], ["__scopeId", "data-v-3d58609d"]]);
+var ht = /*#__PURE__*/ w(ye, [["render", mt], ["__scopeId", "data-v-3d58609d"]]);
 //#endregion
-export { _t as default };
+export { ht as default };

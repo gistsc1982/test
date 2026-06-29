@@ -33436,6 +33436,7 @@ var K1 = {
       transformMode: "translate",
       interactionLayer: "three",
       eventLayerListenerAdded: !1,
+      _eventLayerActive: !0,
       pointerDown: !1,
       pointerDownButton: -1,
       lastPointerPos: {
@@ -33545,7 +33546,17 @@ var K1 = {
     };
   },
   mounted() {
-    console.log("[DualCanvasViewer] 已挂载"), console.log("[DualCanvasViewer] threeContainer ref:", this.$refs.threeContainer), console.log("[DualCanvasViewer] bimContainer ref:", this.$refs.bimContainer), this.heightAlignmentManager = new uM(), console.log("[DualCanvasViewer] ✅ HeightAlignmentManager 已初始化"), window.__dualCanvasViewerInstances || (window.__dualCanvasViewerInstances = []), window.__dualCanvasViewerInstances.push(this), window.__dualCanvasViewer = this, console.log("[DualCanvasViewer] Registered to global debug system. Total instances:", window.__dualCanvasViewerInstances.length), window.exitRealWorldMode = () => {
+    console.log("[DualCanvasViewer] 已挂载"), this.$nextTick(() => {
+      const t = this.$el;
+      t && (t.style.setProperty("position", "relative", "important"), t.style.setProperty("width", "100%", "important"), t.style.setProperty("height", "100%", "important"), t.style.setProperty("overflow", "hidden", "important")), [
+        "threeContainer",
+        "bimContainer",
+        "eventContainer"
+      ].forEach((i) => {
+        const n = this.$refs[i];
+        n && (n.style.setProperty("position", "absolute", "important"), n.style.setProperty("top", "0", "important"), n.style.setProperty("left", "0", "important"), n.style.setProperty("width", "100%", "important"), n.style.setProperty("height", "100%", "important"));
+      }), this.$refs.eventContainer && (this.$refs.eventContainer.style.setProperty("z-index", "10", "important"), this.$refs.eventContainer.style.setProperty("opacity", "0", "important")), this.$refs.threeContainer && this.$refs.threeContainer.style.setProperty("z-index", "1", "important"), this.$refs.bimContainer && this.$refs.bimContainer.style.setProperty("z-index", "2", "important"), console.log("[DualCanvasViewer] ✅ 容器约束样式已强制执行");
+    }), console.log("[DualCanvasViewer] threeContainer ref:", this.$refs.threeContainer), console.log("[DualCanvasViewer] bimContainer ref:", this.$refs.bimContainer), this.heightAlignmentManager = new uM(), console.log("[DualCanvasViewer] ✅ HeightAlignmentManager 已初始化"), window.__dualCanvasViewerInstances || (window.__dualCanvasViewerInstances = []), window.__dualCanvasViewerInstances.push(this), window.__dualCanvasViewer = this, console.log("[DualCanvasViewer] Registered to global debug system. Total instances:", window.__dualCanvasViewerInstances.length), window.exitRealWorldMode = () => {
       this.exitRealWorldMode();
     }, window.saveModelLayoutSnapshot = () => {
       this.saveModelLayoutSnapshot();
@@ -33580,14 +33591,18 @@ var K1 = {
       this.initModelInteraction1(), this.initModelInteraction2(), this.applyControlsRestrictions(), this.updateBimOpacity(), this.registerLayersToViewport();
     }, 200), this.setupCameraSync(), this.initPrecisionModelLoader(), this.setupKeyboardShortcuts(), this.updatePointerEvents(), this.loadDefaultModels(), window.addEventListener("resize", this.handleWindowResize), this.setupCoordinateTracking(), this.$nextTick(() => {
       this._createSceneContainers(), this._initializeSceneRotationSystem();
-    });
+    }), this._handleMouseEnter = () => {
+      this._eventLayerActive || (this._eventLayerActive = !0, this.updatePointerEvents());
+    }, this._handleMouseLeave = () => {
+      this._eventLayerActive && (this._eventLayerActive = !1, this.updatePointerEvents());
+    }, this.$el.addEventListener("mouseenter", this._handleMouseEnter), this.$el.addEventListener("mouseleave", this._handleMouseLeave), console.log("[DualCanvasViewer] ✅ mouseenter/mouseleave 事件层激活控制已设置");
   },
   beforeUnmount() {
     if (window.__dualCanvasViewerInstances) {
       const e = window.__dualCanvasViewerInstances.indexOf(this);
       e > -1 && (window.__dualCanvasViewerInstances.splice(e, 1), console.log("[DualCanvasViewer] Removed from global debug system. Remaining instances:", window.__dualCanvasViewerInstances.length)), window.__dualCanvasViewer === this && delete window.__dualCanvasViewer;
     }
-    this.cleanup(), this.removeKeyboardShortcuts(), window.removeEventListener("resize", this.handleWindowResize), window.removeEventListener("resize", this._updateScreenCenterHandler), this.removeCoordinateTracking(), this.sceneRotationIntegration && this.sceneRotationIntegration.dispose(), this.sceneContainer1 && (this.scene1.remove(this.sceneContainer1), this.sceneContainer1 = null), this.sceneContainer2 && (this.scene2.remove(this.sceneContainer2), this.sceneContainer2 = null), this.anchorContainer1 && (this.scene1.remove(this.anchorContainer1), this.anchorContainer1 = null), this.anchorContainer2 && (this.scene2.remove(this.anchorContainer2), this.anchorContainer2 = null), console.log("[DualCanvasViewer] 场景旋转系统已清理");
+    this.cleanup(), this.removeKeyboardShortcuts(), window.removeEventListener("resize", this.handleWindowResize), window.removeEventListener("resize", this._updateScreenCenterHandler), this.removeCoordinateTracking(), this.sceneRotationIntegration && this.sceneRotationIntegration.dispose(), this.sceneContainer1 && (this.scene1.remove(this.sceneContainer1), this.sceneContainer1 = null), this.sceneContainer2 && (this.scene2.remove(this.sceneContainer2), this.sceneContainer2 = null), this.anchorContainer1 && (this.scene1.remove(this.anchorContainer1), this.anchorContainer1 = null), this.anchorContainer2 && (this.scene2.remove(this.anchorContainer2), this.anchorContainer2 = null), this._handleMouseEnter && this.$el && (this.$el.removeEventListener("mouseenter", this._handleMouseEnter), this.$el.removeEventListener("mouseleave", this._handleMouseLeave)), console.log("[DualCanvasViewer] 场景旋转系统已清理");
   },
   methods: {
     calculateAnchorContainerY() {
@@ -36152,7 +36167,7 @@ var K1 = {
       }
       console.log("[DualCanvasViewer] updatePointerEvents - activeLayer:", this.activeLayer, "interactionLayer:", this.interactionLayer);
       let t = null;
-      if (this.layersConfig.forEach((i) => {
+      this.layersConfig.forEach((i) => {
         const n = this.$refs[i.containerRef];
         if (!n) {
           console.warn(`[DualCanvasViewer] 层 ${i.name} 容器未找到`);
@@ -36183,12 +36198,7 @@ var K1 = {
           transformControls: i.transformControls(),
           selectedModel: i.selectedModel()
         });
-      }), this.activeLayer === "both") {
-        const i = this.xeokitViewers && this.xeokitViewers.length > 0, n = this.hasXeokitModelsInScene(this.modelGroup2);
-        this.interactionLayer === "bim" && i || n ? (e.style.pointerEvents = "auto", console.log("[DualCanvasViewer] 双层模式+BIM交互层+xeokit: 事件层保持激活以转发事件")) : e.style.pointerEvents = "auto";
-      } else
-        e.style.pointerEvents = "auto", console.log("[DualCanvasViewer] 单层模式: 事件层保持激活以接收事件");
-      t && (t.controls && t.controls.domElement !== t.eventTarget && (t.controls.domElement = t.eventTarget, t.controls.update()), console.log("[DualCanvasViewer] 激活 controls，activeLayer:", this.activeLayer, "activeLayerInfo.controls:", t.controls === this.controls1 ? "controls1" : "controls2"), this.layersConfig.forEach((i) => {
+      }), this._eventLayerActive ? e.style.pointerEvents = "auto" : e.style.pointerEvents = "none", t && (t.controls && t.controls.domElement !== t.eventTarget && (t.controls.domElement = t.eventTarget, t.controls.update()), console.log("[DualCanvasViewer] 激活 controls，activeLayer:", this.activeLayer, "activeLayerInfo.controls:", t.controls === this.controls1 ? "controls1" : "controls2"), this.layersConfig.forEach((i) => {
         const n = i.controls();
         if (n) if (this.activeLayer === "both")
           n.enabled = !0, console.log("[DualCanvasViewer] 双层模式：启用", i.id, "controls");
@@ -36198,7 +36208,7 @@ var K1 = {
         }
         const o = i.transformControls();
         o && (this.activeLayer === "both" ? o.enabled = !0 : o.enabled = t.layerNum === i.index);
-      }), console.log("[DualCanvasViewer] 激活层:", t.name, "controls domElement:", t.controls?.domElement?.tagName || "none")), this.eventLayerListenerAdded || (e.addEventListener("pointerdown", this.onEventLayerPointerDown), e.addEventListener("pointermove", this.onEventLayerPointerMove), e.addEventListener("pointerup", this.onEventLayerPointerUp), e.addEventListener("wheel", this.onEventLayerWheel, { passive: !1 }), this.eventLayerListenerAdded = !0, console.log("[DualCanvasViewer] 已绑定事件转发监听器到事件层")), this.activeLayer === "both" && this.$nextTick(() => {
+      }), console.log("[DualCanvasViewer] 激活层:", t.name, "controls domElement:", t.controls?.domElement?.tagName || "none")), this.eventLayerListenerAdded || (e.addEventListener("pointerdown", this.onEventLayerPointerDown), e.addEventListener("pointermove", this.onEventLayerPointerMove), e.addEventListener("pointerup", this.onEventLayerPointerUp), e.addEventListener("wheel", this.onEventLayerWheel, { passive: !1 }), this.eventLayerListenerAdded = !0, console.log("[DualCanvasViewer] 已绑定事件转发监听器（pointer-events: none，不拦截）")), this.activeLayer === "both" && this.$nextTick(() => {
         this.interactionLayer === "three" || !this.interactionLayer ? (this.syncCameraFromThreeToBim(), this.xeokitViewers && this.xeokitViewers.length > 0 && this.syncCameraToXeokit()) : this.interactionLayer === "bim" && (this.syncCameraFromBimToThree(), this.xeokitViewers && this.xeokitViewers.length > 0 && this.syncCameraToXeokit());
       }), this.xeokitViewers && this.xeokitViewers.length > 0 && (console.log("[DualCanvasViewer] 更新 xeokit canvas pointer-events, activeLayer:", this.activeLayer, "interactionLayer:", this.interactionLayer), this.xeokitViewers.forEach((i) => {
         const n = i.canvas;
@@ -39811,6 +39821,7 @@ ${t || "未知错误"}
 function Q1(e, t, i, n, o, r) {
   const s = Cf("DualCanvasControlPanel"), a = Cf("CoordinateInfoPanel");
   return gt(), mt("div", Z1, [
+    t[0] || (t[0] = O("div", { class: "map-test-layer" }, null, -1)),
     O("div", {
       ref: "threeContainer",
       class: Bi(["layer-container three-layer", { "layer-hidden": !o.showThreeLayer }])
@@ -39891,7 +39902,7 @@ function Q1(e, t, i, n, o, r) {
     ])
   ]);
 }
-var tS = /* @__PURE__ */ ff(K1, [["render", Q1], ["__scopeId", "data-v-ffa05e9d"]]);
+var tS = /* @__PURE__ */ ff(K1, [["render", Q1], ["__scopeId", "data-v-8f6e3b9c"]]);
 export {
   tS as default
 };
