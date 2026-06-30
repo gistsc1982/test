@@ -96,6 +96,7 @@ var GEO_LABELS = {
   model: '3D 模型',
   billboard: '图标',
   label: '标签',
+  cluster: '聚类',
   '3dtiles': '3D Tiles',
   unknown: '实体'
 };
@@ -401,6 +402,12 @@ export default {
 .tag-billboard {
   background: rgba(255, 193, 7, 0.2);
   color: #FFD54F;
+}
+
+.tag-cluster {
+  background: rgba(255, 107, 53, 0.25);
+  color: #FF6B35;
+  font-weight: 600;
 }
 
 .tag-3dtiles {

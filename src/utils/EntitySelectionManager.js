@@ -270,26 +270,41 @@ function extractProperties(entity) {
 
 /**
  * 处理聚类实体被点击 — 飞行靠近以展开聚类
+ *
+ * @returns {{ handled: boolean, clusterCount: number, clusterPosition: Cesium.Cartesian3|null }}
  */
-function handleClusterPick(clusterEntity, viewer, Cesium, onClusterExpand) {
-  if (!clusterEntity || !clusterEntity.position) return false;
+function handleClusterPick(clusterEntity, viewer, Cesium) {
+  if (!clusterEntity || !clusterEntity.position) return { handled: false, clusterCount: 0, clusterPosition: null };
 
   try {
     const position = clusterEntity.position.getValue
       ? clusterEntity.position.getValue(Cesium.JulianDate.now())
       : clusterEntity.position;
 
-    if (!position) return false;
+    if (!position) return { handled: false, clusterCount: 0, clusterPosition: null };
 
-    // 计算当前相机到聚类位置的距离，飞行到一半距离来展开聚类
-    const camPos = viewer.camera.positionCartographic;
-    const clusterPos = Cesium.Cartographic.fromCartesian(position);
+    // 提取聚类数量（从 label.text 或 billboard 图片尺寸推算）
+    var count = 0;
+    try {
+      var text = clusterEntity.label && clusterEntity.label.text
+        ? (clusterEntity.label.text.getValue
+          ? clusterEntity.label.text.getValue()
+          : clusterEntity.label.text)
+        : null;
+      if (text && /^\d+$/.test(String(text))) {
+        count = parseInt(text, 10);
+      }
+    } catch (e) { /* ignore */ }
+
+    // ⭐ 激进贴近以强制展开聚类：10% 原距离，最低 25 米
     const dist = Cesium.Cartesian3.distance(viewer.camera.position, position);
-    const targetDist = Math.max(dist * 0.3, 100); // 飞近到 30% 距离，最低 100 米
+    const targetDist = Math.max(dist * 0.1, 25);
+
+    console.log('[EntitySelectionManager] 🔵 聚类展开: 原距离=' + dist.toFixed(0) + 'm → 目标=' + targetDist.toFixed(0) + 'm, 数量=' + count);
 
     viewer.camera.flyTo({
       destination: position,
-      duration: 0.8,
+      duration: 0.6,
       offset: new Cesium.HeadingPitchRange(
         viewer.camera.heading,
         viewer.camera.pitch,
@@ -297,14 +312,10 @@ function handleClusterPick(clusterEntity, viewer, Cesium, onClusterExpand) {
       )
     });
 
-    if (onClusterExpand) {
-      onClusterExpand(clusterEntity, clusterPos);
-    }
-
-    return true;
+    return { handled: true, clusterCount: count, clusterPosition: position };
   } catch (e) {
     console.warn('[EntitySelectionManager] 聚类展开失败:', e.message);
-    return false;
+    return { handled: false, clusterCount: 0, clusterPosition: null };
   }
 }
 
@@ -519,32 +530,93 @@ EntitySelectionManager.prototype = {
   _globalPick: function (viewer, movement, Cesium, mode) {
     var self = this;
     var screenPos = movement.endPosition || movement.position;
-    var pick = viewer.scene.pick(screenPos);
 
-    console.log('[EntitySelectionManager] 🖱️ pick 结果:', {
-      hasPick: !!pick,
-      pickId: pick && pick.id ? (pick.id.name || pick.id.id || pick.id) : null,
-      isTileset: !!(pick && pick.tileset),
-      layersRegistered: self._layers.size
-    });
+    // ⭐ 使用 drillPick 获取所有命中对象（比 scene.pick 更全面，
+    //    可解决 SGKJ_SDK 中聚类实体 pick.id 为 null 的问题）
+    var drillResults = viewer.scene.drillPick(screenPos, 10);
+    var pick = drillResults && drillResults.length > 0 ? drillResults[0] : null;
+
+    // 调试：输出首层 pick + drill 总数
+    if (drillResults && drillResults.length > 0) {
+      var pickSummary = drillResults.slice(0, 5).map(function (p) {
+        var eid = null;
+        if (p.id) {
+          try { eid = p.id.name || p.id.id || (typeof p.id === 'string' ? p.id : p.id._id); } catch (e2) { eid = String(p.id); }
+        } else if (p.primitive && p.primitive.id) {
+          try { eid = p.primitive.id.name || p.primitive.id.id || p.primitive.id._id || String(p.primitive.id); } catch (e2) { eid = 'primitive.hasId'; }
+        }
+        return {
+          hasId: !!p.id,
+          id: eid,
+          hasTileset: !!p.tileset,
+          primitiveType: p.primitive ? (p.primitive.constructor ? p.primitive.constructor.name : typeof p.primitive) : 'null'
+        };
+      });
+      console.log('[EntitySelectionManager] 🖱️ drillPick 结果 (' + drillResults.length + ' 个对象):', pickSummary,
+        ', layersRegistered=' + self._layers.size);
+    } else {
+      console.log('[EntitySelectionManager] 🖱️ drillPick: 无命中对象, layersRegistered=' + self._layers.size);
+    }
+
+    // === 尝试从 drillPick 结果中找到有效 entity ===
+    var entity = null;
+
+    // 优先使用 pick.id（顶层命中）
+    if (pick && pick.id) {
+      entity = pick.id;
+      console.log('[EntitySelectionManager] 🎯 顶层 pick.id:', entity.name || entity.id || entity._id);
+    }
+
+    // 如果 pick.id 为空，尝试遍历 drillPick 结果找到第一个有效 entity
+    if (!entity && drillResults) {
+      for (var di = 0; di < drillResults.length; di++) {
+        var dp = drillResults[di];
+        // 检查 pick.id
+        if (dp.id && Cesium.defined(dp.id)) {
+          entity = dp.id;
+          console.log('[EntitySelectionManager] 🎯 drillPick[' + di + '].id:', entity.name || entity.id || entity._id);
+          break;
+        }
+        // 检查 primitive.id（SGKJ_SDK 可能把 entity 存在 primitive.id）
+        if (dp.primitive && dp.primitive.id && Cesium.defined(dp.primitive.id)) {
+          entity = dp.primitive.id;
+          console.log('[EntitySelectionManager] 🎯 drillPick[' + di + '].primitive.id:', entity.name || entity.id || entity._id);
+          break;
+        }
+      }
+    }
 
     // === 处理 3D Tiles pick ===
-    if (pick && pick.tileset && !pick.id) {
-      // 找到第一个注册了该 viewer 的图层来处理
+    if (!entity && pick && pick.tileset) {
       this._layers.forEach(function (layer, layerId) {
         if (layer.viewer === viewer && layer.options.mode === mode) {
           self._handleTilesetPick(viewer, layerId, pick, screenPos, Cesium);
-          return; // break forEach isn't possible, but we only want first match
+          return;
         }
       });
       return;
     }
 
-    // === 处理 Entity pick ===
-    var entity = pick && pick.id ? pick.id : null;
+    // === 聚类实体检测（兜底方案：drillPick 也未找到 entity） ===
+    //    场景：SGKJ_SDK 中，聚类实体通过 Canvas 图像渲染为 billboard，
+    //          但 pick.id 和 primitive.id 可能均为 null。
+    //    方案：遍历所有已注册图层的 dataSource.clustering._cluster.entities，
+    //          将每个聚类实体的世界坐标转为屏幕坐标，与点击位置做距离比对。
+    if (!entity) {
+      var clusterMatch = this._findClusterEntityByScreenPos(viewer, screenPos, Cesium);
+      if (clusterMatch) {
+        entity = clusterMatch.entity;
+        console.log('[EntitySelectionManager] 🔵 屏幕坐标匹配到聚类实体:', entity.id || entity._id);
+        // 直接走聚类处理流程（绕过正常匹配）
+        if (clusterMatch.layerId && clusterMatch.layerOptions && clusterMatch.layerOptions.enableClustering) {
+          this._handleClusterClick(viewer, clusterMatch.layerId, entity, screenPos, clusterMatch.layerOptions, Cesium);
+          return;
+        }
+      }
+    }
 
-    if (!Cesium.defined(entity)) {
-      console.log('[EntitySelectionManager] 🖱️ 点击空白处（pick.id 为空）');
+    if (!entity || !Cesium.defined(entity)) {
+      console.log('[EntitySelectionManager] 🖱️ 点击空白处（无实体命中）');
       // 点击空白处 → 通知所有图层取消选中
       this._layers.forEach(function (layer, layerId) {
         if (layer.viewer === viewer && layer.options.onDismiss) {
@@ -559,6 +631,7 @@ EntitySelectionManager.prototype = {
 
     // 查找实体属于哪个图层
     var matchedLayerId = null;
+    var matchedViaCluster = false;
     this._layers.forEach(function (layer, layerId) {
       if (matchedLayerId) return; // 已匹配
       if (layer.viewer !== viewer) return;
@@ -579,6 +652,28 @@ EntitySelectionManager.prototype = {
           } catch (e2) { /* ignore */ }
         }
       }
+
+      // ⭐ 聚类实体匹配：Cesium EntityCluster 创建的聚类实体不存储在
+      //    dataSource.entities 中，而是在 dataSource.clustering._cluster.entities 里。
+      //    此处补全匹配逻辑，使聚类点可被选中和展开。
+      if (!matchedLayerId && layer.options.enableClustering && layer.dataSource && layer.dataSource.clustering) {
+        try {
+          var clusterColl = layer.dataSource.clustering._cluster;
+          if (clusterColl && clusterColl.entities && clusterColl.entities.contains(entity)) {
+            matchedLayerId = layerId;
+            matchedViaCluster = true;
+            console.log('[EntitySelectionManager] 🔵 聚类实体已匹配到图层:', layerId,
+              '(聚类数量=' + clusterColl.entities.values.length + ')');
+          }
+        } catch (e) {
+          // 访问 _cluster 内部属性失败，回退到启发式匹配
+          if (self._isClusterEntity(entity)) {
+            matchedLayerId = layerId;
+            matchedViaCluster = true;
+            console.log('[EntitySelectionManager] 🔵 聚类实体通过启发式匹配到图层:', layerId);
+          }
+        }
+      }
     });
 
     if (!matchedLayerId) {
@@ -594,16 +689,165 @@ EntitySelectionManager.prototype = {
     if (layer.options.filter && !layer.options.filter(entity)) return;
 
     // 聚类处理
-    if (layer.options.enableClustering && this._isClusterEntity(entity)) {
+    if (layer.options.enableClustering && (matchedViaCluster || this._isClusterEntity(entity))) {
       console.log('[EntitySelectionManager] 🔵 聚类点被点击，飞行展开...');
-      var expanded = handleClusterPick(entity, viewer, Cesium, function () {
-        // 聚类展开后用户可再次点击
-      });
-      if (expanded) return;
+
+      // ⭐ 先构建聚类摘要 payload，让调用方能展示 popup
+      var clusterCount = 0;
+      try {
+        var labelText = entity.label && entity.label.text
+          ? (entity.label.text.getValue ? entity.label.text.getValue() : entity.label.text)
+          : null;
+        if (labelText && /^\d+$/.test(String(labelText))) {
+          clusterCount = parseInt(labelText, 10);
+        }
+      } catch (e) { /* ignore */ }
+
+      var clusterPayload = {
+        layerId: matchedLayerId,
+        entity: entity,
+        screenPosition: screenPos,
+        geoType: 'cluster',
+        properties: [
+          { name: '聚合点数', value: String(clusterCount || '?') },
+          { name: '提示', value: '正在拉近视角展开聚类…' }
+        ],
+        title: '🔵 聚类点 (' + (clusterCount || '?') + ' 个要素)',
+        _raw: entity,
+        _isCluster: true
+      };
+
+      // 通知调用方展示集群摘要 popup
+      if (layer.options.onSelect) {
+        layer.options.onSelect(clusterPayload);
+      }
+
+      // 飞行靠近以展开聚类
+      var result = handleClusterPick(entity, viewer, Cesium);
+
+      if (!result.handled) {
+        // 飞行失败时仍然通知取消选中（关闭 popup）
+        if (layer.options.onDismiss) {
+          layer.options.onDismiss();
+        }
+      }
+      return;
     }
 
     // 正常选中流程
     this._processSelection(viewer, matchedLayerId, entity, screenPos, layer.options, Cesium);
+  },
+
+  /**
+   * 屏幕坐标匹配聚类实体（兜底方案）
+   *
+   * 当 scene.drillPick() 无法返回聚类实体的 entity 引用时（SGKJ_SDK 中
+   * 聚类 billboard 的 primitive.id 可能为 null），通过遍历所有已注册图层的
+   * dataSource.clustering._cluster.entities，将每个聚类实体的世界坐标转为
+   * 屏幕坐标，与点击位置做距离比对来定位被点击的聚类。
+   *
+   * @returns {{ entity: Cesium.Entity, layerId: string, layerOptions: Object } | null}
+   */
+  _findClusterEntityByScreenPos: function (viewer, screenPos, Cesium) {
+    var CLUSTER_SCREEN_RADIUS = 30; // 屏幕像素匹配半径
+
+    var bestMatch = null;
+    var bestDist = CLUSTER_SCREEN_RADIUS + 1;
+
+    var self = this;
+    this._layers.forEach(function (layer, layerId) {
+      if (!layer.options.enableClustering) return;
+      if (layer.viewer !== viewer) return;
+      if (!layer.dataSource || !layer.dataSource.clustering) return;
+
+      var clusterColl;
+      try {
+        clusterColl = layer.dataSource.clustering._cluster;
+        if (!clusterColl || !clusterColl.entities) return;
+      } catch (e) { return; }
+
+      var clusterEntities = clusterColl.entities.values;
+      for (var i = 0; i < clusterEntities.length; i++) {
+        var ce = clusterEntities[i];
+        try {
+          var worldPos = ce.position
+            ? (ce.position.getValue
+              ? ce.position.getValue(viewer.clock.currentTime)
+              : ce.position)
+            : null;
+          if (!worldPos) continue;
+
+          var ceScreen = viewer.scene.cartesianToCanvasCoordinates(worldPos);
+          if (!ceScreen) continue;
+
+          var dx = ceScreen.x - screenPos.x;
+          var dy = ceScreen.y - screenPos.y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestMatch = {
+              entity: ce,
+              layerId: layerId,
+              layerOptions: layer.options
+            };
+          }
+        } catch (e) { /* 跳过无效的聚类实体 */ }
+      }
+    });
+
+    if (bestMatch) {
+      console.log('[EntitySelectionManager] 🔍 聚类屏幕匹配: dist=' + bestDist.toFixed(1) + 'px, layer=' + bestMatch.layerId);
+    }
+    return bestMatch;
+  },
+
+  /**
+   * 处理聚类实体点击（弹出摘要 + 飞行展开）
+   */
+  _handleClusterClick: function (viewer, layerId, entity, screenPos, options, Cesium) {
+    console.log('[EntitySelectionManager] 🔵 聚类点被点击，飞行展开...');
+
+    // ⭐ 提取聚类数量
+    var clusterCount = 0;
+    try {
+      var labelText = entity.label && entity.label.text
+        ? (entity.label.text.getValue ? entity.label.text.getValue() : entity.label.text)
+        : null;
+      if (labelText && /^\d+$/.test(String(labelText))) {
+        clusterCount = parseInt(labelText, 10);
+      }
+    } catch (e) { /* ignore */ }
+
+    // 构建聚类摘要 payload
+    var clusterPayload = {
+      layerId: layerId,
+      entity: entity,
+      screenPosition: screenPos,
+      geoType: 'cluster',
+      properties: [
+        { name: '聚合点数', value: String(clusterCount || '?') },
+        { name: '提示', value: '正在拉近视角展开聚类…' }
+      ],
+      title: '🔵 聚类点 (' + (clusterCount || '?') + ' 个要素)',
+      _raw: entity,
+      _isCluster: true
+    };
+
+    // 通知调用方展示集群摘要 popup
+    if (options.onSelect) {
+      options.onSelect(clusterPayload);
+    }
+
+    // 飞行靠近以展开聚类
+    var result = handleClusterPick(entity, viewer, Cesium);
+
+    if (!result.handled) {
+      // 飞行失败时关闭 popup
+      if (options.onDismiss) {
+        options.onDismiss();
+      }
+    }
   },
 
   /**
