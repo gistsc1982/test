@@ -52,7 +52,9 @@
     </template>
     <template #dialogs>
       <div v-if="_editorVisible" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;" @click.self="closeEditor">
-        <LittleModelEditor ref="modelEditor" :initial-x="400" :initial-y="200" :auto-register="false" :panel-instance-id="1" @close="closeEditor" />
+        <LittleModelEditor ref="modelEditor" :initial-x="400" :initial-y="200" :auto-register="false" :panel-instance-id="1"
+          :editor-data="_editorData" :layer-entities="_editorLayerEntities"
+          @close="closeEditor" @apply="onEditorApply" @manager-action="onEditorManagerAction" />
       </div>
     </template>
   </JsonConfigPanelBase>
@@ -86,7 +88,9 @@ export default {
       _modelLayers: new Map(),
       _wireframeStates: {},
       _activeLayerId: null,
-      _editorVisible: false
+      _editorVisible: false,
+      _editorData: { layerId: null, layerName: '', scale: 5, labelField: '', models: [] },
+      _editorLayerEntities: []
     };
   },
   computed: {
@@ -324,76 +328,51 @@ export default {
       }
     },
 
-    closeEditor() {
-      // 清理拾取模式
-      var state = window.__littleModelEditorState__;
-      if (state && state.pickHandler) {
-        try { if (state.pickHandler.enableDraw !== undefined) state.pickHandler.enableDraw = false;
-              else if (state.pickHandler.destroy) state.pickHandler.destroy(); } catch (e) {}
-        state.pickHandler = null;
-      }
-      state.picking = false;
-      this._editorVisible = false;
-    },
-
     // ==================== model editor bridge ====================
 
     openEditPanel(item) {
-      console.log('[LittleModelManager] openEditPanel called, item:', item.name, 'loaded:', !!this._modelLayers.get(item.id));
-      var geoJsonData = typeof item.geoJson === 'string' ? JSON.parse(item.geoJson) : item.geoJson;
+      var geoJsonData = typeof item.geoJson === "string" ? JSON.parse(item.geoJson) : item.geoJson;
       var models = [];
       if (geoJsonData && geoJsonData.features) {
-        geoJsonData.features.forEach(f => {
+        geoJsonData.features.forEach(function(f) {
           var c = f.geometry.coordinates;
-          models.push({ name: f.properties?.name || '', lon: c[0], lat: c[1], alt: c[2] || 0 });
+          models.push({ name: f.properties && f.properties.name || "", lon: c[0], lat: c[1], alt: c[2] || 0 });
         });
       }
-
-      var state = window.__littleModelEditorState__;
-      state.layerId = item.id;
-      state.layerName = item.name || '';
-      state.scale = Number(item.modelScale || 5);
-      state.labelField = item.labelField || '';
-      state.models = models;
-      state.picking = false;
-      state.pickHandler = null;
-      state.pickTargetIndex = -1;
-
-      var self = this;
-      if (!window.__littleModelShared__) window.__littleModelShared__ = {};
-      window.__littleModelShared__.getLayerData = function (layerId) {
-        return self._modelLayers.get(layerId);
-      };
-      window.__littleModelShared__.managerAction = function (action) {
-        if (action === 'loadAll') self.loadAllLayers();
-        else if (action === 'destroyAll') self.destroyAllLayers();
-        else if (action === 'wireframe') self.toggleWireframeActive();
-      };
-      window.__littleModelShared__.applyEdit = function (editState) {
-        var layerId = editState.layerId;
-        var layerData = self._modelLayers.get(layerId);
-        var features = editState.models.map(function (m) {
-          return { type: 'Feature', geometry: { type: 'Point', coordinates: [m.lon, m.lat, m.alt] }, properties: { name: m.name } };
-        });
-        var newGeoJson = JSON.stringify({ type: 'FeatureCollection', features: features });
-        var cfgItem = self.configList.find(function (i) { return i.id === layerId; });
-        if (cfgItem) {
-          cfgItem.geoJson = newGeoJson;
-          cfgItem.modelScale = editState.scale;
-          if (editState.labelField !== undefined) cfgItem.labelField = editState.labelField;
-          if (self.$refs.basePanel) self.$refs.basePanel.configList = [...self.configList];
-        }
-        if (layerData) {
-          self.removeLayer({ id: layerId, name: editState.layerName });
-          if (cfgItem) self.loadLayer(cfgItem);
-        }
-        self._editorVisible = false;
-      };
-
+      this._editorData = { layerId: item.id, layerName: item.name || "", scale: Number(item.modelScale || 5), labelField: item.labelField || "", models: models };
+      var layerData = this._modelLayers.get(item.id);
+      this._editorLayerEntities = layerData ? layerData.entities : [];
       this._editorVisible = true;
     },
 
-    // ==================== toolbar helpers ====================
+    closeEditor() {
+      this._editorVisible = false;
+    },
+
+    onEditorApply(result) {
+      var layerId = result.layerId;
+      var layerData = this._modelLayers.get(layerId);
+      var features = result.models.map(function(m) { return { type: "Feature", geometry: { type: "Point", coordinates: [m.lon, m.lat, m.alt] }, properties: { name: m.name } }; });
+      var newGeoJson = JSON.stringify({ type: "FeatureCollection", features: features });
+      var cfgItem = this.configList.find(function(i) { return i.id === layerId; });
+      if (cfgItem) {
+        cfgItem.geoJson = newGeoJson;
+        cfgItem.modelScale = result.scale;
+        if (result.labelField !== undefined) cfgItem.labelField = result.labelField;
+        if (this.$refs.basePanel) this.$refs.basePanel.configList = [].concat(this.configList);
+      }
+      if (layerData) {
+        this.removeLayer({ id: layerId, name: result.layerName });
+        if (cfgItem) this.loadLayer(cfgItem);
+      }
+      this._editorVisible = false;
+    },
+
+    onEditorManagerAction(action) {
+      if (action === "loadAll") this.loadAllLayers();
+      else if (action === "destroyAll") this.destroyAllLayers();
+      else if (action === "wireframe") this.toggleWireframeActive();
+    },
 
     destroyAllLayers() {
       const viewer = this.getViewer();
