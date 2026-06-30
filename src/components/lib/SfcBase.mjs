@@ -1,5 +1,5 @@
 import { createElementBlock as e, openBlock as t } from "vue";
-//#region ../../GISBIM/cesiumBase/src/utils/CesiumEventManager.js
+//#region ../cesiumBase/src/utils/CesiumEventManager.js
 var n = class {
 	constructor() {
 		this.isReady = !1, this.listeners = /* @__PURE__ */ new Set(), this.cesiumInstance = null, this.viewerInstance = null, this.checkInterval = null, this.checkAttempts = 0, this.maxAttempts = 50;

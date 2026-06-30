@@ -17,23 +17,15 @@
     :default-form-values="panelMetadata.defaultFormValues"
     :toolbar-buttons="{ add: false, import: false, export: false, refresh: false }"
     :lazy-load="true"
+    :header-tools="[{ key: 'showToolbar', label: '工具', defaultVisible: true }]"
     @close="$emit('close')"
     @lazy-load="onLazyLoad"
     @config-loaded="onConfigLoaded"
   >
-    <template #header>
-      <h3 class="lme-title">✏️ {{ editorData.layerName || '请选择图层' }}</h3>
-      <button @click.stop="showToolbar = !showToolbar" class="header-tool-btn" type="button" title="显示/隐藏工具栏">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1.5" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="2.5" y1="6.5" x2="11.5" y2="6.5" stroke="currentColor" stroke-width="1.2"/><line x1="2.5" y1="9" x2="8.5" y2="9" stroke="currentColor" stroke-width="1.2"/></svg>
-        工具
-      </button>
-    </template>
-
     <template #toolbar-extra>
-      <div v-if="showToolbar" class="lme-toolbar-outer">
-        <span class="lme-tb-layer">✏️ {{ editorData.layerName || '请选择图层' }}</span>
-        <span class="lme-tb-sep">|</span>
-        <div class="lme-toolbar">
+      <span class="lme-tb-layer">✏️ {{ editorData.layerName || '请选择图层' }}</span>
+      <span class="lme-tb-sep">|</span>
+      <div class="lme-toolbar">
         <button @click="managerAction('loadAll')" class="lme-tb-btn" type="button" title="加载全部图层">📥</button>
         <button @click="managerAction('destroyAll')" class="lme-tb-btn" type="button" title="清空全部图层">🗑️</button>
         <button @click="managerAction('wireframe')" class="lme-tb-btn" type="button" title="切换线框">🔍</button>
@@ -50,7 +42,6 @@
         <button @click="startPickModel" class="lme-tb-btn pick" :disabled="_picking" type="button">
           {{ _picking ? '点击地图放置...' : '+添加点位' }}</button>
         <button @click="applyChanges" class="lme-tb-btn apply" type="button">✅ 应用</button>
-      </div>
       </div>
     </template>
 
@@ -100,8 +91,7 @@ export default {
       editModels: JSON.parse(JSON.stringify(this.editorData.models || [])),
       _picking: false,
       _pickHandler: null,
-      _pickTarget: -1,
-      showToolbar: true
+      _pickTarget: -1
     };
   },
   watch: {
@@ -242,18 +232,8 @@ export default {
 </script>
 
 <style scoped>
-.lme-title { margin: 0; color: #ff9800; font-size: 14px; flex: 1; }
 .lme-tb-layer { color: #ff9800; font-weight: bold; font-size: 12px; white-space: nowrap; }
-.lme-toolbar-outer { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .lme-toolbar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.header-tool-btn {
-  display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px; color: #b0b0b0; font-size: 12px; cursor: pointer;
-  transition: all 0.2s; flex-shrink: 0;
-}
-.header-tool-btn:hover { background: rgba(255, 255, 255, 0.12); color: #e0e0e0; border-color: rgba(255, 255, 255, 0.25); }
-.header-tool-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
 .lme-tb-label { display: flex; align-items: center; gap: 4px; color: #bbb; font-size: 11px; white-space: nowrap; }
 .lme-tb-range { width: 60px; }
 .lme-tb-val { color: #ff9800; font-weight: bold; font-size: 11px; }

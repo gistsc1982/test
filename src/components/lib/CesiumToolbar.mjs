@@ -78,7 +78,7 @@ var u = (e, t) => {
 function g(e, t, n, s, c, u) {
 	return o(), r("button", {
 		class: a(["toolbar-button", u.buttonClasses]),
-		disabled: n.disabled && !n.lazyLoad,
+		disabled: n.disabled,
 		"aria-label": n.ariaLabel,
 		"aria-pressed": n.active ? "true" : "false",
 		onClick: t[0] ||= (...e) => u.handleClick && u.handleClick(...e)
@@ -89,7 +89,7 @@ function g(e, t, n, s, c, u) {
 	], 10, f);
 }
 //#endregion
-//#region ../../GISBIM/cesiumBase/src/components/CesiumToolbar.vue
+//#region ../cesiumBase/src/components/CesiumToolbar.vue
 var _ = {
 	name: "CesiumToolbar",
 	components: { CesiumToolbarButton: /* @__PURE__ */ u(d, [["render", g], ["__scopeId", "data-v-4bd42dcf"]]) },
@@ -195,17 +195,6 @@ var _ = {
 					disabled: !1,
 					ariaLabel: "加载模式",
 					action: "loading-mode-toggle"
-				},
-				{
-					id: "layer-tree-manager",
-					icon: "🌳",
-					label: "图层树",
-					tooltip: "图层树管理 — 树形图层层级增删改（单例模式）",
-					disabled: !1,
-					ariaLabel: "图层树管理",
-					action: "toggle-panel",
-					panelId: "LayerTreeManager",
-					singleton: !0
 				}
 			]
 		};
@@ -220,7 +209,7 @@ var _ = {
 					icon: e.icon || "📄",
 					label: e.title || e.name,
 					tooltip: e.description || e.title,
-					disabled: !1,
+					disabled: n,
 					ariaLabel: e.title || e.name,
 					action: "toggle-panel",
 					panelId: e.name,
@@ -235,9 +224,7 @@ var _ = {
 					let t = this.registeredPanels.get(e.panelId);
 					return {
 						...e,
-						active: t?.visible || !1,
-						lazyLoad: t ? !1 : e.lazyLoad,
-						disabled: t ? !1 : e.disabled
+						active: t?.visible || !1
 					};
 				}
 				return e;
