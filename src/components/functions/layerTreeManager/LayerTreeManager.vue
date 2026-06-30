@@ -2140,6 +2140,17 @@ export default {
       // 设置加载中状态
       this.loadingLayerIds[node.id] = true;
 
+      // ⚠️ 加载中状态触发 Vue 重渲染（spinner 插入 DOM），
+      // 可能导致浏览器在 reflow 时调整 .function-panel 的 scrollTop，
+      // 使 header/toolbar 滚出可视区域。在 nextTick 后立即重置。
+      this.$nextTick(function() {
+        var el = this.$refs.treeContainer;
+        if (el) {
+          var panel = el.closest('.function-panel');
+          if (panel) panel.scrollTop = 0;
+        }
+      }.bind(this));
+
       // ⚠️ 图层数量上限检查：超出上限时自动卸载最旧的图层，防止浏览器资源耗尽
       if (this._cesiumLayers.size >= this._maxActiveLayers) {
         const oldestNodeId = this._layerLoadOrder[0];
