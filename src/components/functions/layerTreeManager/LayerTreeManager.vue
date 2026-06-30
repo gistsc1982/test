@@ -3415,7 +3415,11 @@ export default {
           viewer.imageryLayers.remove(entry.object, false);
           if (!this._isWebGLLost) viewer.scene.requestRender();
         } else if (entry.type === 'geojson') {
+          if (entry.object.clustering && entry.object.clustering.enabled) {
+            try { entry.object.clustering.enabled = false; } catch (e) { /* ignore */ }
+          }
           viewer.dataSources.remove(entry.object, false);
+          viewer.scene.requestRender();
         } else if (entry.type === '3dtiles') {
           entry.object.show = false;
           viewer.scene.primitives.remove(entry.object);
@@ -3537,7 +3541,11 @@ export default {
             break;
           }
           case 'geojson': {
+            if (entry.object.clustering && entry.object.clustering.enabled) {
+              try { entry.object.clustering.enabled = false; } catch (e) { /* ignore */ }
+            }
             viewer.dataSources.remove(entry.object, true);
+            viewer.scene.requestRender();
             break;
           }
           case '3dtiles': {
@@ -3662,7 +3670,11 @@ export default {
             // 组件卸载时安全销毁所有 GPU 资源
             this._safeDestroyImageryLayer(entry.object, entry.provider);
           } else if (entry.type === 'geojson') {
+            if (entry.object.clustering && entry.object.clustering.enabled) {
+              try { entry.object.clustering.enabled = false; } catch (e) { /* ignore */ }
+            }
             viewer.dataSources.remove(entry.object, false);
+            viewer.scene.requestRender();
           } else if (entry.type === '3dtiles') {
             entry.object.show = false;
             viewer.scene.primitives.remove(entry.object);

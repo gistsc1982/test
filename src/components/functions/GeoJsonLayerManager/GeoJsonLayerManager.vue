@@ -567,6 +567,12 @@ export default {
       if (!viewer) { console.error(`[${this.componentName}] ❌ 未找到 Cesium Viewer`); return; }
       const dataSource = this._cesiumLayers.get(layer.id);
       if (dataSource) {
+        // ⭐ 先关闭聚类（SGKJ_SDK 聚类 billboard 可能不会随 dataSource 自动清理）
+        if (dataSource.clustering && dataSource.clustering.enabled) {
+          try {
+            dataSource.clustering.enabled = false;
+          } catch (e) { /* ignore */ }
+        }
         // ⭐ 注销实体拾取
         if (this._selectionManager) {
           this._selectionManager.unregisterLayer(layer.id);
@@ -575,6 +581,8 @@ export default {
         this._cesiumLayers.delete(layer.id);
         this._labelStates = { ...this._labelStates, [layer.id]: false };
         this.updateItemState(layer.id, { loaded: false, loading: false });
+        // ⭐ 强制刷新渲染（SGKJ_SDK 移除 dataSource 后不会自动重绘）
+        viewer.scene.requestRender();
         // 如果当前弹窗显示的是被移除的图层，关闭弹窗
         if (this._popupSelectedLayerId === layer.id) {
           this.dismissEntityPopup();
@@ -762,6 +770,10 @@ export default {
       const viewer = this.getCesiumViewer();
       if (viewer) {
         this._cesiumLayers.forEach((dataSource, id) => {
+          // 先关闭聚类避免 billboard 残留
+          if (dataSource.clustering && dataSource.clustering.enabled) {
+            try { dataSource.clustering.enabled = false; } catch (e) { /* ignore */ }
+          }
           if (this._selectionManager) {
             this._selectionManager.unregisterLayer(id);
           }
@@ -771,6 +783,8 @@ export default {
       this._cesiumLayers.clear();
       this._labelStates = {};
       this.dismissEntityPopup();
+      // ⭐ 强制刷新渲染
+      if (viewer) viewer.scene.requestRender();
     },
     // ==================== 实体选中 & 属性弹窗 ====================
 
