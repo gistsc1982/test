@@ -423,6 +423,82 @@ export default {
             // 默认渐变圆点 / 单字符标记 → 无需后处理，PinBuilder 已经在 load() 时完成
           });
 
+          // ⭐ sizeField：根据属性字段动态调整点大小（径向渐变圆）
+          if (geoType === 'Point' && layer.sizeField) {
+            var sizeField = layer.sizeField;
+            var sizeMin = layer.sizeFieldMin || 10;
+            var sizeMax = layer.sizeFieldMax || 64;
+            var sizeColor = Cesium.Color.fromCssColorString(layer.markerColor || '#FF4500');
+            var fieldValues = [];
+
+            entities.forEach(function (ent) {
+              try {
+                var props = ent.properties ? (ent.properties.getValue ? ent.properties.getValue() : ent.properties) : null;
+                var val = props ? (props[sizeField] || 0) : 0;
+                fieldValues.push(Number(val) || 0);
+              } catch (e) { fieldValues.push(0); }
+            });
+
+            var fMin = Math.min.apply(null, fieldValues);
+            var fMax = Math.max.apply(null, fieldValues);
+            var fRange = fMax - fMin || 1;
+            console.log('[' + this.componentName + '] 📊 sizeField="' + sizeField + '": 范围=[' + fMin + ', ' + fMax + '], 像素=[' + sizeMin + ', ' + sizeMax + ']');
+
+            // 按 4px 档位预生成径向渐变 Canvas 并缓存复用
+            var canvasCache = {};
+            function getGradientCanvas(pixelSize) {
+              var tier = Math.round(pixelSize / 4) * 4; // 4px 档位
+              if (tier < 8) tier = 8;
+              var key = String(tier);
+              if (canvasCache[key]) return canvasCache[key];
+
+              var c = document.createElement('canvas');
+              c.width = tier; c.height = tier;
+              var ctx = c.getContext('2d');
+              var cx = tier / 2, cy = tier / 2, r = tier / 2 - 1;
+
+              // 径向渐变：中心亮 → 边缘暗
+              var grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.05, cx, cy, r);
+              grad.addColorStop(0, 'rgba(' + Math.min(255, sizeColor.red * 255 + 60).toFixed(0) + ',' +
+                                       Math.min(255, sizeColor.green * 255 + 60).toFixed(0) + ',' +
+                                       Math.min(255, sizeColor.blue * 255 + 60).toFixed(0) + ',1)');
+              grad.addColorStop(0.4, 'rgba(' + (sizeColor.red * 255).toFixed(0) + ',' +
+                                          (sizeColor.green * 255).toFixed(0) + ',' +
+                                          (sizeColor.blue * 255).toFixed(0) + ',0.85)');
+              grad.addColorStop(0.8, 'rgba(' + (sizeColor.red * 255 * 0.6).toFixed(0) + ',' +
+                                          (sizeColor.green * 255 * 0.6).toFixed(0) + ',' +
+                                          (sizeColor.blue * 255 * 0.6).toFixed(0) + ',0.5)');
+              grad.addColorStop(1, 'rgba(' + (sizeColor.red * 255 * 0.3).toFixed(0) + ',' +
+                                        (sizeColor.green * 255 * 0.3).toFixed(0) + ',' +
+                                        (sizeColor.blue * 255 * 0.3).toFixed(0) + ',0)');
+
+              ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+              ctx.fillStyle = grad; ctx.fill();
+
+              // 左上角高光
+              ctx.beginPath(); ctx.arc(cx - r * 0.3, cy - r * 0.3, r * 0.2, 0, Math.PI * 2);
+              ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fill();
+
+              canvasCache[key] = c;
+              return c;
+            }
+
+            entities.forEach(function (ent, ei) {
+              var val = fieldValues[ei];
+              var pixelSize = sizeMin + (val - fMin) / fRange * (sizeMax - sizeMin);
+              var canvas = getGradientCanvas(pixelSize);
+              var scale = pixelSize / canvas.width;
+
+              if (ent.billboard) {
+                ent.billboard.image = canvas;
+                ent.billboard.scale = scale;
+                ent.billboard.disableDepthTestDistance = Number.POSITIVE_INFINITY;
+              }
+            });
+
+            console.log('[' + this.componentName + '] 🎨 径向渐变圆已应用，Canvas 缓存档位数=' + Object.keys(canvasCache).length);
+          }
+
           // 输出标记类型日志
           const markerDesc = needsCustomIcon
             ? `emoji canvas 共享 ("${markerIcon}")`
