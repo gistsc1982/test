@@ -1,0 +1,34 @@
+{
+  "panelId": "little-model-editor",
+  "panelName": "模型图层编辑",
+  "panelIcon": "✏️",
+
+  "configId": "little-model-editor",
+
+  "featureFolder": "littleModelManager",
+
+  "dataSource": {
+    "type": "json",
+    "tableName": "LittleModelEditor",
+    "primaryKey": "id",
+    "fileName": "LittleModelEditor",
+    "relativePath": "gis/littleModelManager/LittleModelEditor.json"
+  },
+
+  "fieldDefinitions": [
+    { "key": "scale", "label": "默认缩放", "type": "number", "required": false, "default": 5 },
+    { "key": "labelField", "label": "标注字段", "type": "text", "required": false, "default": "" }
+  ],
+
+  "defaultFormValues": {
+    "scale": 5,
+    "labelField": ""
+  },
+
+  "toolbarButtons": {
+    "add": false,
+    "import": false,
+    "export": false,
+    "refresh": false
+  }
+}

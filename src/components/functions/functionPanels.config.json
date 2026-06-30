@@ -506,6 +506,60 @@
         "initialX": "right",
         "initialY": 200
       }
+    },
+    {
+      "name": "LittleModelManager",
+      "file": "@componentsFunctions/littleModelManager/LittleModelManager.vue",
+      "title": "小模型点位管理",
+      "description": "以GeoJSON点数据配置GLB小模型的放置位置，支持批量渲染和模型复用",
+      "enabled": true,
+      "visible": false,
+      "icon": "🏠",
+      "category": "tools",
+      "singleton": true,
+      "singletonContainerId": "littleModelManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 760
+      }
+    },
+    {
+      "name": "LittleModelManagerMulti",
+      "file": "@componentsFunctions/littleModelManager/LittleModelManager.vue",
+      "title": "小模型点位管理（多实例）",
+      "description": "以GeoJSON点数据配置GLB小模型的放置位置（多实例模式）",
+      "enabled": true,
+      "visible": false,
+      "icon": "🏘️",
+      "category": "tools",
+      "singleton": false,
+      "singletonContainerId": "littleModelManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "left",
+        "initialY": 840
+      }
+    },
+    {
+      "name": "LittleModelEditor",
+      "file": "@componentsFunctions/littleModelManager/LittleModelEditor.vue",
+      "title": "模型图层编辑",
+      "description": "编辑小模型图层的点位、缩放、标注绑定",
+      "enabled": true,
+      "visible": false,
+      "icon": "✏️",
+      "category": "tools",
+      "singleton": true,
+      "singletonContainerId": "littleModelEditor",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "center",
+        "initialY": 150
+      }
     }
   ],
   "categories": {

@@ -1,0 +1,67 @@
+{
+  "panelId": "little-model-manager",
+  "panelName": "小模型点位管理",
+  "panelIcon": "🏠",
+  "configId": "little-model-layers",
+
+  "featureFolder": "littleModelManager",
+
+  "fieldDefinitions": [
+    { "key": "id", "label": "ID", "type": "text", "required": true, "placeholder": "唯一标识符", "readonly": true, "hidden": true },
+    { "key": "name", "label": "图层名称", "type": "text", "required": true, "placeholder": "图层名称" },
+    { "key": "description", "label": "描述", "type": "text", "required": false, "placeholder": "图层描述" },
+    {
+      "key": "modelUrl",
+      "label": "GLB模型",
+      "type": "select",
+      "required": true,
+      "options": [
+        { "value": "/data/gis/models/glb/tree.glb", "label": "🌳 树木" },
+        { "value": "/data/gis/models/glb/house.glb", "label": "🏠 房屋" },
+        { "value": "/data/gis/models/glb/car.glb", "label": "🚗 汽车" },
+        { "value": "/data/gis/models/glb/streetlight.glb", "label": "💡 路灯" },
+        { "value": "/data/gis/models/glb/bench.glb", "label": "🪑 长椅" },
+        { "value": "/data/gis/models/glb/tower.glb", "label": "🗼 塔" }
+      ],
+      "allowCustom": true,
+      "placeholder": "选择或输入 GLB 模型 URL"
+    },
+    { "key": "geoJson", "label": "点位数据 (GeoJSON)", "type": "textarea", "required": true, "placeholder": "GeoJSON Point FeatureCollection" },
+    { "key": "modelScale", "label": "模型缩放", "type": "number", "required": false, "default": 1.0, "placeholder": "1.0 = 原始大小" },
+    { "key": "modelHeading", "label": "模型朝向 (°)", "type": "number", "required": false, "default": 0, "placeholder": "绕Z轴旋转角度" },
+    { "key": "modelPitch", "label": "模型俯仰 (°)", "type": "number", "required": false, "default": 0 },
+    { "key": "modelRoll", "label": "模型翻滚 (°)", "type": "number", "required": false, "default": 0 },
+    { "key": "clampToGround", "label": "贴地", "type": "boolean", "required": false, "default": true },
+    { "key": "heightOffset", "label": "高度偏移 (m)", "type": "number", "required": false, "default": 0, "placeholder": "模型底部离地高度" },
+    { "key": "minimumPixelSize", "label": "最小像素", "type": "number", "required": false, "default": 0, "placeholder": "模型屏幕最小像素大小" },
+    { "key": "maximumScale", "label": "最大缩放", "type": "number", "required": false, "default": 100, "placeholder": "缩放到像素大小的上限倍数" }
+  ],
+  "defaultFormValues": {
+    "id": "",
+    "name": "",
+    "description": "",
+    "modelUrl": "",
+    "geoJson": "{\"type\": \"FeatureCollection\", \"features\": []}",
+    "modelScale": 1.0,
+    "modelHeading": 0,
+    "modelPitch": 0,
+    "modelRoll": 0,
+    "clampToGround": true,
+    "heightOffset": 0,
+    "minimumPixelSize": 0,
+    "maximumScale": 100
+  },
+  "toolbarButtons": {
+    "add": true,
+    "import": true,
+    "export": true,
+    "refresh": true
+  },
+  "dataSource": {
+    "type": "sqlite",
+    "tableName": "LittleModelManager",
+    "primaryKey": "id",
+    "fileName": "LittleModelManager",
+    "relativePath": "gis/littleModelManager/LittleModelManager.json"
+  }
+}
