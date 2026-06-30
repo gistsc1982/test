@@ -293,6 +293,20 @@
       </Teleport>
     </template>
   </JsonConfigPanelBase>
+
+  <!-- ⭐ 通用实体属性弹窗 -->
+  <EntityInfoPopup
+    :visible="showEntityPopup"
+    :title="popupTitle"
+    :properties="popupProperties"
+    :screenX="popupScreenX"
+    :screenY="popupScreenY"
+    :geoType="popupGeoType"
+    :layerName="popupLayerName"
+    :canFlyTo="true"
+    @close="dismissEntityPopup"
+    @fly-to="flyToSelectedEntity"
+  />
 </template>
 
 <script>
@@ -303,12 +317,44 @@ import { validateConfigMetadata, formatValidationResult } from './TableNameValid
 import TreeNodeItem from './TreeNodeItem.vue';
 import rawPanelMetadata from './LayerTreeManager.config.json';
 import { MVTImageryProvider } from '@componentsLib/MVTImageryProvider/MVTImageryProvider.mjs';
+import EntitySelectionManager from '../../../utils/EntitySelectionManager.js';
+import EntityInfoPopup from '../../common/EntityInfoPopup.vue';
 
 const validationResult = validateConfigMetadata(rawPanelMetadata);
 console.log(`[LayerTreeManager] 📋 配置元数据验证结果:`);
 console.log(formatValidationResult(validationResult));
 
 const panelMetadata = validationResult.safeConfig || rawPanelMetadata;
+
+// ========================
+// 环境检测 — 动态获取 API 服务器地址
+// ========================
+
+/**
+ * 返回 API 服务器的 base URL（协议 + 主机 + 端口）
+ * 逻辑与 DataManager.detectServerURL 保持一致：
+ *   - localhost/127.0.0.1 → 固定指向 192.168.31.146
+ *   - 其他 → 使用当前页面 hostname
+ * API 端口优先使用 DataManager 的配置，默认 8081
+ */
+function getApiBaseUrl() {
+  var host = '192.168.31.146';
+  var port = '8081';
+  if (typeof window !== 'undefined' && window.location) {
+    var loc = window.location;
+    if (loc.hostname !== 'localhost' && loc.hostname !== '127.0.0.1') {
+      host = loc.hostname;
+    }
+    // 优先使用 DataManager 的端口配置
+    if (window.__dataManager__ && window.__dataManager__.serverConfig) {
+      port = String(window.__dataManager__.serverConfig.apiPort || 8081);
+    } else if (loc.port) {
+      // 当前页面的端口 + 1（常见：前端 8080 → API 8081）
+      port = String(parseInt(loc.port, 10) + 1);
+    }
+  }
+  return 'http://' + host + ':' + port;
+}
 
 // ========================
 // MVT PBF 解析工具 — 用于自动检测瓦片中的源图层
@@ -1076,7 +1122,8 @@ export default {
 
   components: {
     JsonConfigPanelBase,
-    TreeNodeItem
+    TreeNodeItem,
+    EntityInfoPopup
   },
 
   props: {
@@ -1166,6 +1213,18 @@ export default {
         showToolbar: true
       },
 
+      // ⭐ 实体选中 & 属性弹窗
+      _selectionManager: null,
+      showEntityPopup: false,
+      popupTitle: '',
+      popupProperties: [],
+      popupScreenX: 0,
+      popupScreenY: 0,
+      popupGeoType: '',
+      popupLayerName: '',
+      _popupSelectedEntity: null,
+      _popupSelectedLayerId: null,
+
       componentName: 'LayerTreeManager'
     };
   },
@@ -1198,6 +1257,9 @@ export default {
     this._layerLoadOrder = [];
     // 最大同时加载图层数（防止浏览器资源耗尽，MVT 图层尤其消耗 GPU 内存）
     this._maxActiveLayers = 2;
+    // ⭐ 本地 GeoJsonLayerManager 图层元数据缓存
+    //   { rawGeoJson: string, config: {...} } — rawGeoJson 保持字符串，仅在使用时解析
+    this._localGeoJsonMeta = new Map();
     // Cesium 事件监听器引用（用于组件销毁时移除）
     this._cesiumEventHandlers = [];
     // WebGL 上下文状态标记
@@ -1219,7 +1281,7 @@ export default {
     // 浏览器端 SQLite/IndexedDB 作为离线回退
     this._configStrategy = ConfigStrategyFactory.createWithFallback(
       ['json', 'sqlite'],
-      { baseURL: 'http://localhost:8081' }
+      { baseURL: getApiBaseUrl() }
     );
     // 保留 SQLite 策略引用用于显式保存（JSON 策略的 save 是空操作）
     this._sqliteStrategy = ConfigStrategyFactory.create('sqlite');
@@ -1231,6 +1293,7 @@ export default {
   mounted() {
     this.$nextTick(() => {
       console.log(`[${this.componentName}] 🚀 主动触发树形数据加载（当前内置数据: ${this.flatNodeList.length} 条）`);
+      this._selectionManager = EntitySelectionManager.getInstance();
       this.loadConfig();
 
       // ⚠️ Cesium 资源保护：延迟设置（等待 viewer 就绪）
@@ -1252,6 +1315,10 @@ export default {
   },
 
   beforeDestroy() {
+    if (this._selectionManager) {
+      this._selectionManager.unregisterAll();
+      this._selectionManager.stopTracking();
+    }
     this._teardownCesiumProtections();
     this.destroyAllCesiumLayers();
   },
@@ -1297,11 +1364,15 @@ export default {
         }
 
         this.onConfigLoadedHandler();
+        // ⭐ 动态加载本地 GeoJsonLayerManager 图层（异步，不阻塞主流程）
+        this._loadLocalGeoJsonLayers();
       } catch (error) {
         // 加载失败时保留现有数据（内置示例或用户已添加的数据）
         console.error(`[${this.componentName}] ❌ 配置加载失败:`, error);
         console.warn(`[${this.componentName}] ⚠️ 保留现有数据（${this.flatNodeList.length} 条），不清空`);
         // 不执行 this.flatNodeList = [] — 保留现有数据
+        // 配置加载失败时也尝试加载本地图层（不影响已有数据）
+        this._loadLocalGeoJsonLayers();
       }
     },
 
@@ -1312,11 +1383,13 @@ export default {
       try {
         console.log(`[${this.componentName}] 📤 准备保存树形配置`);
 
-        // 移除 children 字段（如果存在），确保保存的是扁平数据
-        const saveData = this.flatNodeList.map(item => {
-          const { children, loaded, loading, ...cleanItem } = item;
-          return cleanItem;
-        });
+        // 移除 children 字段 + 过滤动态节点（_dynamicSource 标记的节点不应持久化）
+        const saveData = this.flatNodeList
+          .filter(item => !item._dynamicSource)
+          .map(item => {
+            const { children, loaded, loading, _dynamicSource, _dynamicLayerId, _dynamicGeojsonId, ...cleanItem } = item;
+            return cleanItem;
+          });
 
         // 使用 SQLite/IndexedDB 策略保存（JSON 策略的 save 是空操作）
         const saveStrategy = this._sqliteStrategy || this._configStrategy;
@@ -1748,10 +1821,282 @@ export default {
       }
     },
 
+    // ==================== 动态加载本地 GeoJsonLayerManager 图层 ====================
+
+    /**
+     * 从 API 服务器获取 GeoJsonLayerManager 管理的图层目录，
+     * 动态生成树节点并追加到 flatNodeList 的 GeoJSON 分区下。
+     *
+     * 设计要点：
+     *   1. 读取 GeoJsonLayerManager.config.json 了解图层结构定义
+     *   2. 原始 GeoJSON 字符串存入 _localGeoJsonMeta，按需解析后立即释放（低内存）
+     *   3. 动态节点的 _dynamicSource 标记为 'GeoJsonLayerManager'，保存时自动排除
+     *   4. 节点 ID 统一为 'local-geojson-' 前缀，与后端持久化节点隔离
+     *   5. 如果本地服务不可达，静默降级（不影响已加载的树数据）
+     */
+    async _loadLocalGeoJsonLayers() {
+      var API_URL = getApiBaseUrl() + '/data/gis/GeoJsonLayerManager/GeoJsonLayerManager.json';
+      var PARENT_ID = 'folder-geojson';
+
+      try {
+        console.log(`[${this.componentName}] 📡 正在获取本地 GeoJSON 图层目录...`);
+        const resp = await fetch(API_URL, { signal: createTimeoutSignal(5000) });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const layers = await resp.json();
+        if (!layers || !layers.length) {
+          console.log(`[${this.componentName}] ℹ️ 本地 GeoJSON 图层目录为空，跳过`);
+          return;
+        }
+
+        // 过滤已存在的动态节点（避免重复添加）
+        const existingIds = new Set(this.flatNodeList.map(n => n.id));
+        let addedCount = 0;
+
+        for (let i = 0; i < layers.length; i++) {
+          const layer = layers[i];
+          const nodeId = 'local-geojson-' + layer.id;
+          if (existingIds.has(nodeId)) continue;
+
+          // 解析并缓存 GeoJSON 数据
+          let geoJsonData;
+          try {
+            geoJsonData = typeof layer.geoJson === 'string'
+              ? JSON.parse(layer.geoJson)
+              : layer.geoJson;
+          } catch (e) {
+            console.warn(`[${this.componentName}] ⚠️ 图层 "${layer.name}" GeoJSON 解析失败:`, e.message);
+            continue;
+          }
+          // ⭐ 只缓存元数据 + 原始 geojson 字符串（不预解析，按需 JSON.parse 后立即释放）
+          this._localGeoJsonMeta.set(nodeId, {
+            rawGeoJson: layer.geoJson,          // 保持字符串（~KB 级），不解析成对象树（~MB 级）
+            config: layer                        // 样式/聚类等元数据
+          });
+
+          // ⭐ 映射 GeoJsonLayerManager 样式字段 → LayerTreeManager geoJsonStyle
+          const geoJsonStyle = {
+            fill: layer.fillColor || '#FFFF00',
+            fillOpacity: layer.fillOpacity != null ? layer.fillOpacity : 0.5,
+            stroke: layer.strokeColor || '#FF0000',
+            strokeWidth: layer.strokeWidth != null ? layer.strokeWidth : 2,
+            outlineColor: layer.strokeColor || '#FF0000',
+            outlineWidth: layer.strokeWidth != null ? layer.strokeWidth : 2,
+            markerColor: layer.markerColor || '#4169E1',
+            markerSize: layer.markerSize != null ? layer.markerSize : 48,
+            markerIcon: layer.markerIcon || ''
+          };
+
+          // 轻量中心坐标（只 scan 前 20 个特征，不完整解析）
+          const center = this._computeGeoJsonCenterLazy(layer.geoJson);
+
+          // 要素统计（正则提取，不 JSON.parse）
+          const featureSummary = this._summaryGeoJsonLazy(layer.geoJson, layer.geoType);
+
+          // 构建树节点
+          this.flatNodeList.push({
+            id: nodeId,
+            name: '📍本地 · ' + layer.name,
+            parentId: PARENT_ID,
+            nodeType: 'layer',
+            url: 'local://GeoJsonLayerManager/' + layer.id,
+            _dynamicSource: 'GeoJsonLayerManager',
+            _dynamicLayerId: layer.id,
+            _dynamicGeojsonId: nodeId,
+            sortOrder: 10 + i,
+            visible: 1,
+            description: [
+              '来源：本地 GeoJsonLayerManager',
+              '服务类型：GeoJSON ' + (layer.geoType || 'Unknown'),
+              layer.description || '',
+              featureSummary,
+              '本地服务直连，零网络请求。'
+            ].filter(Boolean).join(' | '),
+            icon: this._geoTypeIcon(layer.geoType, layer.markerIcon || ''),
+            centerLon: center.lon,
+            centerLat: center.lat,
+            centerHeight: center.height,
+            // ⭐ 样式 & 聚类配置
+            geoJsonStyle: geoJsonStyle,
+            clusterEnabled: layer.clusterEnabled || false,
+            clusterPixelRange: layer.clusterPixelRange || 50,
+            clusterMinSize: layer.clusterMinSize || 3
+          });
+
+          existingIds.add(nodeId);
+          addedCount++;
+        }
+
+        if (addedCount > 0) {
+          // 触发 Vue 响应式更新
+          this.flatNodeList = [...this.flatNodeList];
+          console.log(`[${this.componentName}] 📍 已动态加载 ${addedCount} 个本地 GeoJSON 图层（共 ${layers.length} 个目录项）`);
+        }
+      } catch (err) {
+        console.warn(`[${this.componentName}] ⚠️ 无法加载本地 GeoJSON 图层目录:`, err.message,
+          '(本地 API 可能未启动，已加载的内置/持久化节点不受影响)');
+      }
+    },
+
+    /**
+     * 从 GeoJSON 字符串/对象计算中心坐标（轻量：解析后立即释放）
+     */
+    _computeGeoJsonCenterLazy(geoJsonRaw) {
+      var geoJson;
+      try {
+        geoJson = typeof geoJsonRaw === 'string' ? JSON.parse(geoJsonRaw) : geoJsonRaw;
+      } catch (e) { return { lon: 116.4, lat: 39.9, height: 8000 }; }
+      return this._computeGeoJsonCenter(geoJson);
+    },
+
+    /**
+     * 从 GeoJSON 字符串/对象生成要素摘要（正则 + 最小解析）
+     */
+    _summaryGeoJsonLazy(geoJsonRaw, geoType) {
+      var raw = typeof geoJsonRaw === 'string' ? geoJsonRaw : JSON.stringify(geoJsonRaw);
+      // 正则快速计数（无需完整解析）
+      var featureMatches = raw.match(/"type"\s*:\s*"Feature"/g);
+      var count = featureMatches ? featureMatches.length : 0;
+      if (count === 0) return '';
+      return count + ' 个' + (geoType || '未知') + '要素';
+    },
+
+    /**
+     * 从 GeoJSON FeatureCollection 计算中心坐标
+     * @returns {{ lon: number, lat: number, height: number }}
+     */
+    _computeGeoJsonCenter(geoJson) {
+      const coords = [];
+      if (!geoJson || !geoJson.features) return { lon: 116.4, lat: 39.9, height: 8000 };
+
+      geoJson.features.forEach(f => {
+        const c = f.geometry && f.geometry.coordinates;
+        if (!c) return;
+        const type = f.geometry.type;
+        if (type === 'Point') coords.push(c);
+        else if (type === 'LineString' || type === 'MultiPoint') c.forEach(p => coords.push(p));
+        else if (type === 'Polygon') c[0].forEach(p => coords.push(p));
+        else if (type === 'MultiPolygon') c.forEach(ring => ring[0].forEach(p => coords.push(p)));
+      });
+
+      if (coords.length === 0) return { lon: 116.4, lat: 39.9, height: 8000 };
+
+      const lngSum = coords.reduce((s, c) => s + c[0], 0);
+      const latSum = coords.reduce((s, c) => s + c[1], 0);
+      const centerLng = lngSum / coords.length;
+      const centerLat = latSum / coords.length;
+
+      // 根据坐标范围推算飞行高度
+      const lngs = coords.map(c => c[0]);
+      const lats = coords.map(c => c[1]);
+      const lngRange = Math.max(...lngs) - Math.min(...lngs);
+      const latRange = Math.max(...lats) - Math.min(...lats);
+      const maxDeg = Math.max(lngRange, latRange, 0.01);
+      const height = Math.max(2000, Math.min(500000, maxDeg * 111000 * 2));
+
+      return {
+        lon: parseFloat(centerLng.toFixed(6)),
+        lat: parseFloat(centerLat.toFixed(6)),
+        height: Math.round(height)
+      };
+    },
+
+    /**
+     * 根据几何类型和自定义图标返回合适的图标符
+     */
+    _geoTypeIcon(geoType, markerIcon) {
+      if (markerIcon && markerIcon.length <= 2) return markerIcon;
+      const icons = { Point: '📍', LineString: '📏', Polygon: '🗺️', MultiPolygon: '🗺️' };
+      return icons[geoType] || '📄';
+    },
+
+    /**
+     * 生成 GeoJSON 数据摘要（特征数、类型等）
+     */
+    _summaryGeoJson(geoJson) {
+      if (!geoJson || !geoJson.features) return '';
+      const count = geoJson.features.length;
+      const types = new Set(geoJson.features.map(f => f.geometry && f.geometry.type).filter(Boolean));
+      const typeStr = Array.from(types).join('/');
+      return `${count} 个${typeStr}要素`;
+    },
+
     /**
      * 保存前将树数据展平
      */
     // ==================== Cesium 图层集成 ====================
+    // ==================== 实体选中 & 属性弹窗 ====================
+
+    _registerEntityPicking(node, dataSource) {
+      if (!this._selectionManager) {
+        this._selectionManager = EntitySelectionManager.getInstance();
+      }
+      const viewer = this.getViewer();
+      if (!viewer) return;
+      const self = this;
+      this._selectionManager.registerLayer(viewer, node.id, dataSource, {
+        mode: 'click',
+        enableHighlight: true,
+        enableClustering: node.clusterEnabled !== false,
+        highlightDuration: 2,
+        onSelect: function (payload) { self._onEntitySelected(node, payload); },
+        onDismiss: function () { self.dismissEntityPopup(); }
+      });
+    },
+
+    _onEntitySelected(node, payload) {
+      this.popupTitle = payload.title || node.name || '实体属性';
+      this.popupProperties = payload.properties || [];
+      this.popupGeoType = payload.geoType || '';
+      this.popupLayerName = node.name || '';
+      this._popupSelectedEntity = payload.entity;
+      this._popupSelectedLayerId = node.id;
+      if (payload.screenPosition) {
+        this.popupScreenX = payload.screenPosition.x;
+        this.popupScreenY = payload.screenPosition.y;
+      }
+      this._startPopupTracking(payload.entity);
+      this.showEntityPopup = true;
+    },
+
+    _startPopupTracking(entity) {
+      if (!this._selectionManager) return;
+      const viewer = this.getViewer();
+      if (!viewer) return;
+      const self = this;
+      this._selectionManager.stopTracking();
+      this._selectionManager.trackScreenPosition(viewer, entity, function (pos) {
+        if (self.showEntityPopup && pos) {
+          self.popupScreenX = pos.x;
+          self.popupScreenY = pos.y;
+        }
+      });
+    },
+
+    flyToSelectedEntity() {
+      const entity = this._popupSelectedEntity;
+      if (!entity || !entity.position) return;
+      const viewer = this.getViewer();
+      const Cesium = this.getCesium();
+      if (!viewer || !Cesium) return;
+      try {
+        const pos = entity.position.getValue
+          ? entity.position.getValue(viewer.clock.currentTime)
+          : entity.position;
+        if (!pos) return;
+        viewer.camera.flyTo({
+          destination: pos,
+          duration: 1.5,
+          offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 500)
+        });
+      } catch (e) { /* ignore */ }
+    },
+
+    dismissEntityPopup() {
+      this.showEntityPopup = false;
+      this._popupSelectedEntity = null;
+      this._popupSelectedLayerId = null;
+      if (this._selectionManager) this._selectionManager.stopTracking();
+    },
 
     /**
      * 获取 Cesium Viewer 实例
@@ -2001,6 +2346,9 @@ export default {
      * 检测图层类型（基于 URL 模式 + 父节点层级）
      */
     detectLayerType(node) {
+      // ⭐ 动态来源检测（优先级最高）
+      if (node._dynamicSource === 'GeoJsonLayerManager') return 'geojson';
+
       const url = (node.url || '').toLowerCase();
       // 从父级/祖先判断类型
       const ancestors = this.getAncestorChain(node.id);
@@ -2469,8 +2817,8 @@ export default {
             // Cesium.GeoJsonDataSource.load(url) 内部用 fetch 强制 CORS 模式，
             // 导致浏览器拦截返回 RequestErrorEvent{statusCode:undefined}。
             // 解决：手动预取数据（带 CORS 代理回退），传入 GeoJSON 对象而非 URL。
-            const WFS_FETCH_TIMEOUT = 8000;
-            const PROXY_FETCH_TIMEOUT = 12000;
+            const WFS_FETCH_TIMEOUT = 15000;       // 直接请求超时增至 15s
+            const PROXY_FETCH_TIMEOUT = 30000;     // 代理请求超时增至 30s（大文件需要更久）
 
             /**
              * 尝试从 URL 获取 JSON 数据，失败时通过 CORS 代理重试
@@ -2478,7 +2826,7 @@ export default {
              * @returns {Promise<Object>} 解析后的 JSON 对象
              */
             const fetchJsonWithCorsFallback = async (directUrl) => {
-              // 第一步：直接 fetch（部分 WFS 服务器支持 CORS）
+              // 第一步：直接 fetch（部分 WFS 服务器支持 CORS，且浏览器环境可能已有代理）
               try {
                 console.log(`[${this.componentName}] 🔍 直接请求 GeoJSON: ${directUrl.slice(0, 120)}...`);
                 const resp = await fetch(directUrl, {
@@ -2493,38 +2841,84 @@ export default {
                 console.warn(`[${this.componentName}] ⚠️ 直接请求失败: ${errMsg}，尝试 CORS 代理...`);
               }
 
-              // 第二步：通过 CORS 代理重试（corsproxy.io 全球 CDN，中国大陆可访问）
-              const corsProxies = [
-                `https://corsproxy.io/?${encodeURIComponent(directUrl)}`,
-              ];
-              // 如果节点配置了自定义代理 URL，优先使用
+              // 第二步：通过多个 CORS 代理依次重试（按优先级）
+              //    corsproxy.io — 全球 CDN，有大小限制（通常 ~5MB）
+              //    allorigins.win — 备选，原始 JSON 直接返回
+              //    codecoolware.com — 备选二
+              //    自建代理 — 用户可在节点配置中设置 wfsProxyUrl
+              const corsProxies = [];
+
+              // 如果节点配置了自定义代理 URL，最高优先级
               if (node.wfsProxyUrl) {
-                corsProxies.unshift(node.wfsProxyUrl + encodeURIComponent(directUrl));
+                corsProxies.push({
+                  name: '自建代理',
+                  url: node.wfsProxyUrl + encodeURIComponent(directUrl)
+                });
               }
 
-              for (const proxyUrl of corsProxies) {
+              // 公共 CORS 代理列表
+              corsProxies.push(
+                { name: 'corsproxy.io', url: `https://corsproxy.io/?${encodeURIComponent(directUrl)}` },
+                { name: 'allorigins.win', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}` },
+                { name: 'codecoolware', url: `https://api.codecoolware.com/cors?url=${encodeURIComponent(directUrl)}` }
+              );
+
+              for (const proxy of corsProxies) {
                 try {
-                  console.log(`[${this.componentName}] 🔄 通过 CORS 代理请求: ${proxyUrl.slice(0, 120)}...`);
-                  const resp = await fetch(proxyUrl, {
+                  console.log(`[${this.componentName}] 🔄 通过 ${proxy.name} 代理请求: ${proxy.url.slice(0, 120)}...`);
+                  const resp = await fetch(proxy.url, {
                     signal: createTimeoutSignal(PROXY_FETCH_TIMEOUT)
                   });
-                  if (!resp.ok) throw new Error(`代理返回 HTTP ${resp.status}`);
+                  if (!resp.ok) throw new Error(`${proxy.name} 返回 HTTP ${resp.status}`);
                   const data = await resp.json();
-                  console.log(`[${this.componentName}] ✅ CORS 代理请求成功`);
+                  console.log(`[${this.componentName}] ✅ ${proxy.name} 代理请求成功`);
                   return data;
                 } catch (proxyErr) {
-                  console.warn(`[${this.componentName}] ⚠️ CORS 代理失败:`, proxyErr.message || proxyErr);
+                  const errMsg = proxyErr.message || String(proxyErr);
+                  console.warn(`[${this.componentName}] ⚠️ ${proxy.name} 代理失败:`, errMsg);
                 }
               }
 
               throw new Error(
-                'WFS 服务无法访问：直接请求被 CORS 拦截，CORS 代理也失败。\n' +
-                '建议：1) 检查网络连接 2) 在节点配置中设置 wfsProxyUrl 使用自建代理'
+                'WFS/GeoJSON 服务无法访问：直接请求被 CORS 拦截，所有 CORS 代理也失败。\n' +
+                '建议：1) 检查网络连接 2) 在节点配置中设置 wfsProxyUrl 使用自建代理\n' +
+                `目标 URL: ${directUrl.slice(0, 100)}`
               );
             };
 
-            // 获取 GeoJSON 数据（手动 fetch + CORS 代理回退，绕过 Cesium 内部 fetch 的 CORS 限制）
-            const geojsonData = await fetchJsonWithCorsFallback(node.url);
+            // ⭐ 动态本地图层：按需解析 GeoJSON（不常驻缓存，解析后立即释放）
+            let geojsonData;
+            if (node._dynamicSource === 'GeoJsonLayerManager') {
+              const cacheKey = node._dynamicGeojsonId || node.id;
+              const meta = this._localGeoJsonMeta.get(cacheKey);
+              if (!meta || !meta.rawGeoJson) {
+                throw new Error(`本地 GeoJSON 缓存未命中: ${cacheKey}。请刷新面板重新加载。`);
+              }
+              // ⚠️ 按需解析 — 仅在加载图层时 JSON.parse，用完不保留引用（允许 GC）
+              try {
+                geojsonData = JSON.parse(meta.rawGeoJson);
+              } catch (e) {
+                throw new Error(`本地 GeoJSON 数据解析失败: ${e.message}`);
+              }
+              // 回填样式（如果节点上没有 geoJsonStyle，从缓存元数据补充）
+              if (meta.config && !node.geoJsonStyle) {
+                node.geoJsonStyle = {
+                  fill: meta.config.fillColor || '#FFFF00',
+                  fillOpacity: meta.config.fillOpacity != null ? meta.config.fillOpacity : 0.5,
+                  stroke: meta.config.strokeColor || '#FF0000',
+                  strokeWidth: meta.config.strokeWidth != null ? meta.config.strokeWidth : 2,
+                  outlineColor: meta.config.strokeColor || '#FF0000',
+                  outlineWidth: meta.config.strokeWidth != null ? meta.config.strokeWidth : 2,
+                  markerColor: meta.config.markerColor || '#4169E1',
+                  markerSize: meta.config.markerSize != null ? meta.config.markerSize : 48,
+                  markerIcon: meta.config.markerIcon || ''
+                };
+              }
+              console.log(`[${this.componentName}] 📦 按需解析本地 GeoJSON: "${node.name}"`);
+            } else {
+              // 获取 GeoJSON 数据（手动 fetch + CORS 代理回退，绕过 Cesium 内部 fetch 的 CORS 限制）
+              geojsonData = await fetchJsonWithCorsFallback(node.url);
+            }
 
             // 基本格式校验
             if (!geojsonData || (geojsonData.type !== 'FeatureCollection' && !geojsonData.type)) {
@@ -2541,20 +2935,28 @@ export default {
             console.log(`[${this.componentName}] 📦 获取到 ${rawFeatureCount} 个要素，传入 Cesium...`);
 
             // ⚠️ 关键：传入 GeoJSON 对象（非 URL），绕过 Cesium 内部 fetch 的 CORS 限制
-            // 样式优先级: JSON配置 wfsStyle > 默认值
-            const s = node.wfsStyle || {};
+            // 样式优先级: 动态 geoJsonStyle > 旧 wfsStyle（兼容） > 默认值
+            const s = node.geoJsonStyle || node.wfsStyle || {};
             const stroke   = Cesium.Color.fromCssColorString(s.stroke   || '#FF6600');
             const fill     = Cesium.Color.fromCssColorString(s.fill     || '#FF6600').withAlpha(s.fillOpacity ?? 0.5);
             const outlineC = Cesium.Color.fromCssColorString(s.outlineColor || '#FF3300');
             const markerC  = Cesium.Color.fromCssColorString(s.markerColor  || '#FF4400');
 
-            // 不设置 clampToGround（polygon 用 GroundPrimitive 时 outline/fill 都不可靠）
+            // ⭐ markerSymbol 策略（与 GeoJsonLayerManager 保持一致）
+            //   空/未设置 → fromColor() 渐变圆点（性能最优）
+            //   单 ASCII 字符 → fromText() PinBuilder 原生文字标记
+            //   emoji/SVG → 传入 markerSymbol 由 Cesium 处理
+            const markerIcon = s.markerIcon || '';
+            const isSingleAscii = markerIcon.length === 1;
+            const markerSymbol = isSingleAscii ? markerIcon : undefined;
+
             const dataSource = await Cesium.GeoJsonDataSource.load(geojsonData, {
               stroke: stroke,
               strokeWidth: s.strokeWidth ?? 3,
               fill: fill,
               markerColor: markerC,
-              markerSize: s.markerSize ?? 24
+              markerSize: s.markerSize ?? 48,
+              markerSymbol: markerSymbol
             });
 
             // 后处理：分面/线设置样式和 clampToGround
@@ -2576,6 +2978,32 @@ export default {
               }
             }
             console.log(`[${this.componentName}] 🎨 后处理样式完成: ${ents.length} 个实体`);
+
+            // ⭐ emoji/SVG 图标后处理（与 GeoJsonLayerManager 逻辑一致）
+            //   单 ASCII 已通过 markerSymbol 传递给 Cesium，emoji 需要 canvas 绘制到 billboard
+            if (markerIcon && markerIcon.length > 1) {
+              var cSize = 64;
+              var sharedPinCanvas = document.createElement('canvas');
+              sharedPinCanvas.width = cSize;
+              sharedPinCanvas.height = cSize;
+              var ctx = sharedPinCanvas.getContext('2d');
+              ctx.font = (cSize * 0.6) + 'px serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(markerIcon, cSize / 2, cSize / 2 + 2);
+              var bScale = ((s.markerSize || 48) / 64) * 1.2;
+              for (var ei = 0; ei < ents.length; ei++) {
+                var ent = ents[ei];
+                if (ent.billboard) {
+                  ent.billboard.image = sharedPinCanvas;
+                  ent.billboard.scale = bScale;
+                  ent.billboard.color = Cesium.Color.WHITE;
+                  ent.billboard.disableDepthTestDistance = Number.POSITIVE_INFINITY;
+                }
+              }
+              console.log(`[${this.componentName}] 🎨 emoji 图标已应用: "${markerIcon}" → ${ents.length} 个实体`);
+            }
+
             const entityCount = dataSource.entities.values.length;
             if (entityCount === 0) {
               throw new Error(layerType === 'wfs'
@@ -2584,7 +3012,47 @@ export default {
             }
             viewer.dataSources.add(dataSource);
             dataSource.name = node.name;
+
+            // ⭐ 点聚类支持（复用 GeoJsonLayerManager 逻辑）
+            if (node.clusterEnabled && entityCount > 0) {
+              var cluster = dataSource.clustering;
+              cluster.pixelRange = node.clusterPixelRange || 80;
+              cluster.minimumClusterSize = node.clusterMinSize || 2;
+              if (cluster.clusterEvent && cluster.clusterEvent.addEventListener) {
+                cluster.clusterEvent.addEventListener(function (clusteredEntities, clusterEntity) {
+                  var count = clusteredEntities.length;
+                  var size = count < 10 ? 44 : count < 100 ? 52 : 60;
+                  var canvas = document.createElement('canvas');
+                  canvas.width = size; canvas.height = size;
+                  var ctx = canvas.getContext('2d');
+                  var cx = size / 2, cy = size / 2, r = size / 2 - 2;
+                  var grad = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+                  grad.addColorStop(0, '#FF6B35');
+                  grad.addColorStop(1, '#CC3300');
+                  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                  ctx.fillStyle = grad; ctx.fill();
+                  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+                  ctx.beginPath(); ctx.moveTo(cx - 6, cy + r - 4);
+                  ctx.lineTo(cx, cy + r + 6); ctx.lineTo(cx + 6, cy + r - 4);
+                  ctx.fillStyle = '#CC3300'; ctx.fill();
+                  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+                  ctx.fillStyle = '#fff'; ctx.font = 'bold ' + (size * 0.4) + 'px sans-serif';
+                  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                  ctx.fillText(count.toString(), cx, cy - 2);
+                  clusterEntity.billboard.show = true;
+                  clusterEntity.billboard.image = canvas;
+                  clusterEntity.billboard.verticalOrigin = Cesium.VerticalOrigin.BOTTOM;
+                  clusterEntity.label.show = false;
+                });
+              }
+              cluster.enabled = true;
+              ents.forEach(function (e) { e.clusterShow = true; });
+              console.log(`[${this.componentName}] 🔵 点聚类已启用: pixelRange=${cluster.pixelRange}, minSize=${cluster.minimumClusterSize}`);
+            }
+
             this._cesiumLayers.set(node.id, { type: 'geojson', object: dataSource });
+            // ⭐ 注册实体拾取（选中高亮 + 属性弹窗）
+            this._registerEntityPicking(node, dataSource);
             console.log(`[${this.componentName}] ✅ ${layerType.toUpperCase()} 加载成功: ${entityCount} 个要素`);
             break;
           }
@@ -3022,6 +3490,13 @@ export default {
           }
         }
 
+        // ⭐ 注销实体拾取 + 关闭弹窗
+        if (this._selectionManager) {
+          this._selectionManager.unregisterLayer(node.id);
+        }
+        if (this._popupSelectedLayerId === node.id) {
+          this.dismissEntityPopup();
+        }
         this._cesiumLayers.delete(node.id);
         this._removeFromLoadOrder(node.id);
         this.loadedLayerIds[node.id] = false;
@@ -3114,6 +3589,12 @@ export default {
     destroyAllCesiumLayers() {
       const viewer = this.getViewer();
       if (!viewer) return;
+
+      // ⭐ 注销所有已注册的实体拾取
+      if (this._selectionManager) {
+        this._selectionManager.unregisterAll();
+      }
+      this.dismissEntityPopup();
 
       this._cesiumLayers.forEach((entry, nodeId) => {
         try {

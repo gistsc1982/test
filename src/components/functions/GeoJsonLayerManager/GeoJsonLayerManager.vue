@@ -77,6 +77,20 @@
 
     <template #dialogs></template>
   </JsonConfigPanelBase>
+
+  <!-- ⭐ 通用实体属性弹窗 -->
+  <EntityInfoPopup
+    :visible="showEntityPopup"
+    :title="popupTitle"
+    :properties="popupProperties"
+    :screenX="popupScreenX"
+    :screenY="popupScreenY"
+    :geoType="popupGeoType"
+    :layerName="popupLayerName"
+    :canFlyTo="true"
+    @close="dismissEntityPopup"
+    @fly-to="flyToSelectedEntity"
+  />
 </template>
 
 <script>
@@ -84,12 +98,14 @@ import JsonConfigPanelBase from '@componentsLib/JsonConfigPanelBase.mjs';
 import '@componentsLib/JsonConfigPanelBase.mjs.css';
 import { ConfigStrategyFactory, configRegistry } from './ConfigLoadStrategy.mjs';
 import rawPanelMetadata from './GeoJsonLayerManager.config.json';
+import EntitySelectionManager from '../../../utils/EntitySelectionManager.js';
+import EntityInfoPopup from '../../common/EntityInfoPopup.vue';
 
 const panelMetadata = rawPanelMetadata;
 
 export default {
   name: 'GeoJsonLayerManager',
-  components: { JsonConfigPanelBase },
+  components: { JsonConfigPanelBase, EntityInfoPopup },
   props: {
     initialX: { type: [Number, String], default: 'left' },
     initialY: { type: Number, default: 440 },
@@ -104,7 +120,18 @@ export default {
       panelMetadata,
       _cesiumLayers: new Map(),
       _labelStates: {},
-      refreshLoading: false
+      refreshLoading: false,
+      // ⭐ 实体选中 & 属性弹窗
+      _selectionManager: null,
+      showEntityPopup: false,
+      popupTitle: '',
+      popupProperties: [],
+      popupScreenX: 0,
+      popupScreenY: 0,
+      popupGeoType: '',
+      popupLayerName: '',
+      _popupSelectedEntity: null,
+      _popupSelectedLayerId: null
     };
   },
   computed: {
@@ -118,8 +145,13 @@ export default {
   },
   mounted() {
     console.log(`[${this.componentName}] 🚀 GeoJsonLayerManager 已挂载`);
+    this._selectionManager = EntitySelectionManager.getInstance();
   },
   beforeUnmount() {
+    if (this._selectionManager) {
+      this._selectionManager.unregisterAll();
+      this._selectionManager.stopTracking();
+    }
     this.destroyAllLayers();
   },
   methods: {
@@ -337,6 +369,9 @@ export default {
           this._cesiumLayers.set(layer.id, dataSource);
           this.updateItemState(layer.id, { loading: false, loaded: true });
 
+          // ⭐ 注册实体拾取（选中高亮 + 属性弹窗）
+          this._registerEntityPicking(layer, dataSource);
+
           // ⭐ 后处理：仅处理 options 无法覆盖的场景
           //   - clampToGround：Cesium GeoJsonDataSource options 已应用，但 polyline/polygon
           //     在某些版本中不会自动继承，此处做兜底强制
@@ -438,10 +473,18 @@ export default {
       if (!viewer) { console.error(`[${this.componentName}] ❌ 未找到 Cesium Viewer`); return; }
       const dataSource = this._cesiumLayers.get(layer.id);
       if (dataSource) {
+        // ⭐ 注销实体拾取
+        if (this._selectionManager) {
+          this._selectionManager.unregisterLayer(layer.id);
+        }
         viewer.dataSources.remove(dataSource);
         this._cesiumLayers.delete(layer.id);
         this._labelStates = { ...this._labelStates, [layer.id]: false };
         this.updateItemState(layer.id, { loaded: false, loading: false });
+        // 如果当前弹窗显示的是被移除的图层，关闭弹窗
+        if (this._popupSelectedLayerId === layer.id) {
+          this.dismissEntityPopup();
+        }
         console.log(`[${this.componentName}] ✅ 图层 "${layer.name}" 已移除`);
       } else {
         this.updateItemState(layer.id, { loaded: false, loading: false });
@@ -615,12 +658,135 @@ export default {
       const viewer = this.getCesiumViewer();
       if (viewer) {
         this._cesiumLayers.forEach((dataSource, id) => {
+          if (this._selectionManager) {
+            this._selectionManager.unregisterLayer(id);
+          }
           viewer.dataSources.remove(dataSource);
         });
       }
       this._cesiumLayers.clear();
       this._labelStates = {};
+      this.dismissEntityPopup();
     },
+    // ==================== 实体选中 & 属性弹窗 ====================
+
+    /**
+     * 为已加载的数据源注册实体拾取
+     */
+    _registerEntityPicking(layer, dataSource) {
+      if (!this._selectionManager) {
+        this._selectionManager = EntitySelectionManager.getInstance();
+      }
+      const viewer = this.getCesiumViewer();
+      if (!viewer) return;
+
+      const self = this;
+      this._selectionManager.registerLayer(viewer, layer.id, dataSource, {
+        mode: 'click',
+        enableHighlight: true,
+        enableClustering: layer.clusterEnabled !== false,
+        highlightDuration: 2,
+        onSelect: function (payload) {
+          self._onEntitySelected(layer, payload);
+        },
+        onDismiss: function () {
+          self.dismissEntityPopup();
+        }
+      });
+      console.log(`[${this.componentName}] 🎯 实体拾取已注册: "${layer.name}" (聚类=${layer.clusterEnabled !== false})`);
+    },
+
+    /**
+     * 实体被选中回调 → 展示属性弹窗 + 启用位置跟踪
+     */
+    _onEntitySelected(layer, payload) {
+      this.popupTitle = payload.title || layer.name || '实体属性';
+      this.popupProperties = payload.properties || [];
+      this.popupGeoType = payload.geoType || '';
+      this.popupLayerName = layer.name || '';
+      this._popupSelectedEntity = payload.entity;
+      this._popupSelectedLayerId = layer.id;
+
+      // 设置初始屏幕位置
+      if (payload.screenPosition) {
+        this.popupScreenX = payload.screenPosition.x;
+        this.popupScreenY = payload.screenPosition.y;
+      }
+
+      // 启用 postRender 位置跟踪（实体移动 / 相机移动时跟随）
+      this._startPopupTracking(payload.entity);
+
+      // 显示弹窗
+      this.showEntityPopup = true;
+      console.log(`[${this.componentName}] 📋 属性弹窗已打开: "${this.popupTitle}" (${this.popupProperties.length} 项属性)`);
+    },
+
+    /**
+     * 位置跟踪：通过 postRender 实时更新弹窗屏幕坐标
+     */
+    _startPopupTracking(entity) {
+      if (!this._selectionManager) return;
+
+      const viewer = this.getCesiumViewer();
+      if (!viewer) return;
+
+      const self = this;
+      this._selectionManager.stopTracking(); // 停止之前的跟踪
+
+      this._selectionManager.trackScreenPosition(viewer, entity, function (screenPos) {
+        if (self.showEntityPopup && screenPos) {
+          self.popupScreenX = screenPos.x;
+          self.popupScreenY = screenPos.y;
+        }
+      });
+    },
+
+    /**
+     * 飞行定位到当前选中的实体
+     */
+    flyToSelectedEntity() {
+      const entity = this._popupSelectedEntity;
+      if (!entity) return;
+
+      const viewer = this.getCesiumViewer();
+      const Cesium = this.getCesium();
+      if (!viewer || !Cesium || !entity.position) {
+        console.warn(`[${this.componentName}] ⚠️ 无法定位 — 实体无 position`);
+        return;
+      }
+
+      try {
+        const position = entity.position.getValue
+          ? entity.position.getValue(viewer.clock.currentTime)
+          : entity.position;
+
+        if (!position) return;
+
+        viewer.camera.flyTo({
+          destination: position,
+          duration: 1.5,
+          offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 500)
+        });
+        console.log(`[${this.componentName}] 🎯 已飞至实体: "${this.popupTitle}"`);
+      } catch (e) {
+        console.warn(`[${this.componentName}] ⚠️ 飞行定位失败:`, e.message);
+      }
+    },
+
+    /**
+     * 关闭属性弹窗 + 清除位置跟踪
+     */
+    dismissEntityPopup() {
+      this.showEntityPopup = false;
+      this._popupSelectedEntity = null;
+      this._popupSelectedLayerId = null;
+
+      if (this._selectionManager) {
+        this._selectionManager.stopTracking();
+      }
+      console.log(`[${this.componentName}] 🔒 属性弹窗已关闭`);
+    },
+
     getCesiumViewer() {
       return typeof window !== 'undefined' ? window.__cesiumViewer__ : null;
     },
