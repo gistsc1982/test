@@ -2054,7 +2054,12 @@ export default {
         this.popupScreenX = payload.screenPosition.x;
         this.popupScreenY = payload.screenPosition.y;
       }
-      this._startPopupTracking(payload.entity);
+      // ⭐ 聚类实体不需要位置跟踪（dummy entity 的 position 是 billboard 锚点）
+      if (!payload._isCluster) {
+        this._startPopupTracking(payload.entity);
+      } else {
+        if (this._selectionManager) this._selectionManager.stopTracking();
+      }
       this.showEntityPopup = true;
     },
 

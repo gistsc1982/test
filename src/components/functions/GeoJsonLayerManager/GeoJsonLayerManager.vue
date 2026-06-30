@@ -713,8 +713,13 @@ export default {
         this.popupScreenY = payload.screenPosition.y;
       }
 
-      // 启用 postRender 位置跟踪（实体移动 / 相机移动时跟随）
-      this._startPopupTracking(payload.entity);
+      // ⭐ 聚类实体不需要位置跟踪（dummy entity 的 position 是 billboard 锚点，
+      //    与点击位置有偏移），弹窗保持在点击屏幕位置即可
+      if (!payload._isCluster) {
+        this._startPopupTracking(payload.entity);
+      } else {
+        if (this._selectionManager) this._selectionManager.stopTracking();
+      }
 
       // 显示弹窗
       this.showEntityPopup = true;
