@@ -46,9 +46,17 @@
         <div class="popup-body">
           <table v-if="properties && properties.length > 0" class="popup-table">
             <tbody>
-              <tr v-for="(prop, idx) in properties" :key="idx">
+              <tr
+                v-for="(prop, idx) in properties"
+                :key="idx"
+                :class="{ 'clickable-row': prop._clickable }"
+                @click="prop._clickable && onRowClick(prop, idx)"
+              >
                 <td class="prop-name">{{ prop.name }}</td>
-                <td class="prop-value" :title="prop.value">{{ prop.value }}</td>
+                <td class="prop-value" :title="prop.value">
+                  {{ prop.value }}
+                  <span v-if="prop._clickable" class="click-hint">📍</span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -117,7 +125,7 @@ export default {
     offsetY: { type: Number, default: -40 }
   },
 
-  emits: ['close', 'fly-to'],
+  emits: ['close', 'fly-to', 'row-click'],
 
   data: function () {
     return {
@@ -203,6 +211,12 @@ export default {
 
     onFlyTo: function () {
       this.$emit('fly-to');
+    },
+
+    onRowClick: function (prop, idx) {
+      if (prop._clickable) {
+        this.$emit('row-click', { prop: prop, index: idx });
+      }
     },
 
     _removeOutsideClick: function () {
@@ -331,6 +345,27 @@ export default {
 
 .popup-table tr:hover {
   background: rgba(255, 255, 255, 0.03);
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+.clickable-row:hover {
+  background: rgba(255, 107, 53, 0.12) !important;
+  color: #FF6B35;
+}
+.clickable-row:hover .prop-name {
+  color: #FF6B35;
+}
+
+.click-hint {
+  font-size: 11px;
+  opacity: 0;
+  margin-left: 4px;
+  transition: opacity 0.15s;
+}
+.clickable-row:hover .click-hint {
+  opacity: 1;
 }
 
 .prop-name {

@@ -90,6 +90,7 @@
     :canFlyTo="true"
     @close="dismissEntityPopup"
     @fly-to="flyToSelectedEntity"
+    @row-click="onPopupRowClick"
   />
 </template>
 
@@ -430,23 +431,40 @@ export default {
 
           viewer.scene.requestRender();
 
-          // ⭐ 定位：从 GeoJSON 坐标计算中心点，直接飞过去
+          // ⭐ 定位：从 GeoJSON 坐标计算边界范围，动态飞行高度
           try {
-            const coords = [];
+            let minLon = 180, maxLon = -180, minLat = 90, maxLat = -90;
             geoJsonData.features.forEach(f => {
               const c = f.geometry.coordinates;
-              if (f.geometry.type === 'Point') coords.push(c);
-              else if (f.geometry.type === 'LineString') c.forEach(p => coords.push(p));
-              else if (f.geometry.type === 'Polygon') c[0].forEach(p => coords.push(p));
+              if (!c) return;
+              const extractCoords = (coords) => {
+                if (typeof coords[0] === 'number') {
+                  const lon = coords[0], lat = coords[1];
+                  if (lon < minLon) minLon = lon; if (lon > maxLon) maxLon = lon;
+                  if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+                } else {
+                  coords.forEach(extractCoords);
+                }
+              };
+              extractCoords(c);
             });
-            if (coords.length > 0) {
-              const lngSum = coords.reduce((s, c) => s + c[0], 0);
-              const latSum = coords.reduce((s, c) => s + c[1], 0);
-              const centerLng = lngSum / coords.length;
-              const centerLat = latSum / coords.length;
-              console.log(`[${this.componentName}] 🎯 计算定位中心: [${centerLng.toFixed(6)}, ${centerLat.toFixed(6)}]，坐标点: ${coords.length}`);
+            if (minLon <= maxLon && minLat <= maxLat) {
+              const centerLng = (minLon + maxLon) / 2;
+              const centerLat = (minLat + maxLat) / 2;
+              let dLon = maxLon - minLon, dLat = maxLat - minLat;
+              if (dLon < 0.001) dLon = 0.001;
+              if (dLat < 0.001) dLat = 0.001;
+              const margin = Math.max(dLon, dLat) * 0.4;
+              const cosLat = Math.cos(centerLat * Math.PI / 180);
+              const diagM = Math.sqrt(
+                Math.pow((dLon + margin * 2) * 111320 * cosLat, 2) +
+                Math.pow((dLat + margin * 2) * 111320, 2)
+              );
+              const fovY = (viewer.camera.frustum && viewer.camera.frustum.fov) || (30 * Math.PI / 180);
+              const targetHeight = Math.max(diagM / (2 * Math.tan(fovY / 2)) * 1.3, 500);
+              console.log(`[${this.componentName}] 🎯 定位: [${centerLng.toFixed(6)}, ${centerLat.toFixed(6)}]，范围=${diagM.toFixed(0)}m，高度=${targetHeight.toFixed(0)}m`);
               viewer.camera.flyTo({
-                destination: Cesium.Cartesian3.fromDegrees(centerLng, centerLat, 8000),
+                destination: Cesium.Cartesian3.fromDegrees(centerLng, centerLat, targetHeight),
                 duration: 1.5,
                 orientation: {
                   heading: Cesium.Math.toRadians(0),
@@ -514,34 +532,44 @@ export default {
         console.warn(`[${this.componentName}] ⚠️ Cesium 未就绪，无法定位`);
         return;
       }
-      // ⭐ 从 GeoJSON 坐标计算中心点，直接飞行定位
+      // ⭐ 从 GeoJSON 坐标计算边界范围，动态飞行高度
       try {
         const geoJsonData = typeof item.geoJson === 'string' ? JSON.parse(item.geoJson) : item.geoJson;
-        const coords = [];
+        let minLon = 180, maxLon = -180, minLat = 90, maxLat = -90;
         if (geoJsonData && geoJsonData.features) {
           geoJsonData.features.forEach(f => {
             const c = f.geometry.coordinates;
             if (!c) return;
-            if (f.geometry.type === 'Point') coords.push(c);
-            else if (f.geometry.type === 'LineString') c.forEach(p => coords.push(p));
-            else if (f.geometry.type === 'Polygon') c[0].forEach(p => coords.push(p));
+            const extractCoords = (coords) => {
+              if (typeof coords[0] === 'number') {
+                const lon = coords[0], lat = coords[1];
+                if (lon < minLon) minLon = lon; if (lon > maxLon) maxLon = lon;
+                if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+              } else { coords.forEach(extractCoords); }
+            };
+            extractCoords(c);
           });
-        }
-        if (coords.length > 0) {
-          const lngSum = coords.reduce((s, c) => s + c[0], 0);
-          const latSum = coords.reduce((s, c) => s + c[1], 0);
-          const centerLng = lngSum / coords.length;
-          const centerLat = latSum / coords.length;
-          viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(centerLng, centerLat, 8000),
-            duration: 1.5,
-            orientation: {
-              heading: Cesium.Math.toRadians(0),
-              pitch: Cesium.Math.toRadians(-90),
-              roll: 0
-            }
-          });
-          console.log(`[${this.componentName}] 🎯 已定位到: ${item.name} [${centerLng.toFixed(6)}, ${centerLat.toFixed(6)}]`);
+          if (minLon <= maxLon && minLat <= maxLat) {
+            const centerLng = (minLon + maxLon) / 2;
+            const centerLat = (minLat + maxLat) / 2;
+            let dLon = maxLon - minLon, dLat = maxLat - minLat;
+            if (dLon < 0.001) dLon = 0.001;
+            if (dLat < 0.001) dLat = 0.001;
+            const margin = Math.max(dLon, dLat) * 0.4;
+            const cosLat = Math.cos(centerLat * Math.PI / 180);
+            const diagM = Math.sqrt(
+              Math.pow((dLon + margin * 2) * 111320 * cosLat, 2) +
+              Math.pow((dLat + margin * 2) * 111320, 2)
+            );
+            const fovY = (viewer.camera.frustum && viewer.camera.frustum.fov) || (30 * Math.PI / 180);
+            const targetHeight = Math.max(diagM / (2 * Math.tan(fovY / 2)) * 1.3, 500);
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(centerLng, centerLat, targetHeight),
+              duration: 1.5,
+              orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-90), roll: 0 }
+            });
+            console.log(`[${this.componentName}] 🎯 已定位到: ${item.name} [${centerLng.toFixed(6)}, ${centerLat.toFixed(6)}] 高度=${targetHeight.toFixed(0)}m`);
+          }
         } else {
           console.warn(`[${this.componentName}] ⚠️ 无有效坐标，无法定位: ${item.name}`);
         }
@@ -776,6 +804,56 @@ export default {
       } catch (e) {
         console.warn(`[${this.componentName}] ⚠️ 飞行定位失败:`, e.message);
       }
+    },
+
+    /**
+     * 弹窗中可点击行被点击 → 飞行定位到该实体 + 关闭弹窗 + 闪烁
+     */
+    onPopupRowClick({ prop }) {
+      if (!prop._worldPos) return;
+      const viewer = this.getCesiumViewer();
+      const Cesium = this.getCesium();
+      if (!viewer || !Cesium) return;
+
+      var worldPos = prop._worldPos;
+      var layerId = this._popupSelectedLayerId;
+
+      // 1. 飞行定位：保持当前相机高度，仅平移到目标经纬度（不缩放）
+      var cg = Cesium.Cartographic.fromCartesian(worldPos);
+      var currentHeight = viewer.camera.positionCartographic.height;
+      var dest = Cesium.Cartesian3.fromDegrees(
+        Cesium.Math.toDegrees(cg.longitude),
+        Cesium.Math.toDegrees(cg.latitude),
+        currentHeight
+      );
+      viewer.camera.flyTo({
+        destination: dest,
+        duration: 0.6,
+        orientation: {
+          heading: viewer.camera.heading,
+          pitch: viewer.camera.pitch,
+          roll: 0
+        }
+      });
+
+      // 2. 关闭弹窗
+      this.dismissEntityPopup();
+
+      // 3. 飞行到位后尝试 drillPick 找实体并闪烁
+      setTimeout(() => {
+        try {
+          var sp = viewer.scene.cartesianToCanvasCoordinates(worldPos);
+          if (!sp) return;
+          var dpResults = viewer.scene.drillPick(new Cesium.Cartesian2(sp.x, sp.y), 5);
+          for (var i = 0; i < dpResults.length; i++) {
+            var entity = dpResults[i].id || (dpResults[i].primitive && dpResults[i].primitive.id);
+            if (entity && !entity._isClusterPrimitive && this._selectionManager && layerId) {
+              this._selectionManager.selectEntity(layerId, entity, { x: sp.x, y: sp.y });
+              return;
+            }
+          }
+        } catch (e) { /* ignore */ }
+      }, 900);
     },
 
     /**

@@ -306,6 +306,7 @@
     :canFlyTo="true"
     @close="dismissEntityPopup"
     @fly-to="flyToSelectedEntity"
+    @row-click="onPopupRowClick"
   />
 </template>
 
@@ -1980,18 +1981,26 @@ export default {
 
       if (coords.length === 0) return { lon: 116.4, lat: 39.9, height: 8000 };
 
-      const lngSum = coords.reduce((s, c) => s + c[0], 0);
-      const latSum = coords.reduce((s, c) => s + c[1], 0);
-      const centerLng = lngSum / coords.length;
-      const centerLat = latSum / coords.length;
-
-      // 根据坐标范围推算飞行高度
       const lngs = coords.map(c => c[0]);
       const lats = coords.map(c => c[1]);
-      const lngRange = Math.max(...lngs) - Math.min(...lngs);
-      const latRange = Math.max(...lats) - Math.min(...lats);
-      const maxDeg = Math.max(lngRange, latRange, 0.01);
-      const height = Math.max(2000, Math.min(500000, maxDeg * 111000 * 2));
+      const centerLng = lngs.reduce((s, v) => s + v, 0) / coords.length;
+      const centerLat = lats.reduce((s, v) => s + v, 0) / coords.length;
+      const minLon = Math.min(...lngs), maxLon = Math.max(...lngs);
+      const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+
+      // ⭐ 基于边界范围和相机FOV计算合适的飞行高度
+      let dLon = maxLon - minLon, dLat = maxLat - minLat;
+      if (dLon < 0.001) dLon = 0.001;
+      if (dLat < 0.001) dLat = 0.001;
+      const margin = Math.max(dLon, dLat) * 0.4;
+      const cosLat = Math.cos(centerLat * Math.PI / 180);
+      const diagM = Math.sqrt(
+        Math.pow((dLon + margin * 2) * 111320 * cosLat, 2) +
+        Math.pow((dLat + margin * 2) * 111320, 2)
+      );
+      // 默认FOV 30°, safetyFactor 1.3, 最低500m
+      const fovY = 30 * Math.PI / 180;
+      const height = Math.max(diagM / (2 * Math.tan(fovY / 2)) * 1.3, 500);
 
       return {
         lon: parseFloat(centerLng.toFixed(6)),
@@ -2101,6 +2110,50 @@ export default {
       this._popupSelectedEntity = null;
       this._popupSelectedLayerId = null;
       if (this._selectionManager) this._selectionManager.stopTracking();
+    },
+
+    onPopupRowClick({ prop }) {
+      if (!prop._worldPos) return;
+      const viewer = this.getViewer();
+      const Cesium = this.getCesium();
+      if (!viewer || !Cesium) return;
+
+      var worldPos = prop._worldPos;
+      var layerId = this._popupSelectedLayerId;
+
+      var cg = Cesium.Cartographic.fromCartesian(worldPos);
+      var currentHeight = viewer.camera.positionCartographic.height;
+      var dest = Cesium.Cartesian3.fromDegrees(
+        Cesium.Math.toDegrees(cg.longitude),
+        Cesium.Math.toDegrees(cg.latitude),
+        currentHeight
+      );
+      viewer.camera.flyTo({
+        destination: dest,
+        duration: 0.6,
+        orientation: {
+          heading: viewer.camera.heading,
+          pitch: viewer.camera.pitch,
+          roll: 0
+        }
+      });
+
+      this.dismissEntityPopup();
+
+      setTimeout(() => {
+        try {
+          var sp = viewer.scene.cartesianToCanvasCoordinates(worldPos);
+          if (!sp) return;
+          var dpResults = viewer.scene.drillPick(new Cesium.Cartesian2(sp.x, sp.y), 5);
+          for (var i = 0; i < dpResults.length; i++) {
+            var entity = dpResults[i].id || (dpResults[i].primitive && dpResults[i].primitive.id);
+            if (entity && !entity._isClusterPrimitive && this._selectionManager && layerId) {
+              this._selectionManager.selectEntity(layerId, entity, { x: sp.x, y: sp.y });
+              return;
+            }
+          }
+        } catch (e) { /* ignore */ }
+      }, 900);
     },
 
     /**

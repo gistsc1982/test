@@ -273,65 +273,81 @@ function extractProperties(entity) {
  *
  * @returns {{ handled: boolean, clusterCount: number, clusterPosition: Cesium.Cartesian3|null }}
  */
-function handleClusterPick(clusterEntity, viewer, Cesium) {
+function handleClusterPick(clusterEntity, viewer, Cesium, options) {
+  // options: { extent, count }
   if (!clusterEntity || !clusterEntity.position) return { handled: false, clusterCount: 0, clusterPosition: null };
 
   try {
-    // ⭐ 兼容两种 position 格式：
-    //    普通 Entity: position 是 PositionProperty，需 .getValue(time)
-    //    伪 Entity (dummy): position 是 Cartesian3，直接使用
+    // ⭐ 兼容两种 position 格式
     var position;
     if (typeof clusterEntity.position.getValue === 'function') {
       position = clusterEntity.position.getValue(Cesium.JulianDate.now());
-    } else if (clusterEntity.position.x !== undefined && clusterEntity.position.y !== undefined && clusterEntity.position.z !== undefined) {
-      // 已经是 Cartesian3
+    } else if (clusterEntity.position.x !== undefined) {
       position = clusterEntity.position;
     } else {
       position = clusterEntity.position;
     }
-
     if (!position) return { handled: false, clusterCount: 0, clusterPosition: null };
 
-    // 转换为地理坐标便于调试
-    var cartographic = Cesium.Cartographic.fromCartesian(position);
-    var lon = Cesium.Math.toDegrees(cartographic.longitude).toFixed(6);
-    var lat = Cesium.Math.toDegrees(cartographic.latitude).toFixed(6);
-    var height = cartographic.height.toFixed(1);
+    var count = (options && options.count) ? options.count : 0;
 
-    // 提取聚类数量（从 label.text 或 billboard 图片尺寸推算）
-    var count = 0;
-    try {
-      var text = clusterEntity.label && clusterEntity.label.text
-        ? (clusterEntity.label.text.getValue
-          ? clusterEntity.label.text.getValue()
-          : clusterEntity.label.text)
-        : null;
-      if (text && /^\d+$/.test(String(text))) {
-        count = parseInt(text, 10);
-      }
-    } catch (e) { /* ignore */ }
+    // ⭐ 如果提供了 extent，手动计算飞行高度确保所有点可视
+    if (options && options.extent) {
+      var ext = options.extent;
+      var dLon = ext.east - ext.west;
+      var dLat = ext.north - ext.south;
+      // 最小范围（避免单点飞太近）
+      if (dLon < 0.001) dLon = 0.001;
+      if (dLat < 0.001) dLat = 0.001;
+      var margin = Math.max(dLon, dLat) * 0.4;
+      var centerLon = (ext.west + ext.east) / 2;
+      var centerLat = (ext.south + ext.north) / 2;
+      // 计算对角线距离（米）：Δlon 转米需乘 cos(lat)
+      var cosLat = Math.cos(Cesium.Math.toRadians(Math.abs(centerLat)));
+      var diagLonM = (dLon + margin * 2) * 111320 * cosLat;
+      var diagLatM = (dLat + margin * 2) * 111320;
+      var diagM = Math.sqrt(diagLonM * diagLonM + diagLatM * diagLatM);
+      // 相机 FOV 约 30°（0.52 rad），高度 ≈ 对角线 / (2 * tan(fov/2))
+      var fovY = viewer.camera.frustum.fov || (30 * Math.PI / 180);
+      var requiredHeight = diagM / (2 * Math.tan(fovY / 2));
+      // 1.5x 安全系数确保四周留白，最低 300m
+      var targetHeight = Math.max(requiredHeight * 1.5, 300);
 
-    // ⭐ 飞到聚类位置上方 2000m（在地形高度基础上叠加）
-    var targetHeight = Math.max(height, 0) + 2000;
-    var targetPos = Cesium.Cartesian3.fromDegrees(
-      parseFloat(lon), parseFloat(lat), targetHeight
-    );
+      console.log('[EntitySelectionManager] 🔵 聚类展开: extent=[' +
+        ext.west.toFixed(6) + ', ' + ext.south.toFixed(6) + ', ' +
+        ext.east.toFixed(6) + ', ' + ext.north.toFixed(6) +
+        '], 对角线=' + diagM.toFixed(0) + 'm, fov=' + (fovY * 180 / Math.PI).toFixed(1) + '°, 高度=' + targetHeight.toFixed(0) + 'm, 数量=' + count);
 
-    var camH = viewer.camera.positionCartographic.height;
-    console.log('[EntitySelectionManager] 🔵 聚类展开: 聚类位置=(' + lon + ', ' + lat + ', ' + height + 'm)' +
-      ', 相机高度=' + camH.toFixed(0) + 'm' +
-      ', 目标=' + targetHeight.toFixed(0) + 'm' +
-      ', 数量=' + count);
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, targetHeight),
+        duration: 0.8,
+        orientation: {
+          heading: Cesium.Math.toRadians(0),
+          pitch: Cesium.Math.toRadians(-90),
+          roll: 0
+        }
+      });
+    } else {
+      // 无 extent 兜底
+      var cartographic = Cesium.Cartographic.fromCartesian(position);
+      var lon = Cesium.Math.toDegrees(cartographic.longitude);
+      var lat = Cesium.Math.toDegrees(cartographic.latitude);
+      var targetHeight = Math.max(cartographic.height, 0) + 2000;
+      var targetPos = Cesium.Cartesian3.fromDegrees(lon, lat, targetHeight);
 
-    viewer.camera.flyTo({
-      destination: targetPos,
-      duration: 0.6,
-      orientation: {
-        heading: viewer.camera.heading,
-        pitch: Cesium.Math.toRadians(-45), // 倾斜 45° 看得更清楚
-        roll: 0
-      }
-    });
+      console.log('[EntitySelectionManager] 🔵 聚类展开(无extent): (' +
+        lon.toFixed(6) + ', ' + lat.toFixed(6) + '), 目标=' + targetHeight.toFixed(0) + 'm');
+
+      viewer.camera.flyTo({
+        destination: targetPos,
+        duration: 0.8,
+        orientation: {
+          heading: Cesium.Math.toRadians(0),
+          pitch: Cesium.Math.toRadians(-90),
+          roll: 0
+        }
+      });
+    }
 
     return { handled: true, clusterCount: count, clusterPosition: position };
   } catch (e) {
@@ -824,8 +840,47 @@ EntitySelectionManager.prototype = {
         layer.options.onSelect(clusterPayload);
       }
 
+      // ⭐ 从缓存查找 extent + count + entitySummaries
+      var flyOptions = {};
+      var cacheEntry = this._clusterEntityCache.get(matchedLayerId);
+      if (cacheEntry && cacheEntry.entities.size > 0) {
+        cacheEntry.entities.forEach(function (val) {
+          if (!val.centerPosition) return;
+          var sp = viewer.scene.cartesianToCanvasCoordinates(val.centerPosition);
+          if (!sp) return;
+          var d2 = Math.pow(sp.x - screenPos.x, 2) + Math.pow(sp.y - screenPos.y, 2);
+          if (d2 < 10000 && val.extent) { // 100px 半径内的匹配
+            flyOptions.extent = val.extent;
+            flyOptions.count = val.count;
+            if (val.entitySummaries && val.entitySummaries.length > 0) {
+              // 计算目标飞行高度用于下级聚类分组模拟
+              var ext2 = val.extent;
+              var dLon2 = Math.max(ext2.east - ext2.west, 0.001);
+              var dLat2 = Math.max(ext2.north - ext2.south, 0.001);
+              var margin2 = Math.max(dLon2, dLat2) * 0.4;
+              var clat2 = (ext2.south + ext2.north) / 2;
+              var cosLat2 = Math.cos(Cesium.Math.toRadians(Math.abs(clat2)));
+              var diagM2 = Math.sqrt(
+                Math.pow((dLon2 + margin2 * 2) * 111320 * cosLat2, 2) +
+                Math.pow((dLat2 + margin2 * 2) * 111320, 2)
+              );
+              var fovY2 = (viewer.camera.frustum && viewer.camera.frustum.fov) || (30 * Math.PI / 180);
+              var estHeight = Math.max(diagM2 / (2 * Math.tan(fovY2 / 2)) * 1.5, 300);
+
+              var layerInfo2 = self._layers.get(matchedLayerId);
+              var pixelRange = (layerInfo2 && layerInfo2.dataSource && layerInfo2.dataSource.clustering)
+                ? (layerInfo2.dataSource.clustering.pixelRange || 80) : 80;
+              self._computeEntityGroupings(val.entitySummaries, estHeight, pixelRange, viewer, Cesium);
+
+              clusterPayload.properties = self._buildGroupedProperties(val.entitySummaries, val.count);
+              clusterPayload.title = '🔵 聚类点 (' + (val.count || clusterCount || '?') + ' 个要素)';
+            }
+          }
+        });
+      }
+
       // 飞行靠近以展开聚类
-      var result = handleClusterPick(entity, viewer, Cesium);
+      var result = handleClusterPick(entity, viewer, Cesium, flyOptions);
 
       if (!result.handled) {
         // 飞行失败时仍然通知取消选中（关闭 popup）
@@ -995,6 +1050,7 @@ EntitySelectionManager.prototype = {
    * 处理聚类实体点击（弹出摘要 + 飞行展开）
    */
   _handleClusterClick: function (viewer, layerId, entity, screenPos, options, Cesium) {
+    var self = this;
     var isPrimitiveMode = !!entity._isClusterPrimitive;
     console.log('[EntitySelectionManager] 🔵 聚类点被点击，飞行展开...', isPrimitiveMode ? '(通过 Billboard primitive 定位)' : '');
 
@@ -1087,13 +1143,55 @@ EntitySelectionManager.prototype = {
       _isCluster: true
     };
 
+    // ⭐ 从缓存查找 extent + entitySummaries 用于自适应飞行和弹窗详情
+    var flyOptions = {};
+    var cacheEntry = this._clusterEntityCache.get(layerId);
+    if (cacheEntry && cacheEntry.entities.size > 0) {
+      cacheEntry.entities.forEach(function (val) {
+        if (!val.centerPosition) return;
+        var sp = viewer.scene.cartesianToCanvasCoordinates(val.centerPosition);
+        if (!sp) return;
+        var d2 = Math.pow(sp.x - screenPos.x, 2) + Math.pow(sp.y - screenPos.y, 2);
+        if (d2 < 10000 && val.extent) {
+          flyOptions.extent = val.extent;
+          flyOptions.count = val.count;
+
+          if (val.entitySummaries && val.entitySummaries.length > 0) {
+            // 计算目标飞行高度用于下级聚类分组模拟
+            var ext2 = val.extent;
+            var dLon2 = Math.max(ext2.east - ext2.west, 0.001);
+            var dLat2 = Math.max(ext2.north - ext2.south, 0.001);
+            var margin2 = Math.max(dLon2, dLat2) * 0.4;
+            var clat2 = (ext2.south + ext2.north) / 2;
+            var cosLat2 = Math.cos(Cesium.Math.toRadians(Math.abs(clat2)));
+            var diagM2 = Math.sqrt(
+              Math.pow((dLon2 + margin2 * 2) * 111320 * cosLat2, 2) +
+              Math.pow((dLat2 + margin2 * 2) * 111320, 2)
+            );
+            var fovY2 = (viewer.camera.frustum && viewer.camera.frustum.fov) || (30 * Math.PI / 180);
+            var estHeight = Math.max(diagM2 / (2 * Math.tan(fovY2 / 2)) * 1.5, 300);
+
+            // ⭐ 执行下级聚类分组
+            var layerInfo2 = self._layers.get(layerId);
+            var pixelRange = (layerInfo2 && layerInfo2.dataSource && layerInfo2.dataSource.clustering)
+              ? (layerInfo2.dataSource.clustering.pixelRange || 80) : 80;
+            self._computeEntityGroupings(val.entitySummaries, estHeight, pixelRange, viewer, Cesium);
+
+            // 用分组折叠后的属性替换
+            clusterPayload.properties = self._buildGroupedProperties(val.entitySummaries, val.count);
+            clusterPayload.title = '🔵 聚类点 (' + (val.count || clusterCount || '?') + ' 个要素)';
+          }
+        }
+      });
+    }
+
     // 通知调用方展示集群摘要 popup
     if (options.onSelect) {
       options.onSelect(clusterPayload);
     }
 
     // 飞行靠近以展开聚类
-    var result = handleClusterPick(entity, viewer, Cesium);
+    var result = handleClusterPick(entity, viewer, Cesium, flyOptions);
 
     if (!result.handled) {
       // 飞行失败时关闭 popup
@@ -1134,25 +1232,54 @@ EntitySelectionManager.prototype = {
       }
       var count = clusteredEntities ? clusteredEntities.length : 0;
 
-      // ⭐ 从 clusteredEntities 计算聚类中心的世界坐标
+      // ⭐ 从 clusteredEntities 计算聚类中心 + 边界范围 + 实体摘要
       var centerPos = null;
+      var extent = null; // { west, south, east, north } 度数
+      var entitySummaries = []; // [{ name, id }] 用于弹窗列表
       if (clusteredEntities && clusteredEntities.length > 0) {
         try {
           var sumX = 0, sumY = 0, sumZ = 0, validCount = 0;
+          var minLon = 180, maxLon = -180, minLat = 90, maxLat = -90;
           for (var ci = 0; ci < clusteredEntities.length; ci++) {
             var e = clusteredEntities[ci];
+            var wp = null;
             if (e && e.position) {
-              var wp = e.position.getValue
+              wp = e.position.getValue
                 ? e.position.getValue(Cesium.JulianDate.now())
                 : e.position;
               if (wp) {
                 sumX += wp.x; sumY += wp.y; sumZ += wp.z;
                 validCount++;
+                var cg = Cesium.Cartographic.fromCartesian(wp);
+                var lon = Cesium.Math.toDegrees(cg.longitude);
+                var lat = Cesium.Math.toDegrees(cg.latitude);
+                if (lon < minLon) minLon = lon;
+                if (lon > maxLon) maxLon = lon;
+                if (lat < minLat) minLat = lat;
+                if (lat > maxLat) maxLat = lat;
               }
+            }
+            // 提取实体摘要（最多 30 条，含 worldPos 用于下级聚类分组）
+            if (entitySummaries.length < 30 && e) {
+              var props = null;
+              try {
+                if (e.properties) {
+                  props = e.properties.getValue ? e.properties.getValue() : e.properties;
+                }
+              } catch (ex) { /* ignore */ }
+              var name = e.name || (props && props.name) || (e.id && e.id._id) || '';
+              entitySummaries.push({
+                name: name || '未命名',
+                worldPos: wp  // ⭐ 存储世界坐标供 _computeEntityGroupings 使用
+              });
             }
           }
           if (validCount > 0) {
             centerPos = new Cesium.Cartesian3(sumX / validCount, sumY / validCount, sumZ / validCount);
+            extent = {
+              west: minLon, south: minLat,
+              east: maxLon, north: maxLat
+            };
           }
         } catch (e) { /* ignore */ }
       }
@@ -1162,7 +1289,9 @@ EntitySelectionManager.prototype = {
         cacheEntry.entities.set(key, {
           entity: clusterEntity,
           count: count,
-          centerPosition: centerPos  // ⭐ 缓存计算出的中心坐标
+          centerPosition: centerPos,
+          extent: extent,              // ⭐ 边界范围
+          entitySummaries: entitySummaries  // ⭐ 实体摘要列表
         });
       }
 
@@ -1205,6 +1334,161 @@ EntitySelectionManager.prototype = {
   /**
    * 移除聚类事件监听并清除缓存
    */
+  /**
+   * 根据目标飞行高度和 pixelRange 计算下级聚类分组
+   *
+   * 原理：飞行拉近后，原本在一个大聚类内的叶子实体可能会重新形成子聚类。
+   *       通过目标高度 → 地面分辨率 → 像素阈值对应的米距离来模拟分组。
+   *
+   * @param {Array} entitySummaries — [{ name, worldPos: Cesium.Cartesian3 }, ...]
+   * @param {number} targetHeight — 目标相机高度（米）
+   * @param {number} pixelRange — 聚类像素半径（默认 80）
+   * @param {Cesium.Viewer} viewer
+   * @param {Object} Cesium
+   * @returns {Array} — 增加了 group 字段的 summaries
+   */
+  _computeEntityGroupings: function (entitySummaries, targetHeight, pixelRange, viewer, Cesium) {
+    if (!entitySummaries || entitySummaries.length < 2) {
+      // 单实体或无实体 → 全部是叶子
+      if (entitySummaries) {
+        entitySummaries.forEach(function (s) { s.group = '无下级聚类分组'; });
+      }
+      return entitySummaries;
+    }
+
+    // 地面分辨率：每个像素对应多少米
+    var fovY = (viewer.camera.frustum && viewer.camera.frustum.fov) || (30 * Math.PI / 180);
+    var screenHeight = viewer.canvas ? viewer.canvas.clientHeight : 1080;
+    var groundRes = targetHeight * Math.tan(fovY / 2) / (screenHeight / 2);
+    var thresholdM = groundRes * (pixelRange || 80);
+
+    // 简单连通分量聚类：每个实体找 thresholdM 内的邻居，合并成组
+    var n = entitySummaries.length;
+    var visited = new Array(n).fill(false);
+    var groups = new Array(n).fill(-1);
+    var groupCount = 0;
+    var groupLabels = {}; // groupIndex → label
+
+    for (var i = 0; i < n; i++) {
+      if (visited[i]) continue;
+      if (!entitySummaries[i].worldPos) {
+        visited[i] = true;
+        groups[i] = groupCount;
+        groupLabels[groupCount] = null; // 无位置 → 叶子
+        groupCount++;
+        continue;
+      }
+
+      // BFS 找连通分量
+      var queue = [i];
+      visited[i] = true;
+      var componentSize = 0;
+      while (queue.length > 0) {
+        var cur = queue.shift();
+        componentSize++;
+        groups[cur] = groupCount;
+        for (var j = 0; j < n; j++) {
+          if (visited[j]) continue;
+          if (!entitySummaries[j].worldPos) continue;
+          var dist = Cesium.Cartesian3.distance(
+            entitySummaries[cur].worldPos,
+            entitySummaries[j].worldPos
+          );
+          if (dist <= thresholdM) {
+            visited[j] = true;
+            queue.push(j);
+          }
+        }
+      }
+
+      if (componentSize < 2) {
+        groupLabels[groupCount] = null; // 孤立实体 → 叶子
+      } else {
+        groupLabels[groupCount] = componentSize + '点聚合';
+      }
+      groupCount++;
+    }
+
+    // 写回 group 字段
+    for (var k = 0; k < n; k++) {
+      var gLabel = groupLabels[groups[k]];
+      entitySummaries[k].group = gLabel || '无下级聚类分组';
+    }
+
+    console.log('[EntitySelectionManager] 📊 下级聚类分组: threshold=' + thresholdM.toFixed(1) + 'm (高度=' +
+      targetHeight.toFixed(0) + 'm, pixelRange=' + (pixelRange || 80) + 'px), 实体=' + n +
+      ', 子聚类组数=' + Object.values(groupLabels).filter(function (v) { return !!v; }).length);
+
+    return entitySummaries;
+  },
+
+  /**
+   * 将 entitySummaries 按 group 字段折叠，构建弹窗属性列表
+   *
+   * 输出格式：
+   *   聚合点数: 47
+   *   实体A: 无下级聚类分组          ← 独立叶子
+   *   ▸ 3点聚合: (3个要素)           ← 子聚类折叠行
+   *   ▸ 5点聚合: (5个要素)
+   *   还有 XX 个要素: (折叠未展开)
+   */
+  _buildGroupedProperties: function (entitySummaries, totalCount) {
+    var props = [{ name: '聚合点数', value: String(totalCount) }];
+
+    // 按 group 分组
+    var groups = {}; // groupLabel → { count, entities: [...] }
+    var leafOrder = []; // 保持叶子实体的出现顺序
+    (entitySummaries || []).forEach(function (s) {
+      var g = s.group || '无下级聚类分组';
+      if (g === '无下级聚类分组') {
+        leafOrder.push(s);
+      } else {
+        if (!groups[g]) groups[g] = { count: 0, entities: [] };
+        groups[g].count++;
+        groups[g].entities.push(s);
+      }
+    });
+
+    // ⭐ 叶子实体排最前（可点击定位）
+    var maxLeaf = 10;
+    for (var li = 0; li < leafOrder.length && li < maxLeaf; li++) {
+      props.push({
+        name: leafOrder[li].name || ('要素 #' + (li + 1)),
+        value: '无下级聚类分组',
+        _clickable: true,
+        _worldPos: leafOrder[li].worldPos
+      });
+    }
+    if (leafOrder.length > maxLeaf) {
+      props.push({
+        name: '▸ ' + (leafOrder.length - maxLeaf) + ' 个独立要素',
+        value: '(已折叠)'
+      });
+    }
+
+    // 列出子聚类组
+    Object.keys(groups).forEach(function (gLabel) {
+      var g = groups[gLabel];
+      props.push({
+        name: '▸ ' + gLabel,
+        value: '(' + g.count + ' 个要素)',
+        _isGroup: true
+      });
+    });
+
+    // 如果有部分实体未包含在 summaries 中
+    var listed = leafOrder.length;
+    Object.values(groups).forEach(function (g) { listed += g.count; });
+    if (totalCount > listed) {
+      props.push({
+        name: '还有 ' + (totalCount - listed) + ' 个要素',
+        value: '(折叠未展开)'
+      });
+    }
+
+    return props;
+  },
+
   _unhookClusterEvent: function (layerId) {
     var cacheEntry = this._clusterEntityCache.get(layerId);
     if (!cacheEntry) return;
