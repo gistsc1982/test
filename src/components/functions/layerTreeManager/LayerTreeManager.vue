@@ -1437,6 +1437,8 @@ export default {
           // 列表
           var configList = panel.querySelector('.config-list');
           if (configList) configList.style.display = sv.list ? '' : 'none';
+          // ⚠️ 显隐切换可能导致浏览器调整 .function-panel 的 scrollTop，须重置
+          panel.scrollTop = 0;
         }.bind(this));
       }
     },
@@ -2780,6 +2782,26 @@ export default {
         }
 
         this.loadedLayerIds[node.id] = true;
+        // ⭐ 图层加载后强制重置布局：显示工具栏 + 滚动到顶
+        this.$nextTick(function() {
+          this.$nextTick(function() {
+            var treeEl = this.$refs.treeContainer;
+            if (!treeEl) return;
+            var panel = treeEl.closest('.function-panel');
+            if (!panel) return;
+            var toolbar = panel.querySelector('.toolbar');
+            var pb = panel.querySelector('.panel-body');
+            // 强制显示工具栏
+            if (toolbar) toolbar.style.display = 'flex';
+            // 重置滚动
+            if (pb) { pb.scrollTop = 0; pb.scrollTo(0, 0); }
+            // 切换再恢复以触发重绘
+            if (toolbar) { toolbar.style.display = 'none'; toolbar.offsetHeight; toolbar.style.display = 'flex'; }
+            // ⚠️ 关键修复：toolbar 显隐切换会导致浏览器调整 .function-panel 的 scrollTop，
+            // 将 header/toolbar 滚出可视区域。必须重置 panel 自身的滚动位置。
+            if (panel) { panel.scrollTop = 0; }
+          }.bind(this));
+        }.bind(this));
         // 清除错误状态（MVT 类型除外：readyPromise 超时错误需保留）
         // ⚠️ MVT readyPromise 超时后仍会添加图层（非阻塞），此时错误提示应保留
         if (layerType !== 'mvt' || !providerReadyError) {
