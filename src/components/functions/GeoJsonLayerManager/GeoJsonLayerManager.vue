@@ -101,6 +101,7 @@ import { ConfigStrategyFactory, configRegistry } from './ConfigLoadStrategy.mjs'
 import rawPanelMetadata from './GeoJsonLayerManager.config.json';
 import EntitySelectionManager from '../../../utils/EntitySelectionManager.js';
 import EntityInfoPopup from '../../common/EntityInfoPopup.vue';
+import HeatmapRenderer from '../../../utils/HeatmapRenderer.js';
 
 const panelMetadata = rawPanelMetadata;
 
@@ -120,6 +121,7 @@ export default {
       componentName: 'GeoJsonLayerManager',
       panelMetadata,
       _cesiumLayers: new Map(),
+      _heatmapLayers: new Map(),
       _labelStates: {},
       refreshLoading: false,
       // ⭐ 实体选中 & 属性弹窗
@@ -499,6 +501,11 @@ export default {
             console.log('[' + this.componentName + '] 🎨 径向渐变圆已应用，Canvas 缓存档位数=' + Object.keys(canvasCache).length);
           }
 
+          // ⭐ 热力图叠加：点图层 + heatmapEnabled → 渲染 Canvas 叠加到 Cesium 地形上
+          if (geoType === 'Point' && layer.heatmapEnabled && entities.length > 0) {
+            this._createHeatmapOverlay(layer, geoJsonData, viewer, Cesium);
+          }
+
           // 输出标记类型日志
           const markerDesc = needsCustomIcon
             ? `emoji canvas 共享 ("${markerIcon}")`
@@ -579,6 +586,8 @@ export default {
         }
         viewer.dataSources.remove(dataSource);
         this._cesiumLayers.delete(layer.id);
+        // ⭐ 移除关联的热力图叠加层
+        this._removeHeatmapOverlay(layer.id, viewer);
         this._labelStates = { ...this._labelStates, [layer.id]: false };
         this.updateItemState(layer.id, { loaded: false, loading: false });
         // ⭐ 强制刷新渲染（SGKJ_SDK 移除 dataSource 后不会自动重绘）
@@ -778,14 +787,133 @@ export default {
             this._selectionManager.unregisterLayer(id);
           }
           viewer.dataSources.remove(dataSource);
+          // ⭐ 移除热力图叠加层
+          this._removeHeatmapOverlay(id, viewer);
         });
       }
       this._cesiumLayers.clear();
+      this._heatmapLayers.clear();
       this._labelStates = {};
       this.dismissEntityPopup();
       // ⭐ 强制刷新渲染
       if (viewer) viewer.scene.requestRender();
     },
+    // ==================== 热力图叠加 ====================
+
+    /**
+     * 为点图层创建热力图叠加层
+     *
+     * 流程：
+     *   1. HeatmapRenderer 根据 GeoJSON features 渲染热力图 Canvas
+     *   2. 将 Canvas 包装为 Cesium SingleTileImageryProvider
+     *   3. 以 imageryLayer 形式添加到 viewer.imageryLayers（覆盖在地形上）
+     *
+     * @param {Object} layer - 图层配置
+     * @param {Object} geoJsonData - 已解析的 GeoJSON 数据
+     * @param {Object} viewer - Cesium Viewer
+     * @param {Object} Cesium - Cesium 全局对象
+     */
+    _createHeatmapOverlay(layer, geoJsonData, viewer, Cesium) {
+      try {
+        const features = geoJsonData.features;
+        if (!features || features.length === 0) {
+          console.warn(`[${this.componentName}] 🔥 热力图跳过: 无 feature 数据`);
+          return;
+        }
+
+        // 1. 配置 HeatmapRenderer
+        const valueField = layer.heatmapValueField || 'value';
+        const blurSize = layer.heatmapBlur !== undefined ? layer.heatmapBlur : 30;
+        const pointSize = layer.heatmapRadius !== undefined ? layer.heatmapRadius : 20;
+        const opacity = layer.heatmapOpacity !== undefined ? layer.heatmapOpacity : 0.8;
+
+        // 解析自定义渐变配色（可选）
+        let gradient = undefined;
+        if (layer.heatmapGradient) {
+          try {
+            gradient = typeof layer.heatmapGradient === 'string'
+              ? JSON.parse(layer.heatmapGradient)
+              : layer.heatmapGradient;
+          } catch (e) {
+            console.warn(`[${this.componentName}] 🔥 热力图渐变解析失败，使用默认配色:`, e);
+          }
+        }
+
+        const renderer = new HeatmapRenderer({
+          pointSize: pointSize,
+          blurSize: blurSize,
+          minOpacity: 0,
+          maxOpacity: 1,
+          gradient: gradient
+        });
+
+        // 2. 渲染热力图 Canvas（分辨率自适应，上限 1024 避免 data URL 过大）
+        const canvasSize = Math.min(1024, Math.max(512, Math.ceil(Math.sqrt(features.length) * 48)));
+        console.log(`[${this.componentName}] 🔥 热力图渲染: canvas=${canvasSize}×${canvasSize}, blur=${blurSize}, radius=${pointSize}, opacity=${opacity}, valueField="${valueField}", features=${features.length}`);
+
+        const result = renderer.renderFromGeoFeatures(
+          features,
+          valueField,
+          canvasSize,
+          canvasSize,
+          0.1  // 10% 边界扩展
+        );
+
+        console.log(`[${this.componentName}] 🔥 热力图渲染完成: bounds=[${result.bounds.minLon.toFixed(4)}, ${result.bounds.minLat.toFixed(4)}] → [${result.bounds.maxLon.toFixed(4)}, ${result.bounds.maxLat.toFixed(4)}], valueRange=[${result.valueRange.min}, ${result.valueRange.max}]`);
+
+        // 3. 创建 Cesium 单瓦片影像提供器
+        //    使用 canvas.toDataURL 生成 data URL（同步，无异步加载竞态问题），
+        //    直接作为 url 传给 SingleTileImageryProvider。
+        const canvas = result.canvas;
+        const bounds = result.bounds;
+
+        const imageUrl = canvas.toDataURL('image/png');
+
+        const imageryProvider = new Cesium.SingleTileImageryProvider({
+          url: imageUrl,
+          rectangle: Cesium.Rectangle.fromDegrees(
+            bounds.minLon,
+            bounds.minLat,
+            bounds.maxLon,
+            bounds.maxLat
+          )
+        });
+
+        // 4. 添加到影像图层栈（置于顶层）
+        const imageryLayer = viewer.imageryLayers.addImageryProvider(imageryProvider);
+        imageryLayer.alpha = opacity;
+
+        // 存储引用以便后续清理
+        this._heatmapLayers.set(layer.id, imageryLayer);
+
+        // 强制刷新渲染
+        viewer.scene.requestRender();
+
+        console.log(`[${this.componentName}] 🔥 热力图叠加层已添加: "${layer.name}", alpha=${opacity}, canvas=${canvas.width}×${canvas.height}, urlLen=${imageUrl.length}`);
+
+      } catch (err) {
+        console.error(`[${this.componentName}] ❌ 热力图创建失败:`, err);
+      }
+    },
+
+    /**
+     * 移除热力图叠加层
+     * @param {string} layerId - 图层 ID
+     * @param {Object} viewer - Cesium Viewer
+     */
+    _removeHeatmapOverlay(layerId, viewer) {
+      const imageryLayer = this._heatmapLayers.get(layerId);
+      if (imageryLayer) {
+        try {
+          viewer.imageryLayers.remove(imageryLayer);
+        } catch (e) {
+          console.warn(`[${this.componentName}] ⚠️ 移除热力图叠加层异常:`, e);
+        }
+        this._heatmapLayers.delete(layerId);
+        console.log(`[${this.componentName}] 🔥 热力图叠加层已移除: id=${layerId}`);
+      }
+    },
+
     // ==================== 实体选中 & 属性弹窗 ====================
 
     /**

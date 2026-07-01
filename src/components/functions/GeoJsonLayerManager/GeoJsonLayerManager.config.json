@@ -37,7 +37,13 @@
     { "key": "labelVisibleMax", "label": "标注可见最远距离(m)", "type": "number", "required": false, "default": 50000 },
     { "key": "clusterEnabled", "label": "开启点聚类", "type": "boolean", "required": false, "default": false },
     { "key": "clusterPixelRange", "label": "聚类半径(px)", "type": "number", "required": false, "default": 50 },
-    { "key": "clusterMinSize", "label": "最少聚合点数", "type": "number", "required": false, "default": 3 }
+    { "key": "clusterMinSize", "label": "最少聚合点数", "type": "number", "required": false, "default": 3 },
+    { "key": "heatmapEnabled", "label": "开启热力图（仅点图层）", "type": "boolean", "required": false, "default": false },
+    { "key": "heatmapBlur", "label": "热力图模糊半径(px)", "type": "number", "required": false, "default": 30 },
+    { "key": "heatmapRadius", "label": "热力图点半径(px)", "type": "number", "required": false, "default": 20 },
+    { "key": "heatmapOpacity", "label": "热力图不透明度(0-1)", "type": "number", "required": false, "default": 0.8 },
+    { "key": "heatmapValueField", "label": "热力值字段", "type": "text", "required": false, "placeholder": "feature.properties中的数值字段名，如：population" },
+    { "key": "heatmapGradient", "label": "热力图渐变配色(JSON)", "type": "textarea", "required": false, "placeholder": "{\"0.0\":\"rgba(0,0,255,0)\",\"0.4\":\"cyan\",\"0.7\":\"yellow\",\"1.0\":\"red\"}" }
   ],
   "defaultFormValues": {
     "id": "",
@@ -60,7 +66,13 @@
     "labelVisibleMax": 50000,
     "clusterEnabled": false,
     "clusterPixelRange": 50,
-    "clusterMinSize": 3
+    "clusterMinSize": 3,
+    "heatmapEnabled": false,
+    "heatmapBlur": 40,
+    "heatmapRadius": 35,
+    "heatmapOpacity": 0.85,
+    "heatmapValueField": "",
+    "heatmapGradient": ""
   },
   "toolbarButtons": {
     "add": true,
