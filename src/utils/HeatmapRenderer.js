@@ -50,23 +50,23 @@ class HeatmapRenderer {
     this.minOpacity = opts.minOpacity != null ? opts.minOpacity : 0;
     this.maxOpacity = opts.maxOpacity != null ? opts.maxOpacity : 1;
 
-    // 默认渐变配色 — 暖色系单色调，无蓝绿跳跃
-    // 透明淡黄绿 → 金黄 → 橙 → 红橙 → 深红
+    // 默认渐变配色 — 高亮度暖色系，确保所有密度层次都明亮可见
+    //   亮度均 >100，消除"黑色等高线"
     this._gradientStops = opts.gradient || {
-      '0.00': 'rgba(160,180,60,0)',     // 完全透明
-      '0.06': 'rgba(170,190,50,0.3)',   // 淡入
-      '0.12': 'rgba(180,200,40,0.55)',  // 淡黄绿
-      '0.20': 'rgba(200,200,20,0.7)',   // 黄绿
-      '0.28': 'rgba(220,195,10,0.8)',   // 亮黄绿
-      '0.36': 'rgba(235,180,0,0.88)',   // 金黄
-      '0.44': 'rgba(245,155,0,0.93)',   // 深金黄
-      '0.52': 'rgba(250,125,0,0.96)',   // 橙黄
-      '0.60': 'rgba(250,95,0,0.98)',    // 橙
-      '0.68': 'rgba(245,65,0,0.99)',    // 深橙
-      '0.76': 'rgba(238,35,0,1)',       // 红橙
-      '0.84': 'rgba(225,15,0,1)',       // 亮红
-      '0.92': 'rgba(210,0,5,1)',        // 红
-      '1.00': 'rgba(190,0,10,1)'        // 深红
+      '0.00': 'rgba(255,250,150,0)',     // 完全透明
+      '0.06': 'rgba(255,245,120,0.4)',   // 淡金
+      '0.12': 'rgba(255,235,90,0.55)',   // 金黄
+      '0.20': 'rgba(255,220,50,0.7)',    // 亮金黄
+      '0.28': 'rgba(255,200,20,0.8)',    // 黄橙
+      '0.36': 'rgba(255,175,0,0.88)',    // 金橙
+      '0.44': 'rgba(255,145,0,0.93)',    // 橙
+      '0.52': 'rgba(255,110,0,0.96)',    // 深橙
+      '0.60': 'rgba(255,75,5,0.98)',     // 红橙
+      '0.68': 'rgba(250,50,10,0.99)',    // 亮红橙
+      '0.76': 'rgba(245,30,15,1)',       // 亮红
+      '0.84': 'rgba(235,15,20,1)',       // 红
+      '0.92': 'rgba(220,8,25,1)',        // 深红
+      '1.00': 'rgba(200,5,30,1)'         // 暗红(峰值)
     };
 
     // 缓存
@@ -213,10 +213,76 @@ class HeatmapRenderer {
 
     ctx.putImageData(imageData, 0, 0);
 
-    // 后处理：轻微模糊消除 source-over 累积产生的离散 alpha 阶梯（等高线效应）
-    ctx.filter = 'blur(2px)';
-    ctx.drawImage(canvas, 0, 0);
-    ctx.filter = 'none';
+    // 后处理 1：轻微模糊消除离散 alpha 阶梯
+    var tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    var tempCtx = tempCanvas.getContext('2d');
+    tempCtx.filter = 'blur(2px)';
+    tempCtx.drawImage(canvas, 0, 0);
+    tempCtx.filter = 'none';
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(tempCanvas, 0, 0);
+
+    // 后处理 2：清除模糊黑色伪影 + 周边暖色回填
+    var w = width;
+    var h = height;
+
+    // Step A: 暗色像素 → 透明（模糊在暖/透交界产生的全部暗色带）
+    var fixData = ctx.getImageData(0, 0, w, h);
+    var fixPixels = fixData.data;
+    for (var pi = 0; pi < fixPixels.length; pi += 4) {
+      if (fixPixels[pi + 3] > 0) {
+        var bright = (fixPixels[pi] + fixPixels[pi + 1] + fixPixels[pi + 2]) / 3;
+        if (bright < 60) {
+          fixPixels[pi] = fixPixels[pi + 1] = fixPixels[pi + 2] = fixPixels[pi + 3] = 0;
+        }
+      }
+    }
+    ctx.putImageData(fixData, 0, 0);
+
+    // Step B: 多次迭代用周边暖色填充透明空洞
+    for (var pass = 0; pass < 8; pass++) {
+      var fillData = ctx.getImageData(0, 0, w, h);
+      var fillPixels = fillData.data;
+      var filledCount = 0;
+
+      for (var pi = 0; pi < fillPixels.length; pi += 4) {
+        if (fillPixels[pi + 3] > 0) continue; // 不透明，跳过
+
+        // 透明像素：搜索 5×5 邻域找非透明暖色邻居
+        var x = (pi / 4) % w;
+        var y = Math.floor((pi / 4) / w);
+        var sumR = 0, sumG = 0, sumB = 0, sumA = 0, count = 0;
+
+        for (var dy = -5; dy <= 5; dy++) {
+          for (var dx = -5; dx <= 5; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            var nx = x + dx, ny = y + dy;
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+            var ni = (ny * w + nx) * 4;
+            if (fillPixels[ni + 3] === 0) continue; // 邻居也透明
+            sumR += fillPixels[ni];
+            sumG += fillPixels[ni + 1];
+            sumB += fillPixels[ni + 2];
+            sumA += fillPixels[ni + 3];
+            count++;
+          }
+        }
+
+        if (count > 0) {
+          fillPixels[pi]     = Math.round(sumR / count);
+          fillPixels[pi + 1] = Math.round(sumG / count);
+          fillPixels[pi + 2] = Math.round(sumB / count);
+          fillPixels[pi + 3] = Math.round(sumA / count);
+          filledCount++;
+        }
+      }
+
+      ctx.putImageData(fillData, 0, 0);
+      if (filledCount === 0) break; // 没有可填充的透明像素了
+    }
 
     return canvas;
   }

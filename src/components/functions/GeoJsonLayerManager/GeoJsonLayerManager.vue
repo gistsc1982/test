@@ -856,7 +856,7 @@ export default {
           valueField,
           canvasSize,
           canvasSize,
-          0.1  // 10% 边界扩展
+          0.15  // 15% 边界扩展
         );
 
         console.log(`[${this.componentName}] 🔥 热力图渲染完成: bounds=[${result.bounds.minLon.toFixed(4)}, ${result.bounds.minLat.toFixed(4)}] → [${result.bounds.maxLon.toFixed(4)}, ${result.bounds.maxLat.toFixed(4)}], valueRange=[${result.valueRange.min}, ${result.valueRange.max}]`);
@@ -866,6 +866,25 @@ export default {
         //    直接作为 url 传给 SingleTileImageryProvider。
         const canvas = result.canvas;
         const bounds = result.bounds;
+
+        // 调试：验证 Canvas 像素（确认无黑色区域）
+        try {
+          const dbgCtx = canvas.getContext('2d');
+          const dbgData = dbgCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+          var darkPx = 0, brightPx = 0, totalPx = canvas.width * canvas.height;
+          for (var i = 0; i < dbgData.length; i += 4) {
+            var r = dbgData[i], g = dbgData[i+1], b = dbgData[i+2], a = dbgData[i+3];
+            var brightness = (r + g + b) / 3;
+            if (a > 0 && brightness < 30) darkPx++;
+            if (a > 0 && brightness > 150) brightPx++;
+          }
+          var darkPct = (darkPx / totalPx * 100).toFixed(1);
+          var brightPct = (brightPx / totalPx * 100).toFixed(1);
+          console.log('[' + this.componentName + '] 🔍 暗色像素(<30亮度): ' + darkPx + ' (' + darkPct + '%) | 亮色像素(>150亮度): ' + brightPx + ' (' + brightPct + '%)');
+          if (darkPx > totalPx * 0.1) {
+            console.warn('[' + this.componentName + '] ⚠️ 超过10%暗色像素，可能存在渲染问题');
+          }
+        } catch (e) { /* ignore */ }
 
         const imageUrl = canvas.toDataURL('image/png');
 
