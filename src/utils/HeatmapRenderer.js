@@ -86,9 +86,10 @@ class HeatmapRenderer {
    * @param {number} canvasWidth - 输出画布宽度（像素）
    * @param {number} canvasHeight - 输出画布高度（像素）
    * @param {number} [marginFrac=0.1] - 地理边界的扩展比例（0-1）
-   * @returns {{ canvas: HTMLCanvasElement, bounds: HeatmapBounds }}
+   * @param {{ min: number, max: number }} [fixedValueRange] - 固定值域（用于视口缩放时保持颜色一致）
+   * @returns {{ canvas: HTMLCanvasElement, bounds: HeatmapBounds, valueRange: {min:number,max:number} }}
    */
-  renderFromGeoFeatures(features, valueField, canvasWidth, canvasHeight, marginFrac = 0.1) {
+  renderFromGeoFeatures(features, valueField, canvasWidth, canvasHeight, marginFrac = 0.1, fixedValueRange) {
     // 1. 计算地理边界 & 收集值
     let minLon = 180, maxLon = -180, minLat = 90, maxLat = -90;
     const values = [];
@@ -121,11 +122,11 @@ class HeatmapRenderer {
       maxLat: maxLat + marginLat
     };
 
-    // 2. 计算归一化函数
-    const vMin = Math.min(...values);
-    const vMax = Math.max(...values);
+    // 2. 计算归一化函数（优先使用固定值域，保证缩放时颜色一致）
+    const vMin = fixedValueRange ? fixedValueRange.min : Math.min(...values);
+    const vMax = fixedValueRange ? fixedValueRange.max : Math.max(...values);
     const vRange = vMax - vMin || 1;
-    const normalize = (v) => (v - vMin) / vRange;
+    const normalize = (v) => Math.min(1, Math.max(0, (v - vMin) / vRange));
 
     // 3. 将地理坐标映射到画布像素坐标
     const lonRange = bounds.maxLon - bounds.minLon;
@@ -225,35 +226,43 @@ class HeatmapRenderer {
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(tempCanvas, 0, 0);
 
-    // 后处理 2：清除模糊黑色伪影 + 周边暖色回填
+    // 后处理 2：清除模糊黑色伪影 + 仅回填暗色空洞（保护自然透明区）
     var w = width;
     var h = height;
+    var totalPx = w * h;
 
-    // Step A: 暗色像素 → 透明（模糊在暖/透交界产生的全部暗色带）
-    var fixData = ctx.getImageData(0, 0, w, h);
-    var fixPixels = fixData.data;
-    for (var pi = 0; pi < fixPixels.length; pi += 4) {
-      if (fixPixels[pi + 3] > 0) {
-        var bright = (fixPixels[pi] + fixPixels[pi + 1] + fixPixels[pi + 2]) / 3;
+    // 记录 Step A 之前哪些像素原本有颜色（alpha > 0）
+    var preData = ctx.getImageData(0, 0, w, h);
+    var wasVisible = new Uint8Array(totalPx); // 1=原本有色, 0=原本透明
+    for (var pi = 0; pi < preData.data.length; pi += 4) {
+      if (preData.data[pi + 3] > 0) wasVisible[pi / 4] = 1;
+    }
+
+    // Step A: 暗色像素 → 透明
+    for (var pi = 0; pi < preData.data.length; pi += 4) {
+      if (preData.data[pi + 3] > 0) {
+        var bright = (preData.data[pi] + preData.data[pi + 1] + preData.data[pi + 2]) / 3;
         if (bright < 60) {
-          fixPixels[pi] = fixPixels[pi + 1] = fixPixels[pi + 2] = fixPixels[pi + 3] = 0;
+          preData.data[pi] = preData.data[pi + 1] = preData.data[pi + 2] = preData.data[pi + 3] = 0;
         }
       }
     }
-    ctx.putImageData(fixData, 0, 0);
+    ctx.putImageData(preData, 0, 0);
 
-    // Step B: 多次迭代用周边暖色填充透明空洞
+    // Step B: 仅回填"原本有色、Step A 变透明"的暗色空洞
+    //         （原本就透明的像素不受影响）
     for (var pass = 0; pass < 8; pass++) {
       var fillData = ctx.getImageData(0, 0, w, h);
       var fillPixels = fillData.data;
       var filledCount = 0;
 
       for (var pi = 0; pi < fillPixels.length; pi += 4) {
-        if (fillPixels[pi + 3] > 0) continue; // 不透明，跳过
+        var pxIdx = pi / 4;
+        // ⭐ 关键：只处理原本有色、现在透明的像素
+        if (!wasVisible[pxIdx] || fillPixels[pi + 3] > 0) continue;
 
-        // 透明像素：搜索 5×5 邻域找非透明暖色邻居
-        var x = (pi / 4) % w;
-        var y = Math.floor((pi / 4) / w);
+        var x = pxIdx % w;
+        var y = Math.floor(pxIdx / w);
         var sumR = 0, sumG = 0, sumB = 0, sumA = 0, count = 0;
 
         for (var dy = -5; dy <= 5; dy++) {
@@ -262,7 +271,7 @@ class HeatmapRenderer {
             var nx = x + dx, ny = y + dy;
             if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
             var ni = (ny * w + nx) * 4;
-            if (fillPixels[ni + 3] === 0) continue; // 邻居也透明
+            if (fillPixels[ni + 3] === 0) continue;
             sumR += fillPixels[ni];
             sumG += fillPixels[ni + 1];
             sumB += fillPixels[ni + 2];
@@ -281,7 +290,7 @@ class HeatmapRenderer {
       }
 
       ctx.putImageData(fillData, 0, 0);
-      if (filledCount === 0) break; // 没有可填充的透明像素了
+      if (filledCount === 0) break;
     }
 
     return canvas;

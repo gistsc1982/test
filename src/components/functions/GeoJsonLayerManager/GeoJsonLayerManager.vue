@@ -122,6 +122,7 @@ export default {
       panelMetadata,
       _cesiumLayers: new Map(),
       _heatmapLayers: new Map(),
+      _heatmapMeta: new Map(),
       _labelStates: {},
       refreshLoading: false,
       // ⭐ 实体选中 & 属性弹窗
@@ -791,8 +792,17 @@ export default {
           this._removeHeatmapOverlay(id, viewer);
         });
       }
+      // 清理热力图相机监听
+      if (viewer) {
+        this._heatmapMeta.forEach(function (meta) {
+          if (meta.cameraHandler) {
+            viewer.camera.changed.removeEventListener(meta.cameraHandler);
+          }
+        });
+      }
       this._cesiumLayers.clear();
       this._heatmapLayers.clear();
+      this._heatmapMeta.clear();
       this._labelStates = {};
       this.dismissEntityPopup();
       // ⭐ 强制刷新渲染
@@ -827,7 +837,6 @@ export default {
         const pointSize = layer.heatmapRadius !== undefined ? layer.heatmapRadius : 20;
         const opacity = layer.heatmapOpacity !== undefined ? layer.heatmapOpacity : 0.8;
 
-        // 解析自定义渐变配色（可选）
         let gradient = undefined;
         if (layer.heatmapGradient) {
           try {
@@ -847,71 +856,188 @@ export default {
           gradient: gradient
         });
 
-        // 2. 渲染热力图 Canvas（分辨率自适应，上限 1024 避免 data URL 过大）
-        const canvasSize = Math.min(1024, Math.max(512, Math.ceil(Math.sqrt(features.length) * 48)));
-        console.log(`[${this.componentName}] 🔥 热力图渲染: canvas=${canvasSize}×${canvasSize}, blur=${blurSize}, radius=${pointSize}, opacity=${opacity}, valueField="${valueField}", features=${features.length}`);
+        // 计算全量数据的固定值域（用于缩放时保持颜色一致性）
+        var allPops = features.map(f => (f.properties && f.properties[valueField]) || 0);
+        var fixedValueRange = {
+          min: Math.min.apply(null, allPops),
+          max: Math.max.apply(null, allPops)
+        };
+        console.log(`[${this.componentName}] 🔥 全量值域: [${fixedValueRange.min}, ${fixedValueRange.max}]`);
 
-        const result = renderer.renderFromGeoFeatures(
-          features,
-          valueField,
-          canvasSize,
-          canvasSize,
-          0.15  // 15% 边界扩展
-        );
+        // 全量数据的经纬度边界（用于判断"所有点都在视口内"）
+        var allLngs = features.map(f => (f.geometry && f.geometry.coordinates) ? f.geometry.coordinates[0] : 0);
+        var allLats = features.map(f => (f.geometry && f.geometry.coordinates) ? f.geometry.coordinates[1] : 0);
+        var fullExtent = {
+          minLon: Math.min.apply(null, allLngs),
+          maxLon: Math.max.apply(null, allLngs),
+          minLat: Math.min.apply(null, allLats),
+          maxLat: Math.max.apply(null, allLats)
+        };
 
-        console.log(`[${this.componentName}] 🔥 热力图渲染完成: bounds=[${result.bounds.minLon.toFixed(4)}, ${result.bounds.minLat.toFixed(4)}] → [${result.bounds.maxLon.toFixed(4)}, ${result.bounds.maxLat.toFixed(4)}], valueRange=[${result.valueRange.min}, ${result.valueRange.max}]`);
+        // 存储热力图元数据
+        const meta = {
+          allFeatures: features,
+          valueField: valueField,
+          fixedValueRange: fixedValueRange,
+          fullExtent: fullExtent,
+          renderer: renderer,
+          config: {
+            blurSize: blurSize,
+            pointSize: pointSize,
+            opacity: opacity,
+            gradient: gradient,
+            layerName: layer.name
+          },
+          cameraHandler: null,
+          currentBounds: null,  // 当前热力图图像的地理边界
+          lastFeatureCount: features.length
+        };
+        this._heatmapMeta.set(layer.id, meta);
 
-        // 3. 创建 Cesium 单瓦片影像提供器
-        //    使用 canvas.toDataURL 生成 data URL（同步，无异步加载竞态问题），
-        //    直接作为 url 传给 SingleTileImageryProvider。
-        const canvas = result.canvas;
-        const bounds = result.bounds;
+        // 渲染函数（初始渲染 + 视口变化时重渲染共用）
+        const self = this;
+        function renderHeatmap(feats) {
+          if (!feats || feats.length === 0) return;
 
-        // 调试：验证 Canvas 像素（确认无黑色区域）
-        try {
-          const dbgCtx = canvas.getContext('2d');
-          const dbgData = dbgCtx.getImageData(0, 0, canvas.width, canvas.height).data;
-          var darkPx = 0, brightPx = 0, totalPx = canvas.width * canvas.height;
-          for (var i = 0; i < dbgData.length; i += 4) {
-            var r = dbgData[i], g = dbgData[i+1], b = dbgData[i+2], a = dbgData[i+3];
-            var brightness = (r + g + b) / 3;
-            if (a > 0 && brightness < 30) darkPx++;
-            if (a > 0 && brightness > 150) brightPx++;
+          const canvasSize = Math.min(1024, Math.max(512, Math.ceil(Math.sqrt(feats.length) * 48)));
+          const result = renderer.renderFromGeoFeatures(feats, valueField, canvasSize, canvasSize, 0.15, fixedValueRange);
+
+          console.log(`[${self.componentName}] 🔥 热力图渲染: canvas=${canvasSize}×${canvasSize}, features=${feats.length}/${meta.allFeatures.length}`);
+
+          const canvas = result.canvas;
+          const bounds = result.bounds;
+          const imageUrl = canvas.toDataURL('image/png');
+
+          const imageryProvider = new Cesium.SingleTileImageryProvider({
+            url: imageUrl,
+            rectangle: Cesium.Rectangle.fromDegrees(
+              bounds.minLon, bounds.minLat,
+              bounds.maxLon, bounds.maxLat
+            )
+          });
+
+          const imageryLayer = viewer.imageryLayers.addImageryProvider(imageryProvider);
+          imageryLayer.alpha = opacity;
+
+          // 移除旧图层
+          const oldLayer = self._heatmapLayers.get(layer.id);
+          if (oldLayer) {
+            viewer.imageryLayers.remove(oldLayer);
           }
-          var darkPct = (darkPx / totalPx * 100).toFixed(1);
-          var brightPct = (brightPx / totalPx * 100).toFixed(1);
-          console.log('[' + this.componentName + '] 🔍 暗色像素(<30亮度): ' + darkPx + ' (' + darkPct + '%) | 亮色像素(>150亮度): ' + brightPx + ' (' + brightPct + '%)');
-          if (darkPx > totalPx * 0.1) {
-            console.warn('[' + this.componentName + '] ⚠️ 超过10%暗色像素，可能存在渲染问题');
-          }
-        } catch (e) { /* ignore */ }
+          self._heatmapLayers.set(layer.id, imageryLayer);
+          meta.currentBounds = bounds;  // 记录当前图像地理边界
 
-        const imageUrl = canvas.toDataURL('image/png');
+          viewer.scene.requestRender();
+          return imageryLayer;
+        }
 
-        const imageryProvider = new Cesium.SingleTileImageryProvider({
-          url: imageUrl,
-          rectangle: Cesium.Rectangle.fromDegrees(
-            bounds.minLon,
-            bounds.minLat,
-            bounds.maxLon,
-            bounds.maxLat
-          )
-        });
+        // 初始渲染（全量 features）
+        renderHeatmap(features);
+        console.log(`[${this.componentName}] 🔥 热力图叠加层已添加: "${layer.name}", alpha=${opacity}`);
 
-        // 4. 添加到影像图层栈（置于顶层）
-        const imageryLayer = viewer.imageryLayers.addImageryProvider(imageryProvider);
-        imageryLayer.alpha = opacity;
-
-        // 存储引用以便后续清理
-        this._heatmapLayers.set(layer.id, imageryLayer);
-
-        // 强制刷新渲染
-        viewer.scene.requestRender();
-
-        console.log(`[${this.componentName}] 🔥 热力图叠加层已添加: "${layer.name}", alpha=${opacity}, canvas=${canvas.width}×${canvas.height}, urlLen=${imageUrl.length}`);
+        // 注册相机变化监听：缩放/平移时根据可视范围重新渲染
+        if (!meta.cameraHandler) {
+          // 防抖：避免飞行动画期间频繁重渲染
+          var debounceTimer = null;
+          meta.cameraHandler = function () {
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(function () {
+              self._updateHeatmapViewport(layer.id, viewer, Cesium);
+            }, 300); // 300ms 防抖
+          };
+          viewer.camera.changed.addEventListener(meta.cameraHandler);
+        }
 
       } catch (err) {
         console.error(`[${this.componentName}] ❌ 热力图创建失败:`, err);
+      }
+    },
+
+    /**
+     * 根据当前相机视口过滤可见点位，重新渲染热力图
+     */
+    _updateHeatmapViewport(layerId, viewer, Cesium) {
+      var meta = this._heatmapMeta.get(layerId);
+      if (!meta || !meta.currentBounds) return;
+
+      try {
+        var rect = viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid);
+        if (!rect) return;
+
+        var vpW = Cesium.Math.toDegrees(rect.west);
+        var vpS = Cesium.Math.toDegrees(rect.south);
+        var vpE = Cesium.Math.toDegrees(rect.east);
+        var vpN = Cesium.Math.toDegrees(rect.north);
+
+        // === 所有点都在视口内 → 跳过 ===
+        var fe = meta.fullExtent;
+        if (vpW <= fe.minLon && vpE >= fe.maxLon &&
+            vpS <= fe.minLat && vpN >= fe.maxLat) {
+          return;
+        }
+
+        // === 视口面积 / 热力图图像面积 ===
+        // ratio < 0.7: 视口远小于图像(放大地图) → 图像被拉伸 → 需重渲染
+        var ib = meta.currentBounds;
+        var imgArea = (ib.maxLon - ib.minLon) * (ib.maxLat - ib.minLat);
+        var vpArea = (vpE - vpW) * (vpN - vpS);
+        var ratio = vpArea > 0 ? vpArea / imgArea : 1;
+        var needRender = ratio < 0.7;
+
+        if (!needRender) {
+          var crossed = vpW > vpE;
+          var visibleCount = 0;
+          for (var i = 0; i < meta.allFeatures.length; i++) {
+            var c = meta.allFeatures[i].geometry && meta.allFeatures[i].geometry.coordinates;
+            if (!c || c.length < 2) continue;
+            var ok = crossed ? (c[0] >= vpW || c[0] <= vpE) : (c[0] >= vpW && c[0] <= vpE);
+            if (ok && c[1] >= vpS && c[1] <= vpN) visibleCount++;
+          }
+          if (visibleCount === meta.lastFeatureCount) return;
+          meta.lastFeatureCount = visibleCount;
+        }
+
+        var crossed2 = vpW > vpE;
+        var visibleFeatures = meta.allFeatures.filter(function (f) {
+          var coords = f.geometry && f.geometry.coordinates;
+          if (!coords || coords.length < 2) return false;
+          var ok = crossed2 ? (coords[0] >= vpW || coords[0] <= vpE) : (coords[0] >= vpW && coords[0] <= vpE);
+          return ok && coords[1] >= vpS && coords[1] <= vpN;
+        });
+
+        if (visibleFeatures.length === 0) {
+          this._removeHeatmapOverlay(layerId, viewer);
+          return;
+        }
+
+        console.log('[' + this.componentName + '] 🔄 重渲染: ' + visibleFeatures.length + '/' + meta.allFeatures.length +
+                    ' 点位, 视口/图像=' + (ratio * 100).toFixed(0) + '%');
+
+        var renderer = meta.renderer;
+        var canvasSize = Math.min(1024, Math.max(512, Math.ceil(Math.sqrt(visibleFeatures.length) * 48)));
+        var result = renderer.renderFromGeoFeatures(visibleFeatures, meta.valueField, canvasSize, canvasSize, 0.15, meta.fixedValueRange);
+
+        var imageUrl = result.canvas.toDataURL('image/png');
+        var imageryProvider = new Cesium.SingleTileImageryProvider({
+          url: imageUrl,
+          rectangle: Cesium.Rectangle.fromDegrees(
+            result.bounds.minLon, result.bounds.minLat,
+            result.bounds.maxLon, result.bounds.maxLat
+          )
+        });
+
+        var imageryLayer = viewer.imageryLayers.addImageryProvider(imageryProvider);
+        imageryLayer.alpha = meta.config.opacity;
+
+        var oldLayer = this._heatmapLayers.get(layerId);
+        if (oldLayer) viewer.imageryLayers.remove(oldLayer);
+        this._heatmapLayers.set(layerId, imageryLayer);
+        meta.currentBounds = result.bounds;
+
+        viewer.scene.requestRender();
+
+      } catch (err) {
+        console.warn('[' + this.componentName + '] ⚠️ 热力图视口更新失败:', err);
       }
     },
 
@@ -929,8 +1055,16 @@ export default {
           console.warn(`[${this.componentName}] ⚠️ 移除热力图叠加层异常:`, e);
         }
         this._heatmapLayers.delete(layerId);
-        console.log(`[${this.componentName}] 🔥 热力图叠加层已移除: id=${layerId}`);
       }
+      // 清理热力图元数据和相机监听
+      const meta = this._heatmapMeta.get(layerId);
+      if (meta) {
+        if (meta.cameraHandler && viewer) {
+          viewer.camera.changed.removeEventListener(meta.cameraHandler);
+        }
+        this._heatmapMeta.delete(layerId);
+      }
+      console.log(`[${this.componentName}] 🔥 热力图叠加层已移除: id=${layerId}`);
     },
 
     // ==================== 实体选中 & 属性弹窗 ====================
