@@ -638,7 +638,14 @@ async function resolveMjsResourcePath(fileName) {
 function getSFCOptions(Vue) {
   return {
     moduleCache: {
-      vue: Vue
+      vue: Vue,
+      // ⭐ 从 window 全局获取 Three.js（由 load-three-globals.js 设置）
+      'three': window.THREE || {},
+      'three/addons/controls/OrbitControls.js': window.OrbitControls ? { OrbitControls: window.OrbitControls } : {},
+      'three/addons/loaders/PLYLoader.js': window.PLYLoader ? { PLYLoader: window.PLYLoader } : {},
+      'three/addons/loaders/GLTFLoader.js': window.GLTFLoader ? { GLTFLoader: window.GLTFLoader } : {},
+      'three/addons/loaders/DRACOLoader.js': window.DRACOLoader ? { DRACOLoader: window.DRACOLoader } : {},
+      'three/addons/controls/TransformControls.js': window.TransformControls ? { TransformControls: window.TransformControls } : {}
     },
     getFile(url) {
       return fetch(url).then(response => response.text());
@@ -4337,8 +4344,8 @@ export default {
           moduleCache: {
             // ⭐ 传递完整的 Vue 对象（不是解构的函数）
             vue: Vue,
-            // ⭐ DualCanvasViewer.mjs 内部已打包 Three.js，不需要提供
-            // 移除 'three' 配置以避免多实例警告
+            // ⭐ Three.js 已外化，需从 window 全局提供，避免产生两份 THREE 实例
+            'three': (typeof window !== 'undefined' && window.THREE) ? window.THREE : {},
             // ⭐ Three.js addons 从全局 window 获取（如果可用）
             // 使用函数包装器创建正确的模块结构，避免 vue3-sfc-loader 命名空间导入问题
             'three/addons/controls/OrbitControls.js': (typeof window !== 'undefined' && window.OrbitControls) ?
@@ -4937,6 +4944,11 @@ export default {
           moduleCache: {
             vue: Vue,
             'three': THREE || {},  // 使用全局 THREE
+            // 新路径 (three/addons/)
+            'three/addons/controls/OrbitControls.js': { OrbitControls },
+            'three/addons/loaders/GLTFLoader.js': { GLTFLoader },
+            'three/addons/loaders/DRACOLoader.js': { DRACOLoader },
+            // 旧路径 (three/examples/jsm/) - 向后兼容
             'three/examples/jsm/controls/OrbitControls.js': { OrbitControls },
             'three/examples/jsm/loaders/GLTFLoader.js': { GLTFLoader },
             'three/examples/jsm/loaders/DRACOLoader.js': { DRACOLoader }
@@ -5092,6 +5104,11 @@ async loadTestSfcComponent(instanceId) {
           moduleCache: {
             vue: Vue,
             'three': THREE || {},  // 使用全局 THREE
+            // 新路径 (three/addons/)
+            'three/addons/controls/OrbitControls.js': { OrbitControls },
+            'three/addons/loaders/GLTFLoader.js': { GLTFLoader },
+            'three/addons/loaders/DRACOLoader.js': { DRACOLoader },
+            // 旧路径 (three/examples/jsm/) - 向后兼容
             'three/examples/jsm/controls/OrbitControls.js': { OrbitControls },
             'three/examples/jsm/loaders/GLTFLoader.js': { GLTFLoader },
             'three/examples/jsm/loaders/DRACOLoader.js': { DRACOLoader }
@@ -5561,10 +5578,19 @@ async loadTestSfcComponent(instanceId) {
 
           await loadCSS(cssPattern);
 
-          // ⭐ vue3-sfc-loader 配置（简化版，Three.js 已打包进组件）
+          // ⭐ vue3-sfc-loader 配置（Three.js 已外化，需从 window 全局提供）
+          // 确保与 import map + load-three-globals.js 使用同一个 THREE 实例
           const options = {
             moduleCache: {
-              vue: Vue
+              vue: Vue,
+              // ⭐ 从 window 全局获取 Three.js（由 load-three-globals.js 设置）
+              // 避免 vue3-sfc-loader 重新加载产生两份 THREE 实例
+              'three': window.THREE || {},
+              'three/addons/controls/OrbitControls.js': window.OrbitControls ? { OrbitControls: window.OrbitControls } : {},
+              'three/addons/loaders/PLYLoader.js': window.PLYLoader ? { PLYLoader: window.PLYLoader } : {},
+              'three/addons/loaders/GLTFLoader.js': window.GLTFLoader ? { GLTFLoader: window.GLTFLoader } : {},
+              'three/addons/loaders/DRACOLoader.js': window.DRACOLoader ? { DRACOLoader: window.DRACOLoader } : {},
+              'three/addons/controls/TransformControls.js': window.TransformControls ? { TransformControls: window.TransformControls } : {}
             },
             getFile: async (url) => {
               console.log('[HelloWorld] 获取文件:', url);

@@ -320,7 +320,7 @@
       "category": "tools",
       "singleton": false,
       "singletonContainerId": "dualCanvasContainer",
-      "lazyLoad": true,
+      "lazyLoad": false,
       "permissions": [],
       "position": {
         "initialX": "center",

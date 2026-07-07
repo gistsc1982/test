@@ -41,6 +41,12 @@ export default defineConfig(({ mode }) => {
         allow: ['..']
       }
     },
+    // ⭐ 排除 three.js 预打包，避免与 import map 加载的 THREE 产生两份实例
+    // dual-canvas-viewer.mjs 通过 import map 解析 'three' 模块
+    // 必须与 load-three-globals.js 使用同一个 three.module.js 实例
+    optimizeDeps: {
+      exclude: ['three']
+    },
     // ⭐ 配置全局变量以支持 Cesium 的 require 方式
     define: {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
