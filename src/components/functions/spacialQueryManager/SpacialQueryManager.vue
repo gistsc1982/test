@@ -118,6 +118,7 @@
         :retryable="true"
         :highlighted-index="_blinkIndex"
         @fly-to="toggleHighlightFeature"
+        @locate="flyToFeature"
         @retry="executeQuery"
         @clear-highlight="clearHighlights"
       />
@@ -1033,19 +1034,101 @@ export default {
       if (!viewer || !Cesium || !feature || !feature.geometry) return;
 
       try {
-        var coord = this._extractFirstCoordinate(feature.geometry);
-        if (!coord) {
-          console.warn('[' + this.componentName + '] flyToFeature: 无法从几何中提取坐标, type=' + feature.geometry.type);
+        // 计算几何的经纬度范围
+        var extent = this._calcGeometryExtent(feature.geometry);
+        if (!extent) {
+          // 无法计算范围时回退到单点定位
+          var coord = this._extractFirstCoordinate(feature.geometry);
+          if (!coord) return;
+          viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(coord[0], coord[1], 5000),
+            orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-60), roll: 0 },
+            duration: 1.0
+          });
           return;
         }
 
+        var dLon = extent.maxLon - extent.minLon;
+        var dLat = extent.maxLat - extent.minLat;
+        if (dLon < 0.0001) dLon = 0.0001;
+        if (dLat < 0.0001) dLat = 0.0001;
+
+        // 10% margin
+        var marginLon = dLon * 0.10;
+        var marginLat = dLat * 0.10;
+
+        // ⭐ 使用 Rectangle，Cesium 自动处理相机高度和视角
+        var rectangle = Cesium.Rectangle.fromDegrees(
+          extent.minLon - marginLon,
+          extent.minLat - marginLat,
+          extent.maxLon + marginLon,
+          extent.maxLat + marginLat
+        );
+
+        console.log('[' + this.componentName + '] flyToFeature: rectangle=(' +
+          rectangle.west.toFixed(6) + ',' + rectangle.south.toFixed(6) + ',' +
+          rectangle.east.toFixed(6) + ',' + rectangle.north.toFixed(6) + ')');
+
         viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees(coord[0], coord[1], 5000),
-          orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-60), roll: 0 },
+          destination: rectangle,
           duration: 1.0
         });
       } catch (e) {
         console.warn('[' + this.componentName + '] flyToFeature 失败:', e);
+      }
+    },
+
+    /**
+     * 计算 GeoJSON 几何的经纬度范围
+     */
+    _calcGeometryExtent(geom) {
+      if (!geom || !geom.type) return null;
+      var result = { minLon: Infinity, maxLon: -Infinity, minLat: Infinity, maxLat: -Infinity };
+      this._collectCoords(geom, result);
+      if (result.minLon === Infinity) return null;
+      return result;
+    },
+
+    /**
+     * 收集所有坐标点，更新范围
+     */
+    _collectCoords(geom, result) {
+      if (!geom || !geom.type) return;
+
+      var addCoord = function (lon, lat) {
+        if (lon < result.minLon) result.minLon = lon;
+        if (lon > result.maxLon) result.maxLon = lon;
+        if (lat < result.minLat) result.minLat = lat;
+        if (lat > result.maxLat) result.maxLat = lat;
+      };
+
+      switch (geom.type) {
+        case 'Point':
+          addCoord(geom.coordinates[0], geom.coordinates[1]);
+          break;
+        case 'MultiPoint':
+        case 'LineString':
+          for (var i = 0; i < geom.coordinates.length; i++) {
+            addCoord(geom.coordinates[i][0], geom.coordinates[i][1]);
+          }
+          break;
+        case 'MultiLineString':
+        case 'Polygon':
+          for (var j = 0; j < geom.coordinates.length; j++) {
+            for (var k = 0; k < geom.coordinates[j].length; k++) {
+              addCoord(geom.coordinates[j][k][0], geom.coordinates[j][k][1]);
+            }
+          }
+          break;
+        case 'MultiPolygon':
+          for (var p = 0; p < geom.coordinates.length; p++) {
+            for (var q = 0; q < geom.coordinates[p].length; q++) {
+              for (var r = 0; r < geom.coordinates[p][q].length; r++) {
+                addCoord(geom.coordinates[p][q][r][0], geom.coordinates[p][q][r][1]);
+              }
+            }
+          }
+          break;
       }
     },
 

@@ -43,7 +43,14 @@
               <span class="prop-value">{{ formatValue(value) }}</span>
             </div>
           </div>
-          <span class="fly-icon">{{ index === highlightedIndex ? '⭐' : '📍' }}</span>
+          <button
+            v-if="index === highlightedIndex"
+            class="locate-btn"
+            @click.stop="$emit('locate', feature)"
+            title="定位到该要素"
+            type="button"
+          >🎯 定位</button>
+          <span v-else class="fly-icon">📍</span>
         </div>
       </div>
     </div>
@@ -66,7 +73,7 @@ export default {
     retryable: { type: Boolean, default: true },
     highlightedIndex: { type: Number, default: -1 }
   },
-  emits: ['fly-to', 'retry', 'clear-highlight', 'export'],
+  emits: ['fly-to', 'locate', 'retry', 'clear-highlight', 'export'],
   computed: {
     emptyResult() {
       return !this.loading && !this.error && this.results !== null && this.results.length === 0 && this.layerName !== '';
@@ -280,4 +287,20 @@ export default {
   transition: opacity 0.15s;
 }
 .result-item:hover .fly-icon { opacity: 1; }
+
+.locate-btn {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  background: rgba(156, 39, 176, 0.2);
+  color: #CE93D8;
+  border: 1px solid rgba(156, 39, 176, 0.4);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.locate-btn:hover {
+  background: rgba(156, 39, 176, 0.35);
+}
 </style>
