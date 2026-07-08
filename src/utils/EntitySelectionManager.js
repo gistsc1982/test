@@ -373,6 +373,12 @@ function EntitySelectionManager() {
   this._postRenderCallback = null;
   /** ⭐ 聚类实体缓存：layerId → { entities: Set<Cesium.Entity>, listener: Function } */
   this._clusterEntityCache = new Map();
+  /** ⭐ 持续闪烁状态 */
+  this._continuousFlashInterval = null;
+  this._continuousFlashEntity = null;
+  this._continuousFlashOrigColor = null;
+  this._continuousFlashGeoType = null;
+  this._continuousFlashViewer = null;
 
   _instance = this;
 }
@@ -735,6 +741,8 @@ EntitySelectionManager.prototype = {
 
     if (!entity || !Cesium.defined(entity)) {
       console.log('[EntitySelectionManager] 🖱️ 点击空白处（无实体命中）');
+      // ⭐ 停止持续闪烁
+      self._stopContinuousFlash();
       // 点击空白处 → 通知所有图层取消选中
       this._layers.forEach(function (layer, layerId) {
         if (layer.viewer === viewer && layer.options.onDismiss) {
@@ -1620,6 +1628,8 @@ EntitySelectionManager.prototype = {
   dismissSelection: function () {
     if (!this._currentSelection) return;
 
+    this._stopContinuousFlash();
+
     var layer = this._layers.get(this._currentSelection.layerId);
     if (layer && layer.options.onDismiss) {
       layer.options.onDismiss(this._currentSelection);
@@ -1665,6 +1675,9 @@ EntitySelectionManager.prototype = {
    * 统一选中处理流程
    */
   _processSelection: function (viewer, layerId, entity, screenPos, options, Cesium) {
+    // ⭐ 先停止上一次的持续闪烁
+    this._stopContinuousFlash();
+
     // 1. 检测 geoType
     var geoType = this._detectGeoType(entity);
 
@@ -1684,9 +1697,14 @@ EntitySelectionManager.prototype = {
 
     // 4. 高亮
     if (options.enableHighlight) {
-      this._applyHighlight(entity, geoType, viewer, {
-        duration: options.highlightDuration
-      });
+      if (options.continuous) {
+        // 持续闪烁模式（直到选中变更才停止）
+        this._applyContinuousHighlight(entity, geoType, viewer, Cesium);
+      } else {
+        this._applyHighlight(entity, geoType, viewer, {
+          duration: options.highlightDuration
+        });
+      }
     }
 
     // 5. 记录当前选中
@@ -1750,6 +1768,139 @@ EntitySelectionManager.prototype = {
     }
 
     return false;
+  },
+
+  /**
+   * ⭐ 持续闪烁高亮（选中设备不变则一直闪烁，直到选中变更）
+   * 直接操作 entity[geoType].color/material 做 on/off 切换
+   */
+  _applyContinuousHighlight: function (entity, geoType, viewer, Cesium) {
+    var self = this;
+    var highlightColor = Cesium.Color.fromCssColorString('#FFD600');
+    var origColor = null;
+    var currentTime = viewer.clock.currentTime;
+
+    // 保存原始颜色（getValue 必须传 time 参数）
+    if (geoType === 'point' && entity.point) {
+      var pc = entity.point.color;
+      if (pc && typeof pc.getValue === 'function') {
+        var raw = pc.getValue(currentTime);
+        origColor = (raw && typeof raw.clone === 'function') ? raw.clone() : null;
+      } else if (pc && typeof pc.clone === 'function') {
+        origColor = pc.clone();
+      }
+    } else if (geoType === 'polygon' && entity.polygon) {
+      var pm = entity.polygon.material;
+      if (pm && typeof pm.getValue === 'function') {
+        var raw = pm.getValue(currentTime);
+        origColor = (raw && typeof raw.clone === 'function') ? raw.clone() : null;
+      } else if (pm && typeof pm.clone === 'function') {
+        origColor = pm.clone();
+      }
+    } else if (geoType === 'polyline' && entity.polyline) {
+      var plm = entity.polyline.material;
+      if (plm && typeof plm.getValue === 'function') {
+        var raw = plm.getValue(currentTime);
+        origColor = (raw && typeof raw.clone === 'function') ? raw.clone() : null;
+      } else if (plm && typeof plm.clone === 'function') {
+        origColor = plm.clone();
+      }
+    } else if (geoType === 'billboard' && entity.billboard) {
+      var bc = entity.billboard.color;
+      if (bc && typeof bc.getValue === 'function') {
+        var raw = bc.getValue(currentTime);
+        origColor = (raw && typeof raw.clone === 'function') ? raw.clone() : null;
+      } else if (bc && typeof bc.clone === 'function') {
+        origColor = bc.clone();
+      }
+    }
+
+    console.log('[EntitySelectionManager] 💡 持续闪烁: geoType=' + geoType + ', origColor=' + (origColor ? '已保存' : '未保存'));
+
+    this._continuousFlashEntity = entity;
+    this._continuousFlashOrigColor = origColor;
+    this._continuousFlashGeoType = geoType;
+    this._continuousFlashViewer = viewer;
+
+    var visible = true;
+    this._continuousFlashInterval = setInterval(function () {
+      visible = !visible;
+      if (!entity || entity.isDestroyed) {
+        self._stopContinuousFlash();
+        return;
+      }
+
+      try {
+        if (geoType === 'point' && entity.point) {
+          entity.point.color = visible ? highlightColor : (origColor || highlightColor.withAlpha(0.05));
+          entity.point.pixelSize = visible ? 18 : 10;
+        } else if (geoType === 'polygon' && entity.polygon) {
+          entity.polygon.material = visible ? highlightColor.withAlpha(0.45) : (origColor || highlightColor.withAlpha(0.0));
+          entity.polygon.outlineColor = visible ? highlightColor : (origColor || highlightColor.withAlpha(0.0));
+          entity.polygon.outlineWidth = visible ? 3 : 0;
+        } else if (geoType === 'polyline' && entity.polyline) {
+          entity.polyline.material = visible ? highlightColor : (origColor || highlightColor.withAlpha(0.05));
+          entity.polyline.width = visible ? 5 : (entity.polyline.width ? 1 : 1);
+        } else if (geoType === 'billboard' && entity.billboard) {
+          entity.billboard.color = visible ? highlightColor : (origColor || highlightColor.withAlpha(0.2));
+          entity.billboard.scale = visible ? 1.3 : 1.0;
+        }
+        viewer.scene.requestRender();
+      } catch (e) {
+        self._stopContinuousFlash();
+      }
+    }, 500);
+
+    console.log('[EntitySelectionManager] 💡 持续闪烁已启动: geoType=' + geoType);
+  },
+
+  /**
+   * ⭐ 停止持续闪烁并恢复原始颜色
+   */
+  _stopContinuousFlash: function () {
+    if (this._continuousFlashInterval) {
+      clearInterval(this._continuousFlashInterval);
+      this._continuousFlashInterval = null;
+    }
+
+    var entity = this._continuousFlashEntity;
+    var origColor = this._continuousFlashOrigColor;
+    var geoType = this._continuousFlashGeoType;
+    var viewer = this._continuousFlashViewer;
+
+    if (entity && !entity.isDestroyed && origColor) {
+      try {
+        if (geoType === 'point' && entity.point) {
+          entity.point.color = origColor;
+          entity.point.pixelSize = 10;
+        } else if (geoType === 'polygon' && entity.polygon) {
+          entity.polygon.material = origColor;
+          entity.polygon.outlineColor = origColor;
+          entity.polygon.outlineWidth = 1;
+        } else if (geoType === 'polyline' && entity.polyline) {
+          entity.polyline.material = origColor;
+          entity.polyline.width = 2;
+        } else if (geoType === 'billboard' && entity.billboard) {
+          entity.billboard.color = origColor;
+          entity.billboard.scale = 1.0;
+        }
+        if (viewer && viewer.scene && !viewer.isDestroyed) {
+          viewer.scene.requestRender();
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    this._continuousFlashEntity = null;
+    this._continuousFlashOrigColor = null;
+    this._continuousFlashGeoType = null;
+    this._continuousFlashViewer = null;
+
+    if (this._continuousFlashInterval) {
+      clearInterval(this._continuousFlashInterval);
+      this._continuousFlashInterval = null;
+    }
+
+    console.log('[EntitySelectionManager] 🔚 持续闪烁已停止');
   },
 
   /**

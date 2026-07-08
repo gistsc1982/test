@@ -105,11 +105,23 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
     if (isCancelled || isFinalized) return;
     console.log('[Drawer] mouseup button=' + e.button + ' type=' + type + ' lons=' + clickLonLats.length);
     if (e.button === 0) {
-      var ll = captureLonLat(e);
-      if (ll) {
-        clickLonLats.push(ll);
-        clickScreenPts.push(captureScreenPt(e));
+      var capLL = captureLonLat(e);
+      if (!capLL) return;
+
+      if (type === 'point') {
+        clickLonLats.push(capLL); clickScreenPts.push(captureScreenPt(e));
+        DT.hand();
+        setTimeout(finalize, 80);
+        return;
       }
+      if (type === 'circle' && clickScreenPts.length >= 1) {
+        clickLonLats.push(capLL); clickScreenPts.push(captureScreenPt(e));
+        DT.hand();
+        setTimeout(finalize, 80);
+        return;
+      }
+      clickLonLats.push(capLL);
+      clickScreenPts.push(captureScreenPt(e));
       setTimeout(checkComplete, 150);
     } else if (e.button === 2) {
       if (type === 'line' || type === 'polygon' || type === 'rectangle') {
@@ -228,7 +240,12 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
       }
     }
 
-    // 停用 DrawingTools，保留 canvas 供遮罩渲染
+    // 点和线：最终绘制缓冲区
+    if ((type === 'point' || type === 'line') && geom) {
+      drawBufferOnFinalize(geom);
+    }
+
+    // 停用 DrawingTools，保留 canvas
     DT.hand();
     canvas.style.cursor = '';
     canvas.style.pointerEvents = 'none';
@@ -334,6 +351,38 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
   DT.begin(kindMap[type] || 'pen');
 
   // deactivate: 清除 canvas（无论是否已完成绘制）
+  // 在 canvas 上绘制最终缓冲区（点/线类型）
+  function drawBufferOnFinalize(geom) {
+    if (bufferRadius <= 0 || !geom) return;
+    var ctx = canvas.getContext('2d');
+    var pr = calcPixelRadius(clickLonLats.length > 0 ? clickLonLats[clickLonLats.length - 1] : null);
+    if (pr <= 0) return;
+    ctx.save();
+    if (type === 'point' && geom.coordinates) {
+      var pt = viewportToCanvas(clickScreenPts[clickScreenPts.length - 1] || clickScreenPts[0]);
+      if (!pt) { ctx.restore(); return; }
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+      ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, pr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else if (type === 'line' && clickScreenPts.length >= 2) {
+      ctx.strokeStyle = 'rgba(255, 0, 0, 0.2)';
+      ctx.lineWidth = pr * 2;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (var i = 0; i < clickScreenPts.length; i++) {
+        var p = viewportToCanvas(clickScreenPts[i]);
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function removeCanvas() {
     DT.hand();
     DT.clear();

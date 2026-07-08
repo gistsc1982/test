@@ -21,6 +21,7 @@
       { key: 'showToolbar', label: '查询工具', defaultVisible: true },
       { key: 'showResults', label: '查询历史', defaultVisible: true }
     ]"
+    @section-toggle="onHeaderToolToggle"
   >
     <!-- ========== 工具栏 ========== -->
     <template #toolbar-extra>
@@ -115,13 +116,14 @@
         :error="queryError"
         :layer-name="currentLayerName"
         :retryable="true"
-        @fly-to="flyToFeature"
+        :highlighted-index="_blinkIndex"
+        @fly-to="toggleHighlightFeature"
         @retry="executeQuery"
         @clear-highlight="clearHighlights"
       />
 
       <!-- 查询历史列表 -->
-      <div v-if="queryHistory.length > 0" class="history-section">
+      <div v-if="showHistorySection && queryHistory.length > 0" class="history-section">
         <div class="history-header">查询历史 ({{ queryHistory.length }})</div>
         <div v-for="(item, idx) in queryHistory" :key="item.id" class="history-item">
           <div class="history-info">
@@ -214,6 +216,14 @@ export default {
       _highlightEntities: [],
       // 查询历史
       queryHistory: [],
+      // header-tools 分区可见性
+      showHistorySection: true,
+      // 闪烁高亮
+      _blinkIndex: -1,
+      _blinkInterval: null,
+      _blinkTimeout: null,
+      _blinkDataSource: null,
+      _blinkEntities: [],
 
       toolLabels: {
         point: '📍 点',
@@ -258,6 +268,7 @@ export default {
     this.discoverWfsLayers();
   },
   beforeUnmount() {
+    this._stopBlink();
     this.deactivateTool();
     this.clearHighlights();
     this._clearEntityMask();
@@ -268,6 +279,13 @@ export default {
     }
   },
   methods: {
+    // ==================== header-tools 分区切换 ====================
+    onHeaderToolToggle(event) {
+      if (event.key === 'showResults') {
+        this.showHistorySection = event.visible;
+      }
+    },
+
     // ==================== 覆盖基类：跳过 JSON 配置加载 ====================
     // SpacialQueryManager 从 LayerTreeManager 状态中发现 WFS 图层，
     // 不需要 JsonConfigPanelBase 的 configList/loadConfig 机制
@@ -420,6 +438,10 @@ export default {
         console.warn('[' + this.componentName + '] Cesium Viewer 不可用');
         return;
       }
+
+      // 根据绘制类型自动切换空间算子
+      var opMap = { point: 'BBOX', line: 'BBOX', circle: 'Intersects', rectangle: 'BBOX', polygon: 'Intersects' };
+      if (opMap[type]) this.spatialOperator = opMap[type];
 
       // 先清理之前的
       if (this._historyCamClear) { this._historyCamClear.destroy(); this._historyCamClear = null; }
@@ -731,8 +753,10 @@ export default {
         var drawingType = this._detectDrawingType();
 
         if (this.drawnGeometry) {
+          console.log('[SpacialQueryManager] 查询: type=' + drawingType + ' geom=' + JSON.stringify(this.drawnGeometry).substring(0, 200) + ' bufferR=' + this.bufferRadius);
           var filterResult = geometryForXmlFilter(drawingType, this.drawnGeometry, this.bufferRadius);
           if (filterResult && filterResult.gml) {
+            console.log('[SpacialQueryManager] GML geom type=' + (filterResult.geoJson ? filterResult.geoJson.type : 'unknown'));
             gmlGeom = filterResult.gml;
           } else if (this.drawnGeometry) {
             // 如果 filter 结果为空但有几何图形，使用回退（如仅属性查询）
@@ -835,22 +859,183 @@ export default {
       this._highlightEntities = [];
     },
 
+    /**
+     * 切换要素的高亮闪烁状态
+     * 点击同一要素 → 停止闪烁；点击不同要素 → 切换闪烁目标
+     */
+    toggleHighlightFeature(feature, index) {
+      if (this._blinkIndex === index) {
+        // 同一要素 — 取消闪烁
+        this._stopBlink();
+        return;
+      }
+
+      // 不同要素 — 停止当前闪烁，开启新的
+      this._stopBlink();
+      this._startBlink(feature, index);
+    },
+
+    /**
+     * 开始闪烁高亮指定要素
+     */
+    /**
+     * 启动闪烁 — 参照 GeoJsonLayerManager：用 GeoJsonDataSource.load() 加载要素几何
+     * 然后对加载出的实体调用 FlashEntityByColor 循环闪烁
+     */
+    _startBlink(feature, index) {
+      var viewer = this.getViewer();
+      var Cesium = this.getCesium();
+      if (!viewer || !Cesium || !feature || !feature.geometry) {
+        console.warn('[' + this.componentName + '] _startBlink: viewer/Cesium/feature 不可用');
+        return;
+      }
+
+      console.log('[' + this.componentName + '] _startBlink: index=' + index + ', geometry.type=' + feature.geometry.type);
+      this._blinkIndex = index;
+
+      // 剥离 Vue 响应式 Proxy，得到纯 GeoJSON Feature
+      var plainFeature = JSON.parse(JSON.stringify(feature));
+
+      var self = this;
+      var loadPromise = Cesium.GeoJsonDataSource.load(plainFeature, {
+        stroke: Cesium.Color.fromCssColorString('#9C27B0'),
+        strokeWidth: 4,
+        fill: Cesium.Color.fromCssColorString('#9C27B0').withAlpha(0.45),
+        markerColor: Cesium.Color.fromCssColorString('#9C27B0'),
+        markerSize: 20
+      });
+
+      // 使用 .then(onFulfilled, onRejected) 兼容 Cesium 的 thenable
+      loadPromise.then(function (dataSource) {
+        if (self._blinkIndex !== index) {
+          return;
+        }
+
+        // ⭐ 隐藏绿色查询高亮
+        for (var h = 0; h < self._highlightEntities.length; h++) {
+          var hds = self._highlightEntities[h];
+          if (hds && !hds.isDestroyed) hds.show = false;
+        }
+
+        viewer.dataSources.add(dataSource);
+        self._blinkDataSource = dataSource;
+
+        var entities = [];
+        var values = dataSource.entities.values;
+        for (var i = 0; i < values.length; i++) {
+          entities.push(values[i]);
+        }
+        self._blinkEntities = entities;
+        console.log('[' + self.componentName + '] _startBlink: GeoJsonDataSource 已加载, ' + entities.length + ' 个实体');
+
+        viewer.scene.requestRender();
+
+        // ⭐ 收集所有 entity，统一启动 setInterval + SDK 闪烁
+        self._flashLoop(viewer);
+      }, function (err) {
+        console.warn('[' + self.componentName + '] GeoJsonDataSource.load 失败:', err);
+        self._blinkIndex = -1;
+      });
+    },
+
+    /**
+     * 检测实体的几何类型（用于 FlashEntityByColor 的 geoType 参数）
+     */
+    _detectEntityGeoType(entity) {
+      if (entity.point) return 'point';
+      if (entity.polygon) return 'polygon';
+      if (entity.polyline) return 'polyline';
+      if (entity.billboard) return 'billboard';
+      return 'point';
+    },
+
+    /**
+     * setInterval + SDK FlashEntityByColor 实现持续闪烁
+     * 每 900ms 对所有 blink 实体触发一次 FlashEntityByColor(0.6s)
+     */
+    _flashLoop(viewer) {
+      var self = this;
+      var Cesium = this.getCesium();
+
+      if (typeof SGKJ_SDK === 'undefined' || !SGKJ_SDK.SceneEffect) {
+        console.warn('[' + this.componentName + '] SDK 不可用');
+        return;
+      }
+
+      var doFlash = function () {
+        if (self._blinkIndex < 0) return;
+        for (var i = 0; i < self._blinkEntities.length; i++) {
+          var ent = self._blinkEntities[i];
+          if (!ent || ent.isDestroyed) continue;
+          var geoType = self._detectEntityGeoType(ent);
+          try {
+            var effect = new SGKJ_SDK.SceneEffect(viewer);
+            effect.FlashEntityByColor(ent, geoType, {
+              time: 0.6,
+              step: 0.04,
+              minValue: 0.1,
+              maxValue: 1
+            });
+          } catch (e) { /* ignore */ }
+        }
+      };
+
+      // 立即触发一次
+      doFlash();
+
+      // 每 900ms 循环
+      this._blinkInterval = setInterval(function () {
+        if (self._blinkIndex < 0) {
+          clearInterval(self._blinkInterval);
+          self._blinkInterval = null;
+          return;
+        }
+        doFlash();
+      }, 900);
+    },
+
+    /**
+     * 停止闪烁并移除高亮 DataSource
+     */
+    _stopBlink() {
+      var viewer = this.getViewer();
+
+      // ⭐ 恢复绿色查询高亮
+      for (var h = 0; h < this._highlightEntities.length; h++) {
+        var hds = this._highlightEntities[h];
+        if (hds && !hds.isDestroyed) hds.show = true;
+      }
+
+      if (this._blinkInterval) {
+        clearInterval(this._blinkInterval);
+        this._blinkInterval = null;
+      }
+      if (this._blinkTimeout) {
+        clearTimeout(this._blinkTimeout);
+        this._blinkTimeout = null;
+      }
+
+      if (viewer && this._blinkDataSource) {
+        try {
+          if (!this._blinkDataSource.isDestroyed) {
+            viewer.dataSources.remove(this._blinkDataSource, true);
+          }
+        } catch (e) { /* ignore */ }
+      }
+      this._blinkDataSource = null;
+      this._blinkEntities = [];
+      this._blinkIndex = -1;
+    },
+
     flyToFeature(feature) {
       var viewer = this.getViewer();
       var Cesium = this.getCesium();
       if (!viewer || !Cesium || !feature || !feature.geometry) return;
 
       try {
-        var geom = feature.geometry;
-        var coord;
-
-        if (geom.type === 'Point') {
-          coord = geom.coordinates;
-        } else if (geom.type === 'LineString') {
-          coord = geom.coordinates[0];
-        } else if (geom.type === 'Polygon') {
-          coord = geom.coordinates[0][0];
-        } else {
+        var coord = this._extractFirstCoordinate(feature.geometry);
+        if (!coord) {
+          console.warn('[' + this.componentName + '] flyToFeature: 无法从几何中提取坐标, type=' + feature.geometry.type);
           return;
         }
 
@@ -861,6 +1046,37 @@ export default {
         });
       } catch (e) {
         console.warn('[' + this.componentName + '] flyToFeature 失败:', e);
+      }
+    },
+
+    /**
+     * 从 GeoJSON 几何对象中提取第一个坐标 [lon, lat]
+     * 支持所有常见 Geometry 类型，包括 Multi* 变体
+     */
+    _extractFirstCoordinate(geom) {
+      if (!geom || !geom.type) return null;
+
+      switch (geom.type) {
+        case 'Point':
+          return geom.coordinates;
+        case 'MultiPoint':
+          return geom.coordinates && geom.coordinates[0];
+        case 'LineString':
+          return geom.coordinates && geom.coordinates[0];
+        case 'MultiLineString':
+          return geom.coordinates && geom.coordinates[0] && geom.coordinates[0][0];
+        case 'Polygon':
+          return geom.coordinates && geom.coordinates[0] && geom.coordinates[0][0];
+        case 'MultiPolygon':
+          return geom.coordinates && geom.coordinates[0] && geom.coordinates[0][0] && geom.coordinates[0][0][0];
+        case 'GeometryCollection':
+          if (geom.geometries && geom.geometries.length > 0) {
+            return this._extractFirstCoordinate(geom.geometries[0]);
+          }
+          return null;
+        default:
+          console.warn('[' + this.componentName + '] _extractFirstCoordinate: 未知几何类型 ' + geom.type);
+          return null;
       }
     },
 
@@ -1001,11 +1217,26 @@ export default {
       if (geom.type === 'Point') {
         var pt = projectLonLat(geom.coordinates[0], geom.coordinates[1]);
         if (!pt) { container.removeChild(canvas); return; }
+        // 用圆的实际半径或点缓冲区半径计算像素半径
+        var radiusM = geom.radius || item.bufferRadius || 500;
+        var latRad = geom.coordinates[1] * Math.PI / 180;
+        var degOff = radiusM / (111320 * Math.cos(latRad));
+        var c0 = Cesium.Cartesian3.fromDegrees(geom.coordinates[0], geom.coordinates[1], 0);
+        var c1 = Cesium.Cartesian3.fromDegrees(geom.coordinates[0] + degOff, geom.coordinates[1], 0);
+        var s0 = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, c0);
+        var s1 = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, c1);
+        var pr = 8;
+        if (Cesium.defined(s0) && Cesium.defined(s1)) pr = Math.abs(s1.x - s0.x);
+        // 缓冲区圆
         ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 200, 0, 0.4)';
+        ctx.arc(pt.x, pt.y, pr, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+        // 中心点
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2);
+        ctx.fill();
       } else if (geom.type === 'LineString') {
         var pts = geom.coordinates;
         if (pts.length < 2) { container.removeChild(canvas); return; }
@@ -1079,6 +1310,7 @@ export default {
 
     // ==================== 清理 ====================
     clearAll() {
+      this._stopBlink();
       if (this._historyCamHandler) { this._historyCamHandler.destroy(); this._historyCamHandler = null; }
       if (this._maskCamHandler) { this._maskCamHandler.destroy(); this._maskCamHandler = null; }
       if (this._historyCamClear) { this._historyCamClear.destroy(); this._historyCamClear = null; }
@@ -1093,6 +1325,10 @@ export default {
     },
 
     clearResults() {
+      // ⭐ 闪烁激活时不停止——由 toggleHighlightFeature 控制生命周期
+      if (this._blinkIndex < 0) {
+        this._stopBlink();
+      }
       this.queryResults = [];
       this.queryError = null;
       this.queryLoading = false;

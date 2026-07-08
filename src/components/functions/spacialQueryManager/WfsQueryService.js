@@ -85,11 +85,28 @@ function buildSpatialFilter(operator, gmlGeometry, geometryPropertyName) {
   }
 
   if (operator === 'BBOX') {
-    // BBOX 使用 <fes:BBOX> 而非 <fes:BBOX><fes:ValueReference>... 的嵌套结构
-    return '      <fes:BBOX>\n' +
-      '        <fes:ValueReference>' + escapeXml(geomProp) + '</fes:ValueReference>\n' +
-      '        ' + gmlGeometry + '\n' +
-      '      </fes:BBOX>';
+    // BBOX 需要 <gml:Envelope>（不能直接用 Polygon）
+    // 从 GML Polygon posList 提取 min/max 坐标
+    var posMatch = gmlGeometry.match(/<gml:posList[^>]*>([\s\S]*?)<\/gml:posList>/);
+    if (posMatch) {
+      var nums = posMatch[1].trim().split(/\s+/);
+      var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (var i = 0; i < nums.length - 1; i += 2) {
+        var x = parseFloat(nums[i]), y = parseFloat(nums[i + 1]);
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+      return '      <fes:BBOX>\n' +
+        '        <fes:ValueReference>' + escapeXml(geomProp) + '</fes:ValueReference>\n' +
+        '        <gml:Envelope srsName="EPSG:4326">\n' +
+        '          <gml:lowerCorner>' + minX.toFixed(6) + ' ' + minY.toFixed(6) + '</gml:lowerCorner>\n' +
+        '          <gml:upperCorner>' + maxX.toFixed(6) + ' ' + maxY.toFixed(6) + '</gml:upperCorner>\n' +
+        '        </gml:Envelope>\n' +
+        '      </fes:BBOX>';
+    }
+    console.warn('[WfsQueryService] BBOX 无法解析坐标，回退到 Intersects');
+    operator = 'Intersects';
+    // fall through to Intersects below
   }
 
   return '      <fes:' + operator + '>\n' +

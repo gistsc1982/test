@@ -32,8 +32,9 @@
           v-for="(feature, index) in results"
           :key="'f-' + index"
           class="result-item"
-          @click="$emit('fly-to', feature)"
-          :title="'点击定位到该要素'"
+          :class="{ 'highlighted': index === highlightedIndex }"
+          @click="$emit('fly-to', feature, index)"
+          :title="index === highlightedIndex ? '点击取消高亮闪烁' : '点击高亮闪烁该要素'"
         >
           <span class="result-index">{{ index + 1 }}</span>
           <div class="result-props">
@@ -42,7 +43,7 @@
               <span class="prop-value">{{ formatValue(value) }}</span>
             </div>
           </div>
-          <span class="fly-icon">📍</span>
+          <span class="fly-icon">{{ index === highlightedIndex ? '⭐' : '📍' }}</span>
         </div>
       </div>
     </div>
@@ -62,7 +63,8 @@ export default {
     loading: { type: Boolean, default: false },
     error: { type: String, default: null },
     layerName: { type: String, default: '' },
-    retryable: { type: Boolean, default: true }
+    retryable: { type: Boolean, default: true },
+    highlightedIndex: { type: Number, default: -1 }
   },
   emits: ['fly-to', 'retry', 'clear-highlight', 'export'],
   computed: {
@@ -229,6 +231,10 @@ export default {
 }
 .result-item:hover {
   background: rgba(33,150,243,0.1);
+}
+.result-item.highlighted {
+  background: rgba(255,214,0,0.12);
+  border-left: 3px solid #FFD600;
 }
 .result-item:last-child { border-bottom: none; }
 

@@ -1085,6 +1085,7 @@ export default {
         enableHighlight: true,
         enableClustering: layer.clusterEnabled !== false,
         highlightDuration: 2,
+        continuous: true,
         onSelect: function (payload) {
           self._onEntitySelected(layer, payload);
         },

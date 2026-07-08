@@ -603,14 +603,15 @@
                     poly.set([lu, ru, p, ld]);
                     poly.draw();
                     break;
-                case graphkind.rect://矩形
+                case graphkind.rect://矩形（预览不修改存储顶点）
                     var lu = getStartPoint();
-                    //矩形右上角和左上角坐标计算方法
-                    var ld = setCuPointXY(lu.getX(), p.getY(), 1);
-                    var ru = setCuPointXY(p.getX(), lu.getY(), 2);
-                    var poly = getCuGraph();
-                    poly.set([lu, ru, p, ld]);
-                    poly.draw();
+                    var pts = getCuGraph().get();
+                    if (pts && pts.length >= 1) {
+                        var p0 = pts[0];
+                        var tempPoly = new Poly();
+                        tempPoly.set([p0, new Point(p.getX(), p0.getY()), p, new Point(p0.getX(), p.getY())]);
+                        tempPoly.draw();
+                    }
                     break;
                 case graphkind.circle://圆
                     var circle = getCuGraph();//获取当前图形
