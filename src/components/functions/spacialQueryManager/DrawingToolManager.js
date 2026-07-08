@@ -211,8 +211,34 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
       }
     }
 
-    cleanup();
+    // 绘制反遮罩（evenodd 挖洞）
+    addMaskToCanvas();
     if (geom && onComplete) onComplete(geom);
+  }
+
+  function addMaskToCanvas() {
+    if (clickScreenPts.length < 3) return;
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width, h = canvas.height;
+    ctx.save();
+    ctx.fillStyle = 'rgba(15, 38, 84, 0.65)';
+    // 大矩形 + 洞内形状（反序），evenodd 挖洞
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(w, 0); ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+    for (var i = clickScreenPts.length - 1; i >= 0; i--) {
+      if (i === clickScreenPts.length - 1) ctx.moveTo(clickScreenPts[i].x, clickScreenPts[i].y);
+      else ctx.lineTo(clickScreenPts[i].x, clickScreenPts[i].y);
+    }
+    ctx.closePath();
+    ctx.fill('evenodd');
+    ctx.restore();
+    // 停用 DrawingTools 但保留 canvas，禁用鼠标事件让 Cesium 可交互
+    DT.hand();
+    canvas.style.cursor = '';
+    canvas.style.pointerEvents = 'none';
+    canvas.removeEventListener('contextmenu', ctxMenu);
+    canvas.removeEventListener('mousedown', onMouseDown);
+    canvas.removeEventListener('mouseup', onMouseUp);
   }
 
   function cancel() {
@@ -235,7 +261,13 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
   var kindMap = { point: 'pen', line: 'line', circle: 'circle', rect: 'rect', rectangle: 'rect', polygon: 'poly' };
   DT.begin(kindMap[type] || 'pen');
 
-  return { deactivate: cancel, canvas: canvas };
+  // deactivate: 清除 canvas（无论是否已完成绘制）
+  function removeCanvas() {
+    DT.hand();
+    DT.clear();
+    cleanup();
+  }
+  return { deactivate: removeCanvas, canvas: canvas };
 }
 
 // ==================== DrawingToolManager ====================
@@ -252,7 +284,7 @@ class DrawingToolManager {
     var bufR = (options && options.bufferRadius) || 0;
     var self = this;
     var drawer = createCanvasDrawer(viewer, type, function (geom) {
-      self._activeDrawer = null;
+      // 不置 null — 保留引用以便清除按钮能移除 canvas
       if (options && options.onComplete) options.onComplete(geom);
     }, bufR);
 

@@ -41,8 +41,8 @@
         <CesiumToolbarButton icon="📍" label="点" tooltip="点缓冲区查询" :active="activeTool === 'point'" @click="activateTool('point')" :disabled="!selectedLayerId" />
         <CesiumToolbarButton icon="📏" label="线" tooltip="线缓冲区查询" :active="activeTool === 'line'" @click="activateTool('line')" :disabled="!selectedLayerId" />
         <CesiumToolbarButton icon="⭕" label="圆" tooltip="圆形查询" :active="activeTool === 'circle'" @click="activateTool('circle')" :disabled="!selectedLayerId" />
-        <CesiumToolbarButton icon="▭" label="矩形" tooltip="矩形查询" :active="activeTool === 'rectangle'" @click="activateTool('rectangle')" :disabled="!selectedLayerId" />
-        <CesiumToolbarButton icon="⬠" label="多边形" tooltip="多边形查询" :active="activeTool === 'polygon'" @click="activateTool('polygon')" :disabled="!selectedLayerId" />
+        <CesiumToolbarButton icon="🔲" label="矩形" tooltip="矩形查询" :active="activeTool === 'rectangle'" @click="activateTool('rectangle')" :disabled="!selectedLayerId" />
+        <CesiumToolbarButton icon="⬢" label="多边形" tooltip="多边形查询" :active="activeTool === 'polygon'" @click="activateTool('polygon')" :disabled="!selectedLayerId" />
       </div>
 
       <span class="toolbar-sep"></span>
@@ -241,6 +241,7 @@ export default {
   beforeUnmount() {
     this.deactivateTool();
     this.clearHighlights();
+    this.clearMask();
     if (this._drawingManager) {
       this._drawingManager.destroy();
       this._drawingManager = null;
@@ -431,7 +432,6 @@ export default {
     onDrawingComplete(geometry) {
       console.log('[' + this.componentName + '] 绘图完成:', geometry);
       this.drawnGeometry = geometry;
-      // SGKJ 已自行恢复光标和事件，只需清除 UI 选中状态
       this.activeTool = null;
 
       // 绘图完成后自动执行查询（如果有图层选择）
@@ -440,6 +440,66 @@ export default {
           this.executeQuery();
         }.bind(this));
       }
+    },
+
+    // ==================== 反遮罩（使用已验证的 commonGIS.addMaskPolygon） ====================
+    addMaskPolygon(geometry) {
+      var viewer = this.getViewer();
+      var Cesium = this.getCesium();
+      if (!viewer || !Cesium || !geometry) return;
+
+      // 先清除旧遮罩
+
+      // GeoJSON geometry → Cesium Cartesian3 数组
+      var positions = this._geomToCartesian3Array(geometry, Cesium);
+      if (!positions || positions.length < 3) return;
+
+      // 使用参考项目已验证的遮罩函数
+      commonGIS.addMaskPolygon(viewer, positions, false);
+
+      // 记录遮罩 entity 以便后续清除
+      this._maskEntities = [
+        viewer.entities.getById('myMaskPolygon'),
+        viewer.entities.getById('myMaskPolyline')
+      ].filter(Boolean);
+    },
+
+    _geomToCartesian3Array(geometry, Cesium) {
+      var flat = [];
+      var buf = 0.001; // ~100m
+
+      if (geometry.type === 'Point') {
+        var lon = geometry.coordinates[0], lat = geometry.coordinates[1];
+        var r = geometry.radius ? geometry.radius / 111320 : buf;
+        var n = 32;
+        for (var i = 0; i <= n; i++) {
+          var a = (i / n) * Math.PI * 2;
+          flat.push(lon + r * Math.cos(a), lat + r * Math.sin(a) * Math.cos(lat * Math.PI / 180));
+        }
+      } else if (geometry.type === 'LineString') {
+        var pts = geometry.coordinates;
+        for (var j = 0; j < pts.length; j++) flat.push(pts[j][0], pts[j][1]);
+        for (var k = pts.length - 1; k >= 0; k--) {
+          flat.push(pts[k][0] + buf / Math.cos(pts[k][1] * Math.PI / 180), pts[k][1] + buf);
+        }
+      } else if (geometry.type === 'Polygon') {
+        var ring = geometry.coordinates[0];
+        for (var m = 0; m < ring.length; m++) flat.push(ring[m][0], ring[m][1]);
+      }
+
+      if (flat.length < 6) return null;
+      return Cesium.Cartesian3.fromDegreesArray(flat);
+    },
+
+    clearMask() {
+      var viewer = this.getViewer();
+      if (!viewer) return;
+      var ids = ['myMaskPolygon', 'myMaskPolyline'];
+      ids.forEach(function (id) {
+        var e = viewer.entities.getById(id);
+        if (e) viewer.entities.remove(e);
+      });
+      this._maskEntities = null;
     },
 
     getToolName(type) {
