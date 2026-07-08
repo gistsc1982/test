@@ -560,6 +560,42 @@
         "initialX": "center",
         "initialY": 150
       }
+    },
+    {
+      "name": "SpacialQueryManager",
+      "file": "@componentsFunctions/spacialQueryManager/SpacialQueryManager.vue",
+      "title": "空间查询",
+      "description": "WFS空间查询工具，支持绘制几何图形进行空间过滤和属性模糊查询",
+      "enabled": true,
+      "visible": false,
+      "icon": "🔍",
+      "category": "tools",
+      "singleton": true,
+      "singletonContainerId": "spacialQueryManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "right",
+        "initialY": 280
+      }
+    },
+    {
+      "name": "SpacialQueryManagerMulti",
+      "file": "@componentsFunctions/spacialQueryManager/SpacialQueryManager.vue",
+      "title": "空间查询（多实例）",
+      "description": "WFS空间查询工具（多实例模式）",
+      "enabled": true,
+      "visible": false,
+      "icon": "🔎",
+      "category": "tools",
+      "singleton": false,
+      "singletonContainerId": "spacialQueryManager",
+      "lazyLoad": true,
+      "permissions": [],
+      "position": {
+        "initialX": "right",
+        "initialY": 360
+      }
     }
   ],
   "categories": {

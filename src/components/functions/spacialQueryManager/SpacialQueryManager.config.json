@@ -1,0 +1,22 @@
+{
+  "panelId": "spacial-query-manager",
+  "panelName": "空间查询",
+  "panelIcon": "🔍",
+  "configId": "spacial-query-layers",
+  "featureFolder": "spacialQueryManager",
+  "fieldDefinitions": [],
+  "defaultFormValues": {},
+  "toolbarButtons": {
+    "add": false,
+    "import": false,
+    "export": false,
+    "refresh": false
+  },
+  "dataSource": {
+    "type": "json",
+    "tableName": "SpacialQueryManager",
+    "primaryKey": "id",
+    "fileName": "SpacialQueryManager",
+    "relativePath": "gis/spacialQueryManager/SpacialQueryManager.json"
+  }
+}
