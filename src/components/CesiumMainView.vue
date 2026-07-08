@@ -8894,26 +8894,24 @@ async loadTestSfcComponent(instanceId) {
 
       console.log('\n💡 请再次点击"🔍 诊断模型"按钮验证修复结果');
 
-      // ⭐ 新增：在修复完成后调用 focusOnSingleModel 来触发下拉定位逻辑
-      console.log('\n🔄 修复完成后，调用 focusOnSingleModel 来触发下拉定位...');
-
-      // 延迟调用，确保模型更新已完成
-      this.$nextTick(() => {
-        if (dualViewer.loadedModelsList && dualViewer.loadedModelsList.length > 0) {
-          // 获取第一个模型的 ID
-          const firstModelId = dualViewer.loadedModelsList[0].id;
-          console.log(`  🔄 调用 focusOnSingleModel(${firstModelId})...`);
-
-          try {
-            dualViewer.focusOnSingleModel(firstModelId);
-            console.log(`  ✅ focusOnSingleModel 已调用`);
-          } catch (error) {
-            console.warn(`  ⚠️  focusOnSingleModel 调用失败:`, error.message);
+      // ⭐ 局部坐标系模式跳过 focusOnSingleModel（后续 autoFocusOnLargeCoordModel 会统一聚焦大模型）
+      if (!dualViewer._hasFlownCesiumToModel) {
+        console.log('\n🔄 修复完成后，调用 focusOnSingleModel 来触发下拉定位...');
+        this.$nextTick(() => {
+          if (dualViewer.loadedModelsList && dualViewer.loadedModelsList.length > 0) {
+            const firstModelId = dualViewer.loadedModelsList[0].id;
+            console.log(`  🔄 调用 focusOnSingleModel(${firstModelId})...`);
+            try {
+              dualViewer.focusOnSingleModel(firstModelId);
+              console.log(`  ✅ focusOnSingleModel 已调用`);
+            } catch (error) {
+              console.warn(`  ⚠️  focusOnSingleModel 调用失败:`, error.message);
+            }
           }
-        } else {
-          console.log(`  ℹ️  没有 loadedModelsList，跳过 focusOnSingleModel 调用`);
-        }
-      });
+        });
+      } else {
+        console.log('⏭️ 局部坐标系模式：跳过小模型聚焦（后续统一聚焦大模型）');
+      }
     },
 
     /**
@@ -8953,6 +8951,12 @@ async loadTestSfcComponent(instanceId) {
       // 获取模型的地理位置信息
       const modelLocation = largeCoordModel.model?.userData?.originalLocation;
 
+      // ⭐ 如果 ENU 初始化已经飞过了，跳过所有相机操作（repositionModelsWithENU 会统一处理）
+      if (dualViewer._hasFlownCesiumToModel) {
+        console.log('[HelloWorld] ⏭️ ENU初始化已处理相机定位，跳过autoFocus（Cesium flyTo + Dual聚焦）');
+        return;
+      }
+
       // ⭐ 关键修复：在局部坐标系模式下，直接定位 Cesium 相机到大坐标模型的经纬度位置
       // 原因：syncThreeToCesium 在 ENU 模式下会跳过同步，导致 Cesium 相机不移动
       if (modelLocation && modelLocation.cartographic) {
@@ -8968,15 +8972,16 @@ async loadTestSfcComponent(instanceId) {
           海拔: altitude.toFixed(2) + '米'
         });
 
-        // 设置 Cesium 相机到模型位置（垂直俯瞰）
-        const cameraHeight = Math.max(altitude + 500, 1000); // 至少 500米 或 1000米高度
-        this.cesiumViewer.camera.setView({
+        // 设置 Cesium 相机到模型位置（使用 flyTo 平滑过渡，避免闪烁）
+        const cameraHeight = Math.max(altitude + 500, 1000);
+        this.cesiumViewer.camera.flyTo({
           destination: this.Cesium.Cartesian3.fromDegrees(longitudeDeg, latitudeDeg, cameraHeight),
           orientation: {
             heading: 0,
-            pitch: -Cesium.Math.PI_OVER_TWO, // -90度，完全垂直向下俯瞰
+            pitch: -Cesium.Math.PI_OVER_TWO,
             roll: 0
-          }
+          },
+          duration: 0.8
         });
 
         console.log('[HelloWorld] ✅ Cesium 相机已定位到大坐标模型位置');
@@ -8998,10 +9003,15 @@ async loadTestSfcComponent(instanceId) {
      * 用于解决SyncManager调整相机角度导致不是完全垂直俯瞰的问题
      */
     forceVerticalOverheadView() {
+      // ⭐ 局部坐标系模式下跳过垂直俯瞰（ENU初始化已定位，且会被后续操作覆盖）
+      const dualViewer = window.__dualCanvasViewerInstances?.[0];
+      if (dualViewer?._hasFlownCesiumToModel || this.syncManager?.mercatorProjection?.useLocalCoordinateSystem) {
+        console.log('[HelloWorld] ⏭️ 局部坐标系模式：跳过垂直俯瞰（ENU已定位，避免额外视角跳转）');
+        return;
+      }
+
       console.log('[HelloWorld] 🔧 强制设置垂直俯瞰视图...');
       console.log('[HelloWorld] 📍 步骤1: 检查Dual Viewer...');
-
-      const dualViewer = window.__dualCanvasViewerInstances?.[0];
       if (!dualViewer) {
         console.error('[HelloWorld] ❌ Dual Canvas Viewer 未初始化');
         return;
@@ -9017,11 +9027,11 @@ async loadTestSfcComponent(instanceId) {
         };
         console.log('[HelloWorld] ✅ SyncManager重新初始化已禁用');
 
-        // 10秒后恢复原始方法
+        // 2秒后恢复原始方法（缩短等待时间，避免阻塞后续 ENU 重定位）
         setTimeout(() => {
           dualViewer.syncManager.reinitUnifiedState = originalReinit;
           console.log('[HelloWorld] ✅ 已恢复SyncManager重新初始化');
-        }, 10000);
+        }, 2000);
       } else {
         console.warn('[HelloWorld] ⚠️ SyncManager 不存在');
       }
@@ -9035,7 +9045,7 @@ async loadTestSfcComponent(instanceId) {
         this.cesiumViewer.camera.setView({
           orientation: {
             heading: 0,
-            pitch: -Cesium.Math.PI_OVER_TWO,  // -90度，完全垂直向下
+            pitch: -Cesium.Math.PI_OVER_TWO,
             roll: 0
           }
         });

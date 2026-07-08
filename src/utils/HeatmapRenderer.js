@@ -174,7 +174,7 @@ class HeatmapRenderer {
       this.canvas = document.createElement('canvas');
     }
     var canvas = this.canvas;
-    var ctx = canvas.getContext('2d');
+    var ctx = canvas.getContext('2d', { willReadFrequently: true });
 
     canvas.width = width;
     canvas.height = height;
@@ -218,7 +218,7 @@ class HeatmapRenderer {
     var tempCanvas = document.createElement('canvas');
     tempCanvas.width = width;
     tempCanvas.height = height;
-    var tempCtx = tempCanvas.getContext('2d');
+    var tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
     tempCtx.filter = 'blur(2px)';
     tempCtx.drawImage(canvas, 0, 0);
     tempCtx.filter = 'none';

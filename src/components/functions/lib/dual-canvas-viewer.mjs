@@ -1,10 +1,10 @@
 import * as h from "three";
-import { OrbitControls as Ue } from "three/addons/controls/OrbitControls.js";
+import { OrbitControls as Ie } from "three/addons/controls/OrbitControls.js";
 import { PLYLoader as vt } from "three/addons/loaders/PLYLoader.js";
 import { GLTFLoader as He } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader as ze } from "three/addons/loaders/DRACOLoader.js";
 import { TransformControls as Oe } from "three/addons/controls/TransformControls.js";
-import { Fragment as Ft, createCommentVNode as oe, createElementBlock as q, createElementVNode as z, createVNode as Qe, normalizeClass as ue, normalizeStyle as Dt, openBlock as Z, renderList as Vt, resolveComponent as et, toDisplayString as I, vModelSelect as zt, vShow as be, withDirectives as Fe } from "vue";
+import { Fragment as Ft, createCommentVNode as oe, createElementBlock as J, createElementVNode as z, createVNode as Qe, normalizeClass as ue, normalizeStyle as Dt, openBlock as Q, renderList as Vt, resolveComponent as et, toDisplayString as I, vModelSelect as zt, vShow as be, withDirectives as Fe } from "vue";
 var tt = Object.defineProperty, re = (e, t) => () => (e && (t = e(e = 0)), t), bt = (e, t) => {
   let o = {};
   for (var i in e)
@@ -13,7 +13,7 @@ var tt = Object.defineProperty, re = (e, t) => () => (e && (t = e(e = 0)), t), b
       enumerable: !0
     });
   return t || tt(o, Symbol.toStringTag, { value: "Module" }), o;
-}, ie, J, ne = [], ve, Ve;
+}, ie, ee, ne = [], ve, Ve;
 function Le() {
   if (typeof window < "u" && window.localStorage) {
     const e = localStorage.getItem("devMode");
@@ -27,9 +27,9 @@ function Le() {
   return !1;
 }
 function ce() {
-  if (ve = requestAnimationFrame(ce), !J || !ie) return;
+  if (ve = requestAnimationFrame(ce), !ee || !ie) return;
   const e = window.devicePixelRatio, t = Math.round(ie.clientWidth * e), o = Math.round(ie.clientHeight * e);
-  (ie.width !== t || ie.height !== o) && J.setSize(t, o, !1);
+  (ie.width !== t || ie.height !== o) && ee.setSize(t, o, !1);
   const i = ie.getBoundingClientRect();
   if (ne.length > 1 && ne.some((n, r) => {
     if (!n.element) return !1;
@@ -39,7 +39,7 @@ function ce() {
       if (!(s.right < c.left || s.left > c.right || s.bottom < c.top || s.top > c.bottom)) return !0;
     }
     return !1;
-  }), J.setScissorTest(!1), J.clear(!0, !1, !1), typeof window < "u" && window.__dualCanvasViewer) {
+  }), ee.setScissorTest(!1), ee.clear(!0, !1, !1), typeof window < "u" && window.__dualCanvasViewer) {
     const n = window.__dualCanvasViewer;
     n && typeof n.protectLargeCoordCameraPosition == "function" && n.protectLargeCoordCameraPosition();
   }
@@ -103,9 +103,9 @@ function ce() {
       isTransparent: V
     });
     const f = (m.left - i.left) * e, C = (i.bottom - m.bottom) * e, M = p * e, y = x * e;
-    J.setViewport(f, C, M, y), c.aspect = p / x, c.updateProjectionMatrix(), l && l.update();
+    ee.setViewport(f, C, M, y), c.aspect = p / x, c.updateProjectionMatrix(), l && l.update();
     const w = u ?? 1, V = w < 1;
-    V || J.clearDepth(), s.traverse((T) => {
+    V || ee.clearDepth(), s.traverse((T) => {
       T.isMesh && T.material && (Array.isArray(T.material) ? T.material : [T.material]).forEach((v) => {
         v.userData._hasOriginalStateSaved || (v.userData.originalTransparent = v.transparent, v.userData.originalOpacity = v.opacity, v.userData._hasOriginalStateSaved = !0), V ? (v.transparent = !0, v.opacity = w, v.depthWrite = !1, v.depthTest = !0) : (v.userData.hasOwnProperty("originalTransparent") && (v.transparent = v.userData.originalTransparent), v.userData.hasOwnProperty("originalOpacity") && (v.opacity = v.userData.originalOpacity), v.depthWrite = !0, v.depthTest = !0), v.needsUpdate = !0;
       });
@@ -125,7 +125,7 @@ function ce() {
     }
     if (Le() && S && r === 0 && ce.frameCount % 6e3 === 0 && (ce._lastDebugFrame = ce.frameCount, console.log(`[rendererManager] 🔍 大坐标场景模型可见性检查 (帧${ce.frameCount}, 场景${r}):`), s.traverse((T) => {
       if (T.isMesh && T.visible) {
-        const v = new h.Box3().setFromObject(T).getCenter(new h.Vector3()), D = c.position.distanceTo(v), _ = v.clone().project(c), b = D >= c.near && D <= c.far, E = _.x >= -1 && _.x <= 1 && _.y >= -1 && _.y <= 1 && _.z >= -1 && _.z <= 1;
+        const v = new h.Box3().setFromObject(T).getCenter(new h.Vector3()), D = c.position.distanceTo(v), _ = v.clone().project(c), b = D >= c.near && D <= c.far, P = _.x >= -1 && _.x <= 1 && _.y >= -1 && _.y <= 1 && _.z >= -1 && _.z <= 1;
         console.log(`[rendererManager]  - ${T.name || T.parent?.userData?.fileName || "unnamed"}:`, {
           中心位置: `(${v.x.toFixed(0)}, ${v.y.toFixed(0)}, ${v.z.toFixed(0)})`,
           距离: D.toFixed(2) + "m",
@@ -133,10 +133,10 @@ function ce() {
           far: c.far.toFixed(2),
           在范围内: b ? "✅" : "❌",
           NDC: `(${_.x.toFixed(3)}, ${_.y.toFixed(3)}, ${_.z.toFixed(3)})`,
-          在视锥体内: E ? "✅" : "❌",
+          在视锥体内: P ? "✅" : "❌",
           材质: T.material?.type,
           可见: T.visible
-        }), (!b || !E) && console.warn("[rendererManager] ⚠️ 模型不可见:", {
+        }), (!b || !P) && console.warn("[rendererManager] ⚠️ 模型不可见:", {
           原因: b ? "NDC 超出视锥体" : "距离超出 near/far 范围",
           距离: D.toFixed(2),
           near: c.near.toFixed(2),
@@ -144,7 +144,7 @@ function ce() {
           NDC: `(${_.x.toFixed(3)}, ${_.y.toFixed(3)}, ${_.z.toFixed(3)})`
         });
       }
-    })), J.render(s, c), ce.frameCount <= 10) {
+    })), ee.render(s, c), ce.frameCount <= 10) {
       const T = s.children.length, v = s.children.filter((D) => D.type === "Mesh" || D.type === "Group").length;
       console.log(`[rendererManager] 帧 ${ce.frameCount}: 渲染场景 ${r}`, {
         opacity: w,
@@ -160,21 +160,21 @@ function ce() {
         }
       });
     }
-  }), J.setScissorTest(!1);
+  }), ee.setScissorTest(!1);
 }
 var fe = {
   init(e) {
-    if (J) return;
-    ie = e, ie.style.position = "fixed", ie.style.top = "0", ie.style.left = "0", ie.style.width = "100vw", ie.style.height = "100vh", ie.style.zIndex = "1", ie.style.pointerEvents = "none", J = new h.WebGLRenderer({
+    if (ee) return;
+    ie = e, ie.style.position = "fixed", ie.style.top = "0", ie.style.left = "0", ie.style.width = "100vw", ie.style.height = "100vh", ie.style.zIndex = "1", ie.style.pointerEvents = "none", ee = new h.WebGLRenderer({
       canvas: ie,
       alpha: !0,
       antialias: !0,
       powerPreference: "high-performance",
       logarithmicDepthBuffer: !0,
       preserveDrawingBuffer: !0
-    }), J.setPixelRatio(window.devicePixelRatio), J.setClearColor(0, 0);
-    const t = J.render.bind(J);
-    J.render = function(n, r) {
+    }), ee.setPixelRatio(window.devicePixelRatio), ee.setClearColor(0, 0);
+    const t = ee.render.bind(ee);
+    ee.render = function(n, r) {
       const a = this.getContext();
       return a && (n && n.traverse((c) => {
         if (c.isMesh || c.isGroup) {
@@ -183,7 +183,7 @@ var fe = {
         }
       }), a.depthFunc(515)), t(n, r);
     };
-    const o = J.getContext();
+    const o = ee.getContext();
     if (o) {
       o.enable(o.DEPTH_TEST), o.depthMask(!0), o.depthRange(0, 1);
       const n = 515;
@@ -223,7 +223,7 @@ var fe = {
     if (console.log("[rendererManager] WebGLRenderer 已创建:", {
       logarithmicDepthBuffer: "❌ 已禁用（设置项: false）",
       hasEXT_frag_depth: i,
-      rendererInfo: J ? "✅ 已创建" : "❌ 未创建"
+      rendererInfo: ee ? "✅ 已创建" : "❌ 未创建"
     }), console.log("[rendererManager] ⚠️ 对数深度缓冲区已禁用（创建参数: logarithmicDepthBuffer: false）"), ie.addEventListener("webglcontextlost", (n) => {
       console.error("WebGL context lost:", n), n.preventDefault();
     }), ie.addEventListener("webglcontextrestored", (n) => {
@@ -260,7 +260,7 @@ var fe = {
     }), this.pendingScenes = []);
   },
   addScene(e) {
-    if (console.log("[rendererManager] addScene called, renderer:", !!J, "canvas:", !!ie), !J || !ie) {
+    if (console.log("[rendererManager] addScene called, renderer:", !!ee, "canvas:", !!ie), !ee || !ie) {
       console.warn("rendererManager not initialized yet. Scene will be added after init."), this.pendingScenes || (this.pendingScenes = []), this.pendingScenes.push(e);
       return;
     }
@@ -283,7 +283,7 @@ var fe = {
   },
   getDebugInfo() {
     return {
-      hasRenderer: !!J,
+      hasRenderer: !!ee,
       hasCanvas: !!ie,
       sceneCount: ne.length,
       scenes: ne.map((e, t) => ({
@@ -296,10 +296,10 @@ var fe = {
         controlsTarget: e.controls ? e.controls.target.toArray() : null,
         visible: e.scene ? e.scene.children.filter((o) => o.visible && o.type === "Mesh").length : 0
       })),
-      rendererInfo: J ? {
-        logarithmicDepthBuffer: J.capabilities.isLogarithmicDepthBuffer,
-        pixelRatio: J.getPixelRatio(),
-        size: J.getSize(new h.Vector2()).toArray()
+      rendererInfo: ee ? {
+        logarithmicDepthBuffer: ee.capabilities.isLogarithmicDepthBuffer,
+        pixelRatio: ee.getPixelRatio(),
+        size: ee.getSize(new h.Vector2()).toArray()
       } : null
     };
   },
@@ -307,10 +307,10 @@ var fe = {
     return ne;
   },
   getRenderer() {
-    return J;
+    return ee;
   },
   dispose() {
-    ve && cancelAnimationFrame(ve), Ve && (clearInterval(Ve), Ve = null), J && (J.dispose(), J = null), ne = [], ie = null;
+    ve && cancelAnimationFrame(ve), Ve && (clearInterval(Ve), Ve = null), ee && (ee.dispose(), ee = null), ne = [], ie = null;
   }
 }, St = class {
   constructor() {
@@ -1277,9 +1277,9 @@ var le = 6378137, it = 20037508, Ae = -5e3, Re = 1e5, nt = class {
       }), i.Cartesian3.normalize(y, y));
       let V, S = u, T = i.Cartographic.fromRadians(l, g, e.position.y);
       if (r && this.modelAbsoluteMercator) {
-        const $ = this.modelAbsoluteMercator.x / le, N = this.mercatorYToLatitude(this.modelAbsoluteMercator.y), Y = this.modelAbsoluteMercator.z || 0;
-        T = i.Cartographic.fromRadians($, N, Y), S = M.cartographicToCartesian(T), console.log("[MercatorProjectionManager] 局部坐标系模式：使用模型位置计算ENU基向量", {
-          模型经纬度: `(${($ * 180 / Math.PI).toFixed(6)}°, ${(N * 180 / Math.PI).toFixed(6)}°)`,
+        const $ = this.modelAbsoluteMercator.x / le, k = this.mercatorYToLatitude(this.modelAbsoluteMercator.y), K = this.modelAbsoluteMercator.z || 0;
+        T = i.Cartographic.fromRadians($, k, K), S = M.cartographicToCartesian(T), console.log("[MercatorProjectionManager] 局部坐标系模式：使用模型位置计算ENU基向量", {
+          模型经纬度: `(${($ * 180 / Math.PI).toFixed(6)}°, ${(k * 180 / Math.PI).toFixed(6)}°)`,
           相机经纬度: `(${(l * 180 / Math.PI).toFixed(6)}°, ${(g * 180 / Math.PI).toFixed(6)}°)`,
           说明: "ENU基向量基于模型位置，确保与局部坐标系对齐"
         });
@@ -1299,49 +1299,49 @@ var le = 6378137, it = 20037508, Ae = -5e3, Re = 1e5, nt = class {
           up: y,
           cameraCartesian: u
         }), !1;
-      const E = new i.Cartesian3(0, 0, 0), F = new i.Cartesian3();
-      i.Cartesian3.multiplyByScalar(v, C.x, F), i.Cartesian3.add(E, F, E);
-      const P = new i.Cartesian3();
-      i.Cartesian3.multiplyByScalar(D, C.y, P), i.Cartesian3.add(E, P, E);
-      const R = new i.Cartesian3();
-      i.Cartesian3.multiplyByScalar(y, C.z, R), i.Cartesian3.add(E, R, E);
-      const L = i.Cartesian3.dot(v, y), A = i.Cartesian3.dot(D, y), U = i.Cartesian3.dot(v, D);
-      if (Math.abs(L) > 0.01 || Math.abs(A) > 0.01 || Math.abs(U) > 0.01) {
+      const P = new i.Cartesian3(0, 0, 0), F = new i.Cartesian3();
+      i.Cartesian3.multiplyByScalar(v, C.x, F), i.Cartesian3.add(P, F, P);
+      const E = new i.Cartesian3();
+      i.Cartesian3.multiplyByScalar(D, C.y, E), i.Cartesian3.add(P, E, P);
+      const A = new i.Cartesian3();
+      i.Cartesian3.multiplyByScalar(y, C.z, A), i.Cartesian3.add(P, A, P);
+      const L = i.Cartesian3.dot(v, y), R = i.Cartesian3.dot(D, y), U = i.Cartesian3.dot(v, D);
+      if (Math.abs(L) > 0.01 || Math.abs(R) > 0.01 || Math.abs(U) > 0.01) {
         console.warn("[MercatorProjectionManager] ⚠️ ENU基向量不正交，重新计算:", {
           eastDotUp: L.toFixed(4),
-          northDotUp: A.toFixed(4),
+          northDotUp: R.toFixed(4),
           eastDotNorth: U.toFixed(4),
           说明: "理想情况下这些值应该接近0"
         });
         const $ = new i.Cartesian3();
         i.Cartesian3.cross(y, v, $), i.Cartesian3.normalize($, $);
-        const N = i.Cartesian3.dot(v, $), Y = i.Cartesian3.dot($, y);
-        Math.abs(N) < 1e-3 && Math.abs(Y) < 1e-3 ? (console.log("[MercatorProjectionManager] ✅ 重新计算后的北向量正交性验证通过"), D = $) : console.error("[MercatorProjectionManager] ❌ 无法修正基向量正交性");
+        const k = i.Cartesian3.dot(v, $), K = i.Cartesian3.dot($, y);
+        Math.abs(k) < 1e-3 && Math.abs(K) < 1e-3 ? (console.log("[MercatorProjectionManager] ✅ 重新计算后的北向量正交性验证通过"), D = $) : console.error("[MercatorProjectionManager] ❌ 无法修正基向量正交性");
       }
-      const H = i.Cartesian3.magnitude(E);
-      if (!isFinite(E.x) || !isFinite(E.y) || !isFinite(E.z) || H < 1e-4)
+      const H = i.Cartesian3.magnitude(P);
+      if (!isFinite(P.x) || !isFinite(P.y) || !isFinite(P.z) || H < 1e-4)
         return console.error("[MercatorProjectionManager] ecefDirection 无效或长度接近零:", {
-          ecefDirection: E,
+          ecefDirection: P,
           directionLength: H,
           mercatorDirection: C,
           east: v,
           north: D,
           up: y
         }), !1;
-      i.Cartesian3.normalize(E, E);
-      const ee = i.Cartesian3.dot(new i.Cartesian3(e.direction.x, e.direction.y, e.direction.z), new i.Cartesian3(0, 1, 0)), O = Math.abs(ee) < 0.2;
+      i.Cartesian3.normalize(P, P);
+      const q = i.Cartesian3.dot(new i.Cartesian3(e.direction.x, e.direction.y, e.direction.z), new i.Cartesian3(0, 1, 0)), O = Math.abs(q) < 0.2;
       if (O) {
         console.warn("[MercatorProjectionManager] ⚠️ 相机接近地平线，启用特殊处理:", {
-          cameraDotUp: ee.toFixed(3),
+          cameraDotUp: q.toFixed(3),
           说明: "可能需要额外的姿态修正"
         });
         const $ = M.geodeticSurfaceNormal(u, new i.Cartesian3());
         i.Cartesian3.normalize($, $);
-        const N = new i.Cartesian3();
-        N.x = -Math.sin(l), N.y = Math.cos(l), N.z = 0, i.Cartesian3.normalize(N, N);
-        const Y = new i.Cartesian3();
-        i.Cartesian3.cross($, N, Y), i.Cartesian3.normalize(Y, Y);
-        const he = i.Cartesian3.dot(N, $), ge = i.Cartesian3.dot(Y, $), te = i.Cartesian3.dot(N, Y);
+        const k = new i.Cartesian3();
+        k.x = -Math.sin(l), k.y = Math.cos(l), k.z = 0, i.Cartesian3.normalize(k, k);
+        const K = new i.Cartesian3();
+        i.Cartesian3.cross($, k, K), i.Cartesian3.normalize(K, K);
+        const he = i.Cartesian3.dot(k, $), ge = i.Cartesian3.dot(K, $), te = i.Cartesian3.dot(k, K);
         console.log("[MercatorProjectionManager] ✅ 地平线模式：稳定的基向量:", {
           正交性检查: {
             eastDotUp: he.toFixed(4),
@@ -1350,7 +1350,7 @@ var le = 6378137, it = 20037508, Ae = -5e3, Re = 1e5, nt = class {
           },
           天向量: `(${$.x.toFixed(3)}, ${$.y.toFixed(3)}, ${$.z.toFixed(3)})`,
           说明: "天向量应该完全垂直于地面"
-        }), v = N, D = Y, y = $, E.x = 0, E.y = 0, E.z = 0, i.Cartesian3.multiplyByScalar(v, C.x, F), i.Cartesian3.add(E, F, E), i.Cartesian3.multiplyByScalar(D, C.y, P), i.Cartesian3.add(E, P, E), i.Cartesian3.multiplyByScalar(y, C.z, R), i.Cartesian3.add(E, R, E);
+        }), v = k, D = K, y = $, P.x = 0, P.y = 0, P.z = 0, i.Cartesian3.multiplyByScalar(v, C.x, F), i.Cartesian3.add(P, F, P), i.Cartesian3.multiplyByScalar(D, C.y, E), i.Cartesian3.add(P, E, P), i.Cartesian3.multiplyByScalar(y, C.z, A), i.Cartesian3.add(P, A, P);
       }
       console.log("[MercatorProjectionManager] ENU/局部墨卡托 基向量检查:", {
         东向量: `(${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)})`,
@@ -1358,24 +1358,24 @@ var le = 6378137, it = 20037508, Ae = -5e3, Re = 1e5, nt = class {
         天向量: `(${y.x.toFixed(3)}, ${y.y.toFixed(3)}, ${y.z.toFixed(3)})`,
         墨卡托方向: `(${C.x.toFixed(3)}, ${C.y.toFixed(3)}, ${C.z.toFixed(3)})`,
         东分量: `(${F.x.toFixed(3)}, ${F.y.toFixed(3)}, ${F.z.toFixed(3)})`,
-        北分量: `(${P.x.toFixed(3)}, ${P.y.toFixed(3)}, ${P.z.toFixed(3)})`,
-        天分量: `(${R.x.toFixed(3)}, ${R.y.toFixed(3)}, ${R.z.toFixed(3)})`,
-        ECEF方向_归一化前: `(${E.x.toFixed(3)}, ${E.y.toFixed(3)}, ${E.z.toFixed(3)})`,
+        北分量: `(${E.x.toFixed(3)}, ${E.y.toFixed(3)}, ${E.z.toFixed(3)})`,
+        天分量: `(${A.x.toFixed(3)}, ${A.y.toFixed(3)}, ${A.z.toFixed(3)})`,
+        ECEF方向_归一化前: `(${P.x.toFixed(3)}, ${P.y.toFixed(3)}, ${P.z.toFixed(3)})`,
         接近地平线: O ? "是" : "否"
       });
-      const B = M.geodeticSurfaceNormal(u, new i.Cartesian3()), k = i.Cartesian3.dot(y, B);
-      k < 0.99 && console.warn("[MercatorProjectionManager] ⚠️ 天向量与地球表面法线不一致:", {
+      const B = M.geodeticSurfaceNormal(u, new i.Cartesian3()), N = i.Cartesian3.dot(y, B);
+      N < 0.99 && console.warn("[MercatorProjectionManager] ⚠️ 天向量与地球表面法线不一致:", {
         实际天向量: `(${y.x.toFixed(3)}, ${y.y.toFixed(3)}, ${y.z.toFixed(3)})`,
         期望天向量: `(${B.x.toFixed(3)}, ${B.y.toFixed(3)}, ${B.z.toFixed(3)})`,
-        点积: k.toFixed(4),
+        点积: N.toFixed(4),
         说明: "天向量应该与地球表面法线一致",
         isUsingLocalCoord: r
-      }), i.Cartesian3.normalize(E, E), t.direction = E, t.up = y, t.right = i.Cartesian3.cross(t.direction, t.up, new i.Cartesian3()), i.Cartesian3.normalize(t.right, t.right), t.update && t.update(o?.clock?.currentTime || i.JulianDate.now());
-      const Q = M.cartesianToCartographic(t.position, new i.Cartographic()), X = (Q.longitude * 180 / Math.PI).toFixed(6), j = (Q.latitude * 180 / Math.PI).toFixed(6), G = Q.height.toFixed(2);
-      let W = "N/A", K = "N/A";
+      }), i.Cartesian3.normalize(P, P), t.direction = P, t.up = y, t.right = i.Cartesian3.cross(t.direction, t.up, new i.Cartesian3()), i.Cartesian3.normalize(t.right, t.right), t.update && t.update(o?.clock?.currentTime || i.JulianDate.now());
+      const j = M.cartesianToCartographic(t.position, new i.Cartographic()), W = (j.longitude * 180 / Math.PI).toFixed(6), X = (j.latitude * 180 / Math.PI).toFixed(6), G = j.height.toFixed(2);
+      let Y = "N/A", Z = "N/A";
       if (this.modelAbsoluteMercator) {
-        const $ = this.modelAbsoluteMercator.x / le, N = this.mercatorYToLatitude(this.modelAbsoluteMercator.y);
-        W = ($ * 180 / Math.PI).toFixed(6), K = (N * 180 / Math.PI).toFixed(6);
+        const $ = this.modelAbsoluteMercator.x / le, k = this.mercatorYToLatitude(this.modelAbsoluteMercator.y);
+        Y = ($ * 180 / Math.PI).toFixed(6), Z = (k * 180 / Math.PI).toFixed(6);
       }
       return console.log("[MercatorProjectionManager] syncDirectionToCesium 完成（局部墨卡托 → ENU基向量 → ECEF）:", {
         State_东南天: `(${e.direction.x.toFixed(3)}, ${e.direction.y.toFixed(3)}, ${e.direction.z.toFixed(3)})`,
@@ -1383,19 +1383,19 @@ var le = 6378137, it = 20037508, Ae = -5e3, Re = 1e5, nt = class {
         ECEF方向: `(${t.direction.x.toFixed(3)}, ${t.direction.y.toFixed(3)}, ${t.direction.z.toFixed(3)})`
       }), console.log("[MercatorProjectionManager] ⭐ 锚定验证:", {
         Cesium相机位置: {
-          经度: X + "°",
-          纬度: j + "°",
+          经度: W + "°",
+          纬度: X + "°",
           高度: G + "m"
         },
         大模型锚定点: {
-          经度: W + "°",
-          纬度: K + "°"
+          经度: Y + "°",
+          纬度: Z + "°"
         },
         相机相对锚定点: {
-          经度差: ((parseFloat(X) - parseFloat(W)) * 111320).toFixed(2) + "m (东)",
-          纬度差: ((parseFloat(j) - parseFloat(K)) * 110540).toFixed(2) + "m (北)"
+          经度差: ((parseFloat(W) - parseFloat(Y)) * 111320).toFixed(2) + "m (东)",
+          纬度差: ((parseFloat(X) - parseFloat(Z)) * 110540).toFixed(2) + "m (北)"
         },
-        锚定状态: Math.abs(parseFloat(X) - parseFloat(W)) < 1e-3 && Math.abs(parseFloat(j) - parseFloat(K)) < 1e-3 ? "❌ 相机在锚定点上方（视角中心）" : "✅ 锚定点在相机视野内"
+        锚定状态: Math.abs(parseFloat(W) - parseFloat(Y)) < 1e-3 && Math.abs(parseFloat(X) - parseFloat(Z)) < 1e-3 ? "❌ 相机在锚定点上方（视角中心）" : "✅ 锚定点在相机视野内"
       }), !0;
     } catch (n) {
       return console.error("[MercatorProjectionManager] syncDirectionToCesium 失败:", n), !1;
@@ -1975,7 +1975,7 @@ var At = class {
       return !0;
     }
   };
-})), ht, kt = re((() => {
+})), ht, Nt = re((() => {
   je(), ht = class extends Te {
     constructor(e) {
       super(e), this.operationType = "zoom";
@@ -2105,7 +2105,7 @@ var At = class {
       t || (e.target.y = 0);
     }
   };
-})), ut, Nt = re((() => {
+})), ut, kt = re((() => {
   Xe(), ut = class extends _e {
     constructor(e) {
       super(e), this.mode = "surface";
@@ -2136,7 +2136,7 @@ var At = class {
       return "地上翻转 - 使用统一坐标系和笛卡尔坐标计算";
     }
   };
-})), gt, It = re((() => {
+})), gt, Ut = re((() => {
   Xe(), gt = class extends _e {
     constructor(e) {
       super(e), this.mode = "underground";
@@ -2646,8 +2646,8 @@ var At = class {
       return "地下平移 - 使用 Cesium 原生 camera.move* API，上下平移沿水平面";
     }
   };
-})), ke, wt, yt, Ut = re((() => {
-  Me(), ke = class extends pe {
+})), Ne, wt, yt, It = re((() => {
+  Me(), Ne = class extends pe {
     constructor(e) {
       super(e), this.operationType = "rotate", this.handlerOperationType = "rotate";
     }
@@ -2745,7 +2745,7 @@ var At = class {
     getDescription() {
       return "Cesium 原生旋转 - 直接操作 Cesium 相机";
     }
-  }, wt = class extends ke {
+  }, wt = class extends Ne {
     constructor(e) {
       super(e), this.mode = "surface";
     }
@@ -2755,7 +2755,7 @@ var At = class {
     getDescription() {
       return "地上旋转 - Cesium 原生 API";
     }
-  }, yt = class extends ke {
+  }, yt = class extends Ne {
     constructor(e) {
       super(e), this.mode = "underground";
     }
@@ -2767,7 +2767,7 @@ var At = class {
     }
   };
 })), Mt, Ht = re((() => {
-  Ge(), ye(), Ut(), ft(), Ct(), xt(), pt(), mt(), Mt = class {
+  Ge(), ye(), It(), ft(), Ct(), xt(), pt(), mt(), Mt = class {
     constructor(e) {
       this.syncManager = e, this.detector = new Se(), console.log("[OperationRouter] 构造函数调用，开始创建处理器实例"), this.handlers = {
         surfaceRotate: new wt(e),
@@ -2845,7 +2845,7 @@ var At = class {
   UnifiedRotationHandler: () => _e,
   surfaceModeDetector: () => Be
 }), Bt = re((() => {
-  Ge(), ye(), je(), Rt(), kt(), Xe(), Nt(), It(), mt(), Me(), ft(), Ct(), xt(), pt(), Ht();
+  Ge(), ye(), je(), Rt(), Nt(), Xe(), kt(), Ut(), mt(), Me(), ft(), Ct(), xt(), pt(), Ht();
 }));
 console.log("[SyncManager] 导入的 mercatorProjectionManager:", {
   mercatorProjectionManager: de,
@@ -2855,14 +2855,14 @@ console.log("[SyncManager] 导入的 mercatorProjectionManager:", {
   有setDualFloorHeight: typeof de?.setDualFloorHeight == "function",
   有getCurrentFloorHeight: typeof de?.getCurrentFloorHeight == "function"
 });
-var Ne = null;
+var ke = null;
 async function Gt() {
-  if (!Ne) try {
-    Ne = (await Promise.resolve().then(() => (Bt(), Ot))).OperationRouter;
+  if (!ke) try {
+    ke = (await Promise.resolve().then(() => (Bt(), Ot))).OperationRouter;
   } catch (e) {
     console.warn("[SyncManager] OperationRouter not available:", e.message);
   }
-  return Ne;
+  return ke;
 }
 var me = class {
   static normalize(e) {
@@ -3002,7 +3002,7 @@ var me = class {
     }, this.mercatorProjection.setFloorCenter(this.floorCenterMercator), this.leftFlipProtection = {
       enabled: !1,
       until: 0
-    };
+    }, this._postENULoadAlignmentDone = !1;
   }
   async _initOperationRouter() {
     const e = await Gt();
@@ -3580,10 +3580,10 @@ var me = class {
       }), C.y > -0.1)) {
         const v = Math.sqrt(C.x * C.x + C.z * C.z);
         if (v > 1e-3) {
-          const _ = C.x / v, b = C.z / v, E = -0.05;
-          if (C.y > E) {
-            const F = Math.min(C.y, E), P = Math.sqrt(1 - F * F);
-            C.x = _ * P, C.y = F, C.z = b * P;
+          const _ = C.x / v, b = C.z / v, P = -0.05;
+          if (C.y > P) {
+            const F = Math.min(C.y, P), E = Math.sqrt(1 - F * F);
+            C.x = _ * E, C.y = F, C.z = b * E;
           }
         } else C = {
           x: 0,
@@ -3647,12 +3647,12 @@ var me = class {
         const v = window.__dualCanvasViewerInstances?.[0];
         if (v && v.modelGroup1 && v.modelGroup1.children.length > 0) {
           const D = [];
-          v.modelGroup1.children.forEach((b, E) => {
+          v.modelGroup1.children.forEach((b, P) => {
             const F = b.userData?.originalLocation;
             if (F && (F.cartographic || F.ecef)) {
-              const P = new h.Vector3();
-              b.getWorldPosition(P), D.push({
-                index: E,
+              const E = new h.Vector3();
+              b.getWorldPosition(E), D.push({
+                index: P,
                 name: b.name,
                 localPosition: {
                   x: b.position.x,
@@ -3660,9 +3660,9 @@ var me = class {
                   z: b.position.z
                 },
                 worldPosition: {
-                  x: P.x,
-                  y: P.y,
-                  z: P.z
+                  x: E.x,
+                  y: E.y,
+                  z: E.z
                 },
                 ecef: F.ecef ? {
                   x: F.ecef.x,
@@ -3678,23 +3678,23 @@ var me = class {
             }
           });
           const _ = [];
-          p.forEach((b, E) => {
-            const F = D.find((P) => P.index === b.index);
+          p.forEach((b, P) => {
+            const F = D.find((E) => E.index === b.index);
             if (F) {
-              const P = {
+              const E = {
                 x: F.localPosition.x - b.localPosition.x,
                 y: F.localPosition.y - b.localPosition.y,
                 z: F.localPosition.z - b.localPosition.z
-              }, R = {
+              }, A = {
                 x: F.worldPosition.x - b.worldPosition.x,
                 y: F.worldPosition.y - b.worldPosition.y,
                 z: F.worldPosition.z - b.worldPosition.z
               }, L = F.cartographic && b.cartographic ? F.cartographic.height - b.cartographic.height : 0;
-              (Math.abs(P.x) > 0.01 || Math.abs(P.y) > 0.01 || Math.abs(P.z) > 0.01 || Math.abs(R.x) > 0.01 || Math.abs(R.y) > 0.01 || Math.abs(R.z) > 0.01 || Math.abs(L) > 0.01) && _.push({
+              (Math.abs(E.x) > 0.01 || Math.abs(E.y) > 0.01 || Math.abs(E.z) > 0.01 || Math.abs(A.x) > 0.01 || Math.abs(A.y) > 0.01 || Math.abs(A.z) > 0.01 || Math.abs(L) > 0.01) && _.push({
                 index: b.index,
                 name: b.name,
-                局部坐标变化: `Δ(${P.x.toFixed(4)}, ${P.y.toFixed(4)}, ${P.z.toFixed(4)})`,
-                世界坐标变化: `Δ(${R.x.toFixed(4)}, ${R.y.toFixed(4)}, ${R.z.toFixed(4)})`,
+                局部坐标变化: `Δ(${E.x.toFixed(4)}, ${E.y.toFixed(4)}, ${E.z.toFixed(4)})`,
+                世界坐标变化: `Δ(${A.x.toFixed(4)}, ${A.y.toFixed(4)}, ${A.z.toFixed(4)})`,
                 海拔变化: L !== 0 ? `${L.toFixed(4)}米` : "无",
                 ECEF坐标: b.ecef ? "相同" : "无"
               });
@@ -4674,11 +4674,11 @@ var me = class {
         z: D.up.z
       };
       if (e && e.camera1 && e.camera1.position && e.controls1) {
-        const E = e.camera1.position.clone(), F = e.controls1.target.clone();
-        !this._lastCesiumHeightForSync && v && (this._lastCesiumHeightForSync = v.positionCartographic.height, this._lastThreeHeightForSync = E.y, this._lastThreeTargetYForSync = F.y);
-        const P = e.syncDepth || 0;
-        e.syncDepth = P + 1, v && (this._lastCesiumHeightForSync ? (this._lastCesiumHeightForSync = v.positionCartographic.height, this._lastThreeHeightForSync = E.y, this._lastThreeTargetYForSync = F.y) : (this._lastCesiumHeightForSync = v.positionCartographic.height, this._lastThreeHeightForSync = E.y, this._lastThreeTargetYForSync = F.y)), e.syncDepth = P;
-        const R = D.target || {
+        const P = e.camera1.position.clone(), F = e.controls1.target.clone();
+        !this._lastCesiumHeightForSync && v && (this._lastCesiumHeightForSync = v.positionCartographic.height, this._lastThreeHeightForSync = P.y, this._lastThreeTargetYForSync = F.y);
+        const E = e.syncDepth || 0;
+        e.syncDepth = E + 1, v && (this._lastCesiumHeightForSync ? (this._lastCesiumHeightForSync = v.positionCartographic.height, this._lastThreeHeightForSync = P.y, this._lastThreeTargetYForSync = F.y) : (this._lastCesiumHeightForSync = v.positionCartographic.height, this._lastThreeHeightForSync = P.y, this._lastThreeTargetYForSync = F.y)), e.syncDepth = E;
+        const A = D.target || {
           x: 0,
           y: 0,
           z: 0
@@ -4686,20 +4686,20 @@ var me = class {
           x: D.position.x,
           y: D.position.y,
           z: D.position.z
-        }, A = {
-          x: R.x,
-          y: R.y,
-          z: R.z
+        }, R = {
+          x: A.x,
+          y: A.y,
+          z: A.z
         };
         return console.log(`[SyncManager.syncUnifiedToThree] ${o}：使用 unifiedCameraState 方向计算相机位置`, {
           height: D.height.toFixed(2),
           direction: `(${_.x.toFixed(3)}, ${_.y.toFixed(3)}, ${_.z.toFixed(3)})`,
           up: `(${b.x.toFixed(3)}, ${b.y.toFixed(3)}, ${b.z.toFixed(3)})`,
           position: `(${L.x.toFixed(2)}, ${L.y.toFixed(2)}, ${L.z.toFixed(2)})`,
-          target: `(${A.x.toFixed(2)}, ${A.y.toFixed(2)}, ${A.z.toFixed(2)})`
+          target: `(${R.x.toFixed(2)}, ${R.y.toFixed(2)}, ${R.z.toFixed(2)})`
         }), {
           position: L,
-          target: A,
+          target: R,
           direction: _,
           up: b,
           right: {
@@ -4723,15 +4723,15 @@ var me = class {
     r && this.mercatorProjection.modelAbsoluteMercator && (n = this.mercatorProjection.modelAbsoluteMercator);
     const a = i.position.x + n.x, s = -i.position.z + n.y, c = i.position.y, l = i.target.x + n.x, g = -i.target.z + n.y, u = i.target.y, d = i.position.x, m = i.position.z, p = this.mercatorToThree(a, s, c), x = this.mercatorToThree(l, g, u);
     if (r && (Math.abs(d) > 1 || Math.abs(m) > 1)) {
-      const v = d, D = m, _ = p.x, b = p.z, E = _ / v, F = b / D;
+      const v = d, D = m, _ = p.x, b = p.z, P = _ / v, F = b / D;
       console.log("[SyncManager.syncUnifiedToThree] 坐标转换缩放检测:", {
         期望X: v.toFixed(2),
         实际X: _.toFixed(2),
-        X缩放: E.toFixed(3),
+        X缩放: P.toFixed(3),
         期望Z: D.toFixed(2),
         实际Z: b.toFixed(2),
         Z缩放: F.toFixed(3),
-        说明: E !== 1 || F !== 1 ? "⚠️ 存在额外缩放" : "✓ 无额外缩放"
+        说明: P !== 1 || F !== 1 ? "⚠️ 存在额外缩放" : "✓ 无额外缩放"
       });
     }
     const f = {
@@ -4879,6 +4879,35 @@ var me = class {
       direction: `(${s.direction.x.toFixed(3)}, ${s.direction.y.toFixed(3)}, ${s.direction.z.toFixed(3)})`
     });
   }
+  syncAlignCesiumAfterENULoad() {
+    if (this._postENULoadAlignmentDone) {
+      console.log("[SyncManager] 🔄 后加载对齐已执行过，跳过");
+      return;
+    }
+    if (this._postENULoadAlignmentDone = !0, !this.mercatorProjection?.isUsingLocalCoordinateSystem?.()) {
+      console.log("[SyncManager] 🔄 后加载对齐：非局部坐标系，跳过");
+      return;
+    }
+    const e = this.cesiumViewer;
+    if (!e || !e.camera || !e.scene) {
+      console.warn("[SyncManager] 🔄 后加载对齐：Cesium viewer/camera/scene 未就绪，跳过");
+      return;
+    }
+    const t = this.unifiedCameraState;
+    if (!t || !t.direction || !t.position) {
+      console.warn("[SyncManager] 🔄 后加载对齐：unifiedCameraState 无效，跳过");
+      return;
+    }
+    const o = t.direction, i = t.position;
+    if (!isFinite(o.x) || !isFinite(o.y) || !isFinite(o.z) || !isFinite(i.x) || !isFinite(i.y) || !isFinite(i.z)) {
+      console.warn("[SyncManager] 🔄 后加载对齐：direction/position 包含非有限值，跳过");
+      return;
+    }
+    console.log("[SyncManager] 🔄 后加载对齐：开始同步方向到 Cesium...", {
+      direction: `(${o.x.toFixed(3)}, ${o.y.toFixed(3)}, ${o.z.toFixed(3)})`,
+      position: `(${i.x.toFixed(2)}, ${i.y.toFixed(2)}, ${i.z.toFixed(2)})`
+    }), this.mercatorProjection.syncDirectionToCesium(t, e.camera, e.scene), this._skipNextCesiumSync = !0, e.scene.requestRender(), console.log("[SyncManager] ✅ 后加载 Cesium 对齐完成");
+  }
   normalizeVector(e) {
     const t = Math.sqrt(e.x * e.x + e.y * e.y + e.z * e.z);
     return t > 1e-4 ? {
@@ -4957,8 +4986,8 @@ var me = class {
       let D;
       try {
         D = d.Cartographic.fromRadians(l.longitude, l.latitude, 0);
-      } catch (E) {
-        console.warn("[SyncManager._syncCesiumToUnified] 计算目标点失败:", E), D = l;
+      } catch (P) {
+        console.warn("[SyncManager._syncCesiumToUnified] 计算目标点失败:", P), D = l;
       }
       const _ = {
         x: D.longitude * r,
@@ -5574,7 +5603,7 @@ var Kt = class {
   class: "hint-text info"
 }, Mo = { class: "info-panel" }, vo = { class: "info-item" }, Fo = { class: "info-value" }, Do = { class: "info-item" }, Vo = { class: "info-value" };
 function zo(e, t, o, i, n, r) {
-  return Z(), q("div", Zt, [
+  return Q(), J("div", Zt, [
     t[25] || (t[25] = z("div", { class: "panel-header" }, [z("h3", null, "双画布查看器")], -1)),
     z("div", Jt, [
       z("button", {
@@ -5644,12 +5673,12 @@ function zo(e, t, o, i, n, r) {
         class: "file-input"
       }, null, 544)])
     ]),
-    o.loadedModelsList.length > 0 ? (Z(), q("div", mo, [t[21] || (t[21] = z("h4", null, "定位或变换", -1)), z("div", fo, [t[20] || (t[20] = z("label", { for: "model-selector" }, "选择模型:", -1)), Fe(z("select", {
+    o.loadedModelsList.length > 0 ? (Q(), J("div", mo, [t[21] || (t[21] = z("h4", null, "定位或变换", -1)), z("div", fo, [t[20] || (t[20] = z("label", { for: "model-selector" }, "选择模型:", -1)), Fe(z("select", {
       id: "model-selector",
       "onUpdate:modelValue": t[10] || (t[10] = (a) => n.selectedModelId = a),
       onChange: t[11] || (t[11] = (...a) => r.handleModelChange && r.handleModelChange(...a)),
       class: "model-selector"
-    }, [t[19] || (t[19] = z("option", { value: "" }, "-- 请选择模型 --", -1)), (Z(!0), q(Ft, null, Vt(o.loadedModelsList, (a) => (Z(), q("option", {
+    }, [t[19] || (t[19] = z("option", { value: "" }, "-- 请选择模型 --", -1)), (Q(!0), J(Ft, null, Vt(o.loadedModelsList, (a) => (Q(), J("option", {
       key: a.id,
       value: a.id
     }, I(a.name) + " (" + I(r.getLayerDisplayName(a.layer)) + ") ", 9, Co))), 128))], 544), [[zt, n.selectedModelId]])])])) : oe("", !0),
@@ -5670,7 +5699,7 @@ function zo(e, t, o, i, n, r) {
         onClick: t[13] || (t[13] = (a) => e.$emit("exitRealWorldMode")),
         title: "退出真实世界模式，切换回混合模式"
       }, " 🔄 退出真实世界→混合模式 "),
-      o.hasLargeCoordModelSelected ? (Z(), q("div", wo, " ✓ 已选中大坐标模型 ")) : (Z(), q("div", yo, " ℹ 请先选中一个大坐标模型 "))
+      o.hasLargeCoordModelSelected ? (Q(), J("div", wo, " ✓ 已选中大坐标模型 ")) : (Q(), J("div", yo, " ℹ 请先选中一个大坐标模型 "))
     ]),
     z("div", Mo, [z("div", vo, [t[23] || (t[23] = z("span", { class: "info-label" }, "原始模型对象:", -1)), z("span", Fo, I(o.threeObjectCount), 1)]), z("div", Do, [t[24] || (t[24] = z("span", { class: "info-label" }, "BIM 模型对象:", -1)), z("span", Vo, I(o.bimObjectCount), 1)])])
   ]);
@@ -5755,13 +5784,13 @@ var bo = /* @__PURE__ */ Je(qt, [["render", zo]]), So = {
 }, To = {
   class: "coordinate-panel",
   "data-panel": "coordinate"
-}, _o = { class: "coordinate-header" }, Eo = ["aria-expanded"], Po = { class: "coordinate-summary" }, Lo = { class: "coord-item" }, $o = { class: "coord-value" }, Ao = { class: "coord-item" }, Ro = { class: "coord-value" }, ko = {
+}, _o = { class: "coordinate-header" }, Eo = ["aria-expanded"], Po = { class: "coordinate-summary" }, Lo = { class: "coord-item" }, $o = { class: "coord-value" }, Ao = { class: "coord-item" }, Ro = { class: "coord-value" }, No = {
   key: 0,
   class: "coord-item"
-}, No = { class: "coord-value" }, Io = {
+}, ko = { class: "coord-value" }, Uo = {
   key: 1,
   class: "coord-item"
-}, Uo = { class: "coord-value" }, Ho = {
+}, Io = { class: "coord-value" }, Ho = {
   key: 2,
   class: "coord-item"
 }, Oo = { class: "coord-value" }, Bo = {
@@ -5798,7 +5827,7 @@ var bo = /* @__PURE__ */ Je(qt, [["render", zo]]), So = {
 }, bi = { class: "coord-row" }, Si = { class: "coord-value" }, Ti = { class: "coord-row" }, _i = { class: "coord-value" }, Ei = { class: "coord-row" }, Pi = { class: "coord-value" }, Li = {
   key: 2,
   class: "coord-section"
-}, $i = { class: "coord-row" }, Ai = { class: "coord-value" }, Ri = { class: "coord-row" }, ki = { class: "coord-value" }, Ni = { class: "coord-row" }, Ii = { class: "coord-value" }, Ui = {
+}, $i = { class: "coord-row" }, Ai = { class: "coord-value" }, Ri = { class: "coord-row" }, Ni = { class: "coord-value" }, ki = { class: "coord-row" }, Ui = { class: "coord-value" }, Ii = {
   key: 3,
   class: "coord-section"
 }, Hi = { class: "coord-row" }, Oi = { class: "coord-value" }, Bi = { class: "coord-row" }, Gi = { class: "coord-value" }, ji = { class: "coord-row" }, Xi = { class: "coord-value" }, Wi = {
@@ -5818,7 +5847,7 @@ var bo = /* @__PURE__ */ Je(qt, [["render", zo]]), So = {
   class: "coord-section"
 }, Fn = { class: "coord-row" }, Dn = { class: "coord-value" }, Vn = { class: "coord-row" }, zn = { class: "coord-value" }, bn = { class: "coord-row" }, Sn = { class: "coord-value" }, Tn = { class: "coord-system-status" }, _n = ["title"];
 function En(e, t, o, i, n, r) {
-  return Z(), q("div", To, [
+  return Q(), J("div", To, [
     z("div", _o, [t[1] || (t[1] = z("h3", null, "双层坐标信息", -1)), z("button", {
       onClick: t[0] || (t[0] = (a) => e.$emit("toggleDetails")),
       class: ue(["toggle-btn", { expanded: o.showDetails }]),
@@ -5829,39 +5858,39 @@ function En(e, t, o, i, n, r) {
     Fe(z("div", Po, [
       z("div", Lo, [t[2] || (t[2] = z("span", { class: "coord-label" }, "屏幕", -1)), z("span", $o, I(o.coords.screen.x.toFixed(0)) + ", " + I(o.coords.screen.y.toFixed(0)), 1)]),
       z("div", Ao, [t[3] || (t[3] = z("span", { class: "coord-label" }, "NDC", -1)), z("span", Ro, I(o.coords.ndc.x.toFixed(2)) + ", " + I(o.coords.ndc.y.toFixed(2)), 1)]),
-      o.activeLayer === "three" || o.activeLayer === "both" ? (Z(), q("div", ko, [t[4] || (t[4] = z("span", { class: "coord-label" }, "世界(层1)", -1)), z("span", No, I(r.formatWorldCoords(o.coords.world1)), 1)])) : oe("", !0),
-      o.activeLayer === "three" ? (Z(), q("div", Io, [t[5] || (t[5] = z("span", {
+      o.activeLayer === "three" || o.activeLayer === "both" ? (Q(), J("div", No, [t[4] || (t[4] = z("span", { class: "coord-label" }, "世界(层1)", -1)), z("span", ko, I(r.formatWorldCoords(o.coords.world1)), 1)])) : oe("", !0),
+      o.activeLayer === "three" ? (Q(), J("div", Uo, [t[5] || (t[5] = z("span", {
         class: "coord-label",
         title: "相对于真实世界原点的坐标（米）"
-      }, "真实世界", -1)), z("span", Uo, I(r.formatRealWorldCoords(o.coords.world1, "layer1")), 1)])) : oe("", !0),
-      o.activeLayer === "bim" || o.activeLayer === "both" ? (Z(), q("div", Ho, [t[6] || (t[6] = z("span", { class: "coord-label" }, "世界(层2)", -1)), z("span", Oo, I(r.formatWorldCoords(o.coords.world2)), 1)])) : oe("", !0),
-      o.activeLayer === "bim" ? (Z(), q("div", Bo, [t[7] || (t[7] = z("span", {
+      }, "真实世界", -1)), z("span", Io, I(r.formatRealWorldCoords(o.coords.world1, "layer1")), 1)])) : oe("", !0),
+      o.activeLayer === "bim" || o.activeLayer === "both" ? (Q(), J("div", Ho, [t[6] || (t[6] = z("span", { class: "coord-label" }, "世界(层2)", -1)), z("span", Oo, I(r.formatWorldCoords(o.coords.world2)), 1)])) : oe("", !0),
+      o.activeLayer === "bim" ? (Q(), J("div", Bo, [t[7] || (t[7] = z("span", {
         class: "coord-label",
         title: "相对于真实世界原点的坐标（米）"
       }, "真实世界", -1)), z("span", Go, I(r.formatRealWorldCoords(o.coords.world2, "layer2")), 1)])) : oe("", !0),
-      o.activeLayer === "both" ? (Z(), q("div", jo, [t[8] || (t[8] = z("span", {
+      o.activeLayer === "both" ? (Q(), J("div", jo, [t[8] || (t[8] = z("span", {
         class: "coord-label",
         title: "相对于真实世界原点的坐标（米）"
       }, "真实世界(层1)", -1)), z("span", Xo, I(r.formatRealWorldCoords(o.coords.world1, "layer1")), 1)])) : oe("", !0),
-      o.activeLayer === "both" ? (Z(), q("div", Wo, [t[9] || (t[9] = z("span", {
+      o.activeLayer === "both" ? (Q(), J("div", Wo, [t[9] || (t[9] = z("span", {
         class: "coord-label",
         title: "相对于真实世界原点的坐标（米）"
       }, "真实世界(层2)", -1)), z("span", Yo, I(r.formatRealWorldCoords(o.coords.world2, "layer2")), 1)])) : oe("", !0),
-      o.hasXeokitModels ? (Z(), q("div", Ko, [t[10] || (t[10] = z("span", { class: "coord-label" }, "世界(XKT)", -1)), z("span", qo, I(r.formatWorldCoords(o.coords.worldXeokit)), 1)])) : oe("", !0),
-      o.activeLayer === "three" || o.activeLayer === "both" ? (Z(), q("div", Zo, [t[11] || (t[11] = z("span", {
+      o.hasXeokitModels ? (Q(), J("div", Ko, [t[10] || (t[10] = z("span", { class: "coord-label" }, "世界(XKT)", -1)), z("span", qo, I(r.formatWorldCoords(o.coords.worldXeokit)), 1)])) : oe("", !0),
+      o.activeLayer === "three" || o.activeLayer === "both" ? (Q(), J("div", Zo, [t[11] || (t[11] = z("span", {
         class: "coord-label",
         title: "墨卡托投影坐标（米）"
       }, "墨卡托(层1)", -1)), z("span", Jo, I(r.formatMercatorCoords(o.coords.mercator1)), 1)])) : oe("", !0),
-      o.activeLayer === "bim" || o.activeLayer === "both" ? (Z(), q("div", Qo, [t[12] || (t[12] = z("span", {
+      o.activeLayer === "bim" || o.activeLayer === "both" ? (Q(), J("div", Qo, [t[12] || (t[12] = z("span", {
         class: "coord-label",
         title: "墨卡托投影坐标（米）"
       }, "墨卡托(层2)", -1)), z("span", ei, I(r.formatMercatorCoords(o.coords.mercator2)), 1)])) : oe("", !0),
-      o.usingENU && (o.activeLayer === "three" || o.activeLayer === "both") ? (Z(), q("div", ti, [t[13] || (t[13] = z("span", {
+      o.usingENU && (o.activeLayer === "three" || o.activeLayer === "both") ? (Q(), J("div", ti, [t[13] || (t[13] = z("span", {
         class: "coord-label",
         title: "ENU坐标（东、北、天，米）",
         style: { color: "#667eea" }
       }, "ENU(层1)", -1)), z("span", oi, I(r.formatENUCoords(o.coords.enu1)), 1)])) : oe("", !0),
-      o.usingENU ? (Z(), q("div", ii, [t[14] || (t[14] = z("span", {
+      o.usingENU ? (Q(), J("div", ii, [t[14] || (t[14] = z("span", {
         class: "coord-label",
         style: { color: "#667eea" }
       }, "ENU原点", -1)), z("span", ni, I(r.formatENUOrigin(o.coords.enuOrigin)), 1)])) : oe("", !0)
@@ -5877,7 +5906,7 @@ function En(e, t, o, i, n, r) {
         z("div", ui, [t[18] || (t[18] = z("span", { class: "coord-label" }, "X", -1)), z("span", gi, I(o.coords.screen.x.toFixed(2)) + " px", 1)]),
         z("div", mi, [t[19] || (t[19] = z("span", { class: "coord-label" }, "Y", -1)), z("span", fi, I(o.coords.screen.y.toFixed(2)) + " px", 1)])
       ]),
-      o.viewportManager ? (Z(), q("div", Ci, [
+      o.viewportManager ? (Q(), J("div", Ci, [
         t[23] || (t[23] = z("h5", null, "虚拟视口", -1)),
         z("div", xi, [t[21] || (t[21] = z("span", { class: "coord-label" }, "尺寸", -1)), z("span", pi, I(o.viewportStatus.width) + " × " + I(o.viewportStatus.height), 1)]),
         z("div", wi, [t[22] || (t[22] = z("span", { class: "coord-label" }, "相对", -1)), z("span", yi, I(o.coords.viewport.x.toFixed(2)) + ", " + I(o.coords.viewport.y.toFixed(2)), 1)])
@@ -5887,49 +5916,49 @@ function En(e, t, o, i, n, r) {
         z("div", vi, [t[24] || (t[24] = z("span", { class: "coord-label" }, "X", -1)), z("span", Fi, I(o.coords.ndc.x.toFixed(3)), 1)]),
         z("div", Di, [t[25] || (t[25] = z("span", { class: "coord-label" }, "Y", -1)), z("span", Vi, I(o.coords.ndc.y.toFixed(3)), 1)])
       ]),
-      o.activeLayer === "three" || o.activeLayer === "both" ? (Z(), q("div", zi, [
+      o.activeLayer === "three" || o.activeLayer === "both" ? (Q(), J("div", zi, [
         t[30] || (t[30] = z("h5", null, "世界坐标 (层1)", -1)),
         z("div", bi, [t[27] || (t[27] = z("span", { class: "coord-label" }, "X", -1)), z("span", Si, I(o.coords.world1.x !== null ? o.coords.world1.x.toFixed(3) : "N/A"), 1)]),
         z("div", Ti, [t[28] || (t[28] = z("span", { class: "coord-label" }, "Y", -1)), z("span", _i, I(o.coords.world1.y !== null ? o.coords.world1.y.toFixed(3) : "N/A"), 1)]),
         z("div", Ei, [t[29] || (t[29] = z("span", { class: "coord-label" }, "Z", -1)), z("span", Pi, I(o.coords.world1.z !== null ? o.coords.world1.z.toFixed(3) : "N/A"), 1)])
       ])) : oe("", !0),
-      o.activeLayer === "bim" || o.activeLayer === "both" ? (Z(), q("div", Li, [
+      o.activeLayer === "bim" || o.activeLayer === "both" ? (Q(), J("div", Li, [
         t[34] || (t[34] = z("h5", null, "世界坐标 (层2)", -1)),
         z("div", $i, [t[31] || (t[31] = z("span", { class: "coord-label" }, "X", -1)), z("span", Ai, I(o.coords.world2.x !== null ? o.coords.world2.x.toFixed(3) : "N/A"), 1)]),
-        z("div", Ri, [t[32] || (t[32] = z("span", { class: "coord-label" }, "Y", -1)), z("span", ki, I(o.coords.world2.y !== null ? o.coords.world2.y.toFixed(3) : "N/A"), 1)]),
-        z("div", Ni, [t[33] || (t[33] = z("span", { class: "coord-label" }, "Z", -1)), z("span", Ii, I(o.coords.world2.z !== null ? o.coords.world2.z.toFixed(3) : "N/A"), 1)])
+        z("div", Ri, [t[32] || (t[32] = z("span", { class: "coord-label" }, "Y", -1)), z("span", Ni, I(o.coords.world2.y !== null ? o.coords.world2.y.toFixed(3) : "N/A"), 1)]),
+        z("div", ki, [t[33] || (t[33] = z("span", { class: "coord-label" }, "Z", -1)), z("span", Ui, I(o.coords.world2.z !== null ? o.coords.world2.z.toFixed(3) : "N/A"), 1)])
       ])) : oe("", !0),
-      o.hasXeokitModels ? (Z(), q("div", Ui, [
+      o.hasXeokitModels ? (Q(), J("div", Ii, [
         t[38] || (t[38] = z("h5", null, "世界坐标 (XKT)", -1)),
         z("div", Hi, [t[35] || (t[35] = z("span", { class: "coord-label" }, "X", -1)), z("span", Oi, I(o.coords.worldXeokit.x !== null ? o.coords.worldXeokit.x.toFixed(3) : "N/A"), 1)]),
         z("div", Bi, [t[36] || (t[36] = z("span", { class: "coord-label" }, "Y", -1)), z("span", Gi, I(o.coords.worldXeokit.y !== null ? o.coords.worldXeokit.y.toFixed(3) : "N/A"), 1)]),
         z("div", ji, [t[37] || (t[37] = z("span", { class: "coord-label" }, "Z", -1)), z("span", Xi, I(o.coords.worldXeokit.z !== null ? o.coords.worldXeokit.z.toFixed(3) : "N/A"), 1)])
       ])) : oe("", !0),
-      o.activeLayer === "three" || o.activeLayer === "both" ? (Z(), q("div", Wi, [
+      o.activeLayer === "three" || o.activeLayer === "both" ? (Q(), J("div", Wi, [
         t[42] || (t[42] = z("h5", null, "墨卡托坐标 (层1)", -1)),
         z("div", Yi, [t[39] || (t[39] = z("span", { class: "coord-label" }, "X", -1)), z("span", Ki, I(o.coords.mercator1.x !== null ? o.coords.mercator1.x.toFixed(2) + " m" : "N/A"), 1)]),
         z("div", qi, [t[40] || (t[40] = z("span", { class: "coord-label" }, "Y", -1)), z("span", Zi, I(o.coords.mercator1.y !== null ? o.coords.mercator1.y.toFixed(2) + " m" : "N/A"), 1)]),
         z("div", Ji, [t[41] || (t[41] = z("span", { class: "coord-label" }, "Z", -1)), z("span", Qi, I(o.coords.mercator1.z !== null ? o.coords.mercator1.z.toFixed(2) + " m" : "N/A"), 1)])
       ])) : oe("", !0),
-      o.activeLayer === "bim" || o.activeLayer === "both" ? (Z(), q("div", en, [
+      o.activeLayer === "bim" || o.activeLayer === "both" ? (Q(), J("div", en, [
         t[46] || (t[46] = z("h5", null, "墨卡托坐标 (层2)", -1)),
         z("div", tn, [t[43] || (t[43] = z("span", { class: "coord-label" }, "X", -1)), z("span", on, I(o.coords.mercator2.x !== null ? o.coords.mercator2.x.toFixed(2) + " m" : "N/A"), 1)]),
         z("div", nn, [t[44] || (t[44] = z("span", { class: "coord-label" }, "Y", -1)), z("span", rn, I(o.coords.mercator2.y !== null ? o.coords.mercator2.y.toFixed(2) + " m" : "N/A"), 1)]),
         z("div", an, [t[45] || (t[45] = z("span", { class: "coord-label" }, "Z", -1)), z("span", sn, I(o.coords.mercator2.z !== null ? o.coords.mercator2.z.toFixed(2) + " m" : "N/A"), 1)])
       ])) : oe("", !0),
-      o.usingENU && (o.activeLayer === "three" || o.activeLayer === "both") ? (Z(), q("div", ln, [
+      o.usingENU && (o.activeLayer === "three" || o.activeLayer === "both") ? (Q(), J("div", ln, [
         t[50] || (t[50] = z("h5", { style: { color: "#667eea" } }, "ENU 坐标 (层1)", -1)),
         z("div", cn, [t[47] || (t[47] = z("span", { class: "coord-label" }, "E (东)", -1)), z("span", dn, I(o.coords.enu1.east !== null ? o.coords.enu1.east.toFixed(2) + " m" : "N/A"), 1)]),
         z("div", hn, [t[48] || (t[48] = z("span", { class: "coord-label" }, "N (北)", -1)), z("span", un, I(o.coords.enu1.north !== null ? o.coords.enu1.north.toFixed(2) + " m" : "N/A"), 1)]),
         z("div", gn, [t[49] || (t[49] = z("span", { class: "coord-label" }, "U (天)", -1)), z("span", mn, I(o.coords.enu1.up !== null ? o.coords.enu1.up.toFixed(2) + " m" : "N/A"), 1)])
       ])) : oe("", !0),
-      o.usingENU && o.coords.enuOrigin ? (Z(), q("div", fn, [
+      o.usingENU && o.coords.enuOrigin ? (Q(), J("div", fn, [
         t[54] || (t[54] = z("h5", { style: { color: "#667eea" } }, "ENU 原点", -1)),
         z("div", Cn, [t[51] || (t[51] = z("span", { class: "coord-label" }, "经度", -1)), z("span", xn, I(o.coords.enuOrigin.longitude !== null ? o.coords.enuOrigin.longitude.toFixed(6) + "°" : "N/A"), 1)]),
         z("div", pn, [t[52] || (t[52] = z("span", { class: "coord-label" }, "纬度", -1)), z("span", wn, I(o.coords.enuOrigin.latitude !== null ? o.coords.enuOrigin.latitude.toFixed(6) + "°" : "N/A"), 1)]),
         z("div", yn, [t[53] || (t[53] = z("span", { class: "coord-label" }, "高度", -1)), z("span", Mn, I(o.coords.enuOrigin.height !== null ? o.coords.enuOrigin.height.toFixed(2) + " m" : "N/A"), 1)])
       ])) : oe("", !0),
-      o.showGeoCoords ? (Z(), q("div", vn, [
+      o.showGeoCoords ? (Q(), J("div", vn, [
         t[58] || (t[58] = z("h5", null, "地理坐标", -1)),
         z("div", Fn, [t[55] || (t[55] = z("span", { class: "coord-label" }, "经度", -1)), z("span", Dn, I(o.coords.geo.longitude !== null ? o.coords.geo.longitude.toFixed(6) + "°" : "N/A"), 1)]),
         z("div", Vn, [t[56] || (t[56] = z("span", { class: "coord-label" }, "纬度", -1)), z("span", zn, I(o.coords.geo.latitude !== null ? o.coords.geo.latitude.toFixed(6) + "°" : "N/A"), 1)]),
@@ -5942,7 +5971,7 @@ function En(e, t, o, i, n, r) {
     }, I(o.usingUnifiedViewport ? "✓ 统一" : "⚠ 传统"), 11, _n)])
   ]);
 }
-var Pn = /* @__PURE__ */ Je(So, [["render", En]]), Ie = -50, Ln = class {
+var Pn = /* @__PURE__ */ Je(So, [["render", En]]), Ue = -50, Ln = class {
   constructor() {
     this.Cesium = null, this.cesiumViewer = null, this.floorCenterMercator = null, this.floorCenterCartographic = null, this.initialENUState = {
       east: new h.Vector3(1, 0, 0),
@@ -6002,10 +6031,10 @@ var Pn = /* @__PURE__ */ Je(So, [["render", En]]), Ie = -50, Ln = class {
     });
   }
   _detectModeFromCartographic(e) {
-    return e && e.height < Ie ? "underground" : "surface";
+    return e && e.height < Ue ? "underground" : "surface";
   }
   detectModeFromPosition(e) {
-    return !e || typeof e.y != "number" ? this.currentRotation.mode : e.y < Ie ? "underground" : "surface";
+    return !e || typeof e.y != "number" ? this.currentRotation.mode : e.y < Ue ? "underground" : "surface";
   }
   enableModeTransitionProtection(e = 1e3) {
     this._modeTransitionProtection.enabled = !0, this._modeTransitionProtection.until = Date.now() + e, console.log("[SceneRotationManager] 模式切换保护已启用，时长:", e, "ms");
@@ -6157,7 +6186,7 @@ var Pn = /* @__PURE__ */ Je(So, [["render", En]]), Ie = -50, Ln = class {
     return e;
   }
   _adjustForUndergroundMode(e, t) {
-    if (t > Ie - 100) {
+    if (t > Ue - 100) {
       console.warn("[SceneRotationManager] 地下模式：相机高度过高，限制旋转");
       const o = new h.Euler().setFromQuaternion(e, "YXZ"), i = Math.PI / 2 - 0.1;
       o.x > i && (o.x = i, e.setFromEuler(o));
@@ -6450,7 +6479,7 @@ var Pn = /* @__PURE__ */ Je(So, [["render", En]]), Ie = -50, Ln = class {
   },
   methods: {
     initThree() {
-      this.controls && this.controls.dispose(), this.scene.background = new h.Color(15267304), this.camera.position.set(0, 10, 0), this.camera.lookAt(0, 0, 0), this.controls = new Ue(this.camera, this.$refs.container), this.controls.enableDamping = !1, this.controls.target.set(0, 0, 0);
+      this.controls && this.controls.dispose(), this.scene.background = new h.Color(15267304), this.camera.position.set(0, 10, 0), this.camera.lookAt(0, 0, 0), this.controls = new Ie(this.camera, this.$refs.container), this.controls.enableDamping = !1, this.controls.target.set(0, 0, 0);
       const e = new h.AmbientLight(16777215, 0.8);
       this.scene.add(e);
       const t = new h.DirectionalLight(16777215, 0.8);
@@ -6841,28 +6870,28 @@ var Pn = /* @__PURE__ */ Je(So, [["render", En]]), Ie = -50, Ln = class {
             console.log("[ThreeViewer] PLY is point cloud, adding default Gaussian attributes");
             const g = r.attributes.position.array;
             let u = 1 / 0, d = -1 / 0, m = 1 / 0, p = -1 / 0, x = 1 / 0, f = -1 / 0;
-            for (let E = 0; E < a; E++)
-              u = Math.min(u, g[E * 3]), d = Math.max(d, g[E * 3]), m = Math.min(m, g[E * 3 + 1]), p = Math.max(p, g[E * 3 + 1]), x = Math.min(x, g[E * 3 + 2]), f = Math.max(f, g[E * 3 + 2]);
+            for (let P = 0; P < a; P++)
+              u = Math.min(u, g[P * 3]), d = Math.max(d, g[P * 3]), m = Math.min(m, g[P * 3 + 1]), p = Math.max(p, g[P * 3 + 1]), x = Math.min(x, g[P * 3 + 2]), f = Math.max(f, g[P * 3 + 2]);
             const C = d - u, M = p - m, y = f - x, w = (C + M + y) / 3 / 2500, V = new Float32Array(a * 3);
-            for (let E = 0; E < a * 3; E++) V[E] = w;
+            for (let P = 0; P < a * 3; P++) V[P] = w;
             r.setAttribute("scale", new h.BufferAttribute(V, 3));
             const S = new Float32Array(a * 4);
-            for (let E = 0; E < a; E++)
-              S[E * 4] = 0, S[E * 4 + 1] = 0, S[E * 4 + 2] = 0, S[E * 4 + 3] = 1;
+            for (let P = 0; P < a; P++)
+              S[P * 4] = 0, S[P * 4 + 1] = 0, S[P * 4 + 2] = 0, S[P * 4 + 3] = 1;
             r.setAttribute("rotation", new h.BufferAttribute(S, 4));
             const T = new Float32Array(a);
-            for (let E = 0; E < a; E++) T[E] = 0.9;
+            for (let P = 0; P < a; P++) T[P] = 0.9;
             r.setAttribute("opacity", new h.BufferAttribute(T, 1));
             const v = new Float32Array(a * 3);
             if (c) {
-              const E = r.attributes.color.array;
+              const P = r.attributes.color.array;
               for (let F = 0; F < a; F++) {
-                const P = E[F * 3], R = E[F * 3 + 1], L = E[F * 3 + 2];
-                v[F * 3] = (P - 0.5) / 0.282095, v[F * 3 + 1] = (R - 0.5) / 0.282095, v[F * 3 + 2] = (L - 0.5) / 0.282095;
+                const E = P[F * 3], A = P[F * 3 + 1], L = P[F * 3 + 2];
+                v[F * 3] = (E - 0.5) / 0.282095, v[F * 3 + 1] = (A - 0.5) / 0.282095, v[F * 3 + 2] = (L - 0.5) / 0.282095;
               }
               console.log("[ThreeViewer] Using original PLY colors for Gaussian rendering");
             } else {
-              for (let E = 0; E < a * 3; E++) v[E] = 0;
+              for (let P = 0; P < a * 3; P++) v[P] = 0;
               console.log("[ThreeViewer] No color in PLY, using gray");
             }
             r.setAttribute("featureDc", new h.BufferAttribute(v, 3));
@@ -7116,15 +7145,15 @@ var Pn = /* @__PURE__ */ Je(So, [["render", En]]), Ie = -50, Ln = class {
           ]
         }), v.attributes.scale) {
           const F = v.attributes.scale.array;
-          let P = 1 / 0, R = -1 / 0;
+          let E = 1 / 0, A = -1 / 0;
           for (let L = 0; L < F.length; L++)
-            P = Math.min(P, F[L]), R = Math.max(R, F[L]);
-          console.log("[ThreeViewer] Scale range:", P, "to", R);
+            E = Math.min(E, F[L]), A = Math.max(A, F[L]);
+          console.log("[ThreeViewer] Scale range:", E, "to", A);
         }
         const _ = this.createGaussianSplatMaterial(), b = new h.Points(v, _);
         b.name = i;
-        const E = new h.Group();
-        return E.add(b), E.userData.format = "drc", E.userData.filePath = i, E.userData.isGaussianSplat = !0, console.log(`[ThreeViewer] DRC Gaussian splat loaded successfully: ${i}`), E;
+        const P = new h.Group();
+        return P.add(b), P.userData.format = "drc", P.userData.filePath = i, P.userData.isGaussianSplat = !0, console.log(`[ThreeViewer] DRC Gaussian splat loaded successfully: ${i}`), P;
       }
       const s = t.GetAttributeId(o, e.POSITION), c = t.GetAttribute(o, s), l = new e.DracoFloat32Array();
       t.GetAttributeFloatForAllPoints(o, c, l);
@@ -7795,18 +7824,11 @@ var Rn = {
       c.getSize(l);
       const g = Math.max(l.x, l.y, l.z), u = Math.max(500, g * 5);
       try {
-        o.camera.setView({
-          destination: t.Cartesian3.fromDegrees(r, a, s + u),
-          orientation: {
-            heading: 0,
-            pitch: -t.Math.PI_OVER_FOUR,
-            roll: 0
-          }
-        }), o.scene.requestRender(), console.log("[DualCanvasViewer] ✅ Cesium 相机已定位到大坐标模型位置:", {
-          相机高度: (s + u).toFixed(2) + "米",
+        this._hasFlownCesiumToModel = !0, console.log("[DualCanvasViewer] ⏭️ 跳过首次Cesium相机跳转，由ENU初始化统一处理（避免重复setView闪烁）", {
+          目标位置: `${r.toFixed(6)}°, ${a.toFixed(6)}°, ${(s + u).toFixed(2)}m`,
           模型最大尺寸: g.toFixed(2) + "米"
-        }), this._hasFlownCesiumToModel = !0, console.log("[DualCanvasViewer] 🎯 初始化ENU坐标系，使模型平行于Cesium地面"), this.initENUCoordinateSystem(r, a, s, u).then((m) => {
-          m ? (console.log("[DualCanvasViewer] ✅ ENU坐标系初始化成功，等待所有模型加载完成后重新定位"), this.waitForAllModelsAndRepositionENU()) : console.warn("[DualCanvasViewer] ⚠️ ENU坐标系初始化失败，继续使用墨卡托投影");
+        }), console.log("[DualCanvasViewer] 🎯 初始化ENU坐标系，使模型平行于Cesium地面"), this.initENUCoordinateSystem(r, a, s, u).then((m) => {
+          m ? (console.log("[DualCanvasViewer] ✅ ENU坐标系初始化成功，等待所有模型加载完成后重新定位"), this.syncManager && (this.syncManager._postENULoadAlignmentDone = !1), this.waitForAllModelsAndRepositionENU()) : console.warn("[DualCanvasViewer] ⚠️ ENU坐标系初始化失败，继续使用墨卡托投影");
         });
         const d = this.syncManager?.mercatorProjection || this.mercatorProjectionManager;
         if (d && i.cartographic) {
@@ -7906,91 +7928,91 @@ var Rn = {
       for (const F of d) f.set(F.uuid, F.position.clone());
       let C = null;
       for (const F of d) {
-        const P = F.name || F.userData.fileName || "未知", R = F.userData.originalLocation;
-        if (R && R.cartographic) {
-          const L = R.cartographic;
+        const E = F.name || F.userData.fileName || "未知", A = F.userData.originalLocation;
+        if (A && A.cartographic) {
+          const L = A.cartographic;
           console.log("[DualCanvasViewer] 📍 大坐标模型地理位置:", {
-            模型: P,
+            模型: E,
             经度: Cesium.Math.toDegrees(L.longitude).toFixed(6) + "°",
             纬度: Cesium.Math.toDegrees(L.latitude).toFixed(6) + "°",
             高度: L.height.toFixed(2) + "米"
           });
-          const A = Cesium.Cartesian3.fromRadians(L.longitude, L.latitude, L.height), U = new h.Vector3(A.x, A.y, A.z), H = e.ecefToThreeJS(U);
+          const R = Cesium.Cartesian3.fromRadians(L.longitude, L.latitude, L.height), U = new h.Vector3(R.x, R.y, R.z), H = e.ecefToThreeJS(U);
           console.log("[DualCanvasViewer] 🔄 大坐标模型坐标转换:", {
-            模型: P,
+            模型: E,
             ECEF: `(${U.x.toFixed(2)}, ${U.y.toFixed(2)}, ${U.z.toFixed(2)})`,
             ENU: `(${H.x.toFixed(2)}, ${H.y.toFixed(2)}, ${H.z.toFixed(2)})`
           }), C = H.clone(), F.position.copy(H);
-          const ee = F.userData._enuCompensationApplied === !0;
-          if (F.userData.enuCompensation && F.userData.enuCompensation.compensationMatrix && !ee) {
-            const B = F.userData.enuCompensation.compensationMatrix, k = B.ecefToENU, Q = B.useOnlyHorizontal === !0;
-            if (k && Array.isArray(k) && k.length === 3) {
+          const q = F.userData._enuCompensationApplied === !0;
+          if (F.userData.enuCompensation && F.userData.enuCompensation.compensationMatrix && !q) {
+            const B = F.userData.enuCompensation.compensationMatrix, N = B.ecefToENU, j = B.useOnlyHorizontal === !0;
+            if (N && Array.isArray(N) && N.length === 3) {
               console.log("[DualCanvasViewer] 🌍 应用 ENU 旋转补偿:", {
-                模型: P,
-                水平面补偿: Q ? "是（只补偿贴地旋转方向）" : "否（全方向补偿）",
-                说明: Q ? "只使用 East 和 North 向量进行水平面旋转，UP 方向保持不变" : "应用完整 ECEF→ENU 变换矩阵"
+                模型: E,
+                水平面补偿: j ? "是（只补偿贴地旋转方向）" : "否（全方向补偿）",
+                说明: j ? "只使用 East 和 North 向量进行水平面旋转，UP 方向保持不变" : "应用完整 ECEF→ENU 变换矩阵"
               });
-              const X = new h.Matrix4();
-              if (Q) {
-                const j = k[0], G = k[1], W = k[2];
-                new h.Vector3(j[0], j[1], j[2]).normalize(), new h.Vector3(G[0], G[1], G[2]).normalize(), new h.Vector3(W[0], W[1], W[2]).normalize();
-                const K = new h.Vector3(j[0], j[1], 0).normalize(), $ = Math.atan2(K.y, K.x), N = Math.cos($), Y = Math.sin($);
-                X.set(N, 0, Y, 0, 0, 1, 0, 0, -Y, 0, N, 0, 0, 0, 0, 1), console.log("[DualCanvasViewer] 📐 ENU水平面补偿:", {
-                  ENU_East向量: `(${j[0].toFixed(4)}, ${j[1].toFixed(4)}, ${j[2].toFixed(4)})`,
+              const W = new h.Matrix4();
+              if (j) {
+                const X = N[0], G = N[1], Y = N[2];
+                new h.Vector3(X[0], X[1], X[2]).normalize(), new h.Vector3(G[0], G[1], G[2]).normalize(), new h.Vector3(Y[0], Y[1], Y[2]).normalize();
+                const Z = new h.Vector3(X[0], X[1], 0).normalize(), $ = Math.atan2(Z.y, Z.x), k = Math.cos($), K = Math.sin($);
+                W.set(k, 0, K, 0, 0, 1, 0, 0, -K, 0, k, 0, 0, 0, 0, 1), console.log("[DualCanvasViewer] 📐 ENU水平面补偿:", {
+                  ENU_East向量: `(${X[0].toFixed(4)}, ${X[1].toFixed(4)}, ${X[2].toFixed(4)})`,
                   ENU_North向量: `(${G[0].toFixed(4)}, ${G[1].toFixed(4)}, ${G[2].toFixed(4)})`,
                   水平旋转角度: ($ * 180 / Math.PI).toFixed(2) + "°"
                 });
-              } else X.set(k[0][0], k[0][1], k[0][2], 0, k[1][0], k[1][1], k[1][2], 0, k[2][0], k[2][1], k[2][2], 0, 0, 0, 0, 1);
-              typeof window < "u" && window.__ENU_COMPENSATION_ENABLED__ ? (F.quaternion.setFromRotationMatrix(X), F.userData._enuCompensationApplied = !0, F.updateMatrixWorld(), console.log("[DualCanvasViewer] ✅ ENU 补偿已应用")) : (console.log("[DualCanvasViewer] ⚠️ ENU 补偿已禁用（测试模式）"), console.log("[DualCanvasViewer] 💡 启用方法: window.__ENU_COMPENSATION_ENABLED__ = true"));
+              } else W.set(N[0][0], N[0][1], N[0][2], 0, N[1][0], N[1][1], N[1][2], 0, N[2][0], N[2][1], N[2][2], 0, 0, 0, 0, 1);
+              typeof window < "u" && window.__ENU_COMPENSATION_ENABLED__ ? (F.quaternion.setFromRotationMatrix(W), F.userData._enuCompensationApplied = !0, F.updateMatrixWorld(), console.log("[DualCanvasViewer] ✅ ENU 补偿已应用")) : (console.log("[DualCanvasViewer] ⚠️ ENU 补偿已禁用（测试模式）"), console.log("[DualCanvasViewer] 💡 启用方法: window.__ENU_COMPENSATION_ENABLED__ = true"));
             }
-          } else F.userData.enuCompensation && F.userData.enuCompensation.compensationMatrix ? console.log("[DualCanvasViewer] ⏭️ 模型ENU补偿已在加载时应用，跳过重复应用:", { 模型: P }) : console.warn("[DualCanvasViewer] ⚠️ 模型缺少 ENU 旋转补偿信息:", {
-            模型: P,
+          } else F.userData.enuCompensation && F.userData.enuCompensation.compensationMatrix ? console.log("[DualCanvasViewer] ⏭️ 模型ENU补偿已在加载时应用，跳过重复应用:", { 模型: E }) : console.warn("[DualCanvasViewer] ⚠️ 模型缺少 ENU 旋转补偿信息:", {
+            模型: E,
             原因: F.userData.enuCompensation ? "有 enuCompensation 但缺少 compensationMatrix" : "没有 enuCompensation",
             建议: "请使用最新版本的 convert-b3dm-batch.js 转换 GLB 文件"
           });
-          if (F.userData._zupYupConversionDone) console.log("[DualCanvasViewer] ⏭️ 模型 Z-up/Y-up 转换已在加载时完成，跳过重复旋转:", { 模型: P });
+          if (F.userData._zupYupConversionDone) console.log("[DualCanvasViewer] ⏭️ 模型 Z-up/Y-up 转换已在加载时完成，跳过重复旋转:", { 模型: E });
           else if (console.log("[DualCanvasViewer] 🔧 开始 Z-up/Y-up 转换（ENU坐标系重新定位）:", {
-            模型: P,
+            模型: E,
             说明: "模型加载时未进行 Z-up/Y-up 转换，现在执行"
-          }), P.includes("ECEF_to_ThreeJS"))
+          }), E.includes("ECEF_to_ThreeJS"))
             console.log("[DualCanvasViewer] ⏭️ 检测到取反轴版本模型，跳过 Z-up/Y-up 旋转检测:", {
-              模型: P,
+              模型: E,
               说明: "模型在转换时已处理为 Y-up 贴地坐标"
             }), (!F.userData.enuCompensation || !F.userData.enuCompensation.compensationMatrix) && F.quaternion.set(0, 0, 0, 1), F.updateMatrixWorld();
           else {
             let B = new h.Box3().setFromObject(F);
-            const k = new h.Vector3();
-            B.getSize(k);
-            const Q = k.z > k.y && k.z > k.x;
+            const N = new h.Vector3();
+            B.getSize(N);
+            const j = N.z > N.y && N.z > N.x;
             if (console.log("[DualCanvasViewer] 🔍 模型坐标系检测:", {
-              模型: P,
-              边界框尺寸: `X=${k.x.toFixed(2)}m, Y=${k.y.toFixed(2)}m, Z=${k.z.toFixed(2)}m`,
-              最大尺寸: Math.max(k.x, k.y, k.z).toFixed(2) + "m",
-              坐标系类型: Q ? "Z-up（需要旋转）" : "Y-up（标准）"
-            }), Q) {
-              const X = new h.Matrix4();
-              X.makeRotationX(-Math.PI / 2);
-              const j = new h.Quaternion();
-              if (j.setFromRotationMatrix(X), F.userData.enuCompensation && F.userData.enuCompensation.compensationMatrix) {
-                const Y = F.quaternion.clone();
-                F.quaternion.multiplyQuaternions(j, Y), console.log("[DualCanvasViewer] 🔄 组合旋转: ENU补偿 × Z-up→Y-up");
-              } else F.quaternion.copy(j);
+              模型: E,
+              边界框尺寸: `X=${N.x.toFixed(2)}m, Y=${N.y.toFixed(2)}m, Z=${N.z.toFixed(2)}m`,
+              最大尺寸: Math.max(N.x, N.y, N.z).toFixed(2) + "m",
+              坐标系类型: j ? "Z-up（需要旋转）" : "Y-up（标准）"
+            }), j) {
+              const W = new h.Matrix4();
+              W.makeRotationX(-Math.PI / 2);
+              const X = new h.Quaternion();
+              if (X.setFromRotationMatrix(W), F.userData.enuCompensation && F.userData.enuCompensation.compensationMatrix) {
+                const K = F.quaternion.clone();
+                F.quaternion.multiplyQuaternions(X, K), console.log("[DualCanvasViewer] 🔄 组合旋转: ENU补偿 × Z-up→Y-up");
+              } else F.quaternion.copy(X);
               F.updateMatrixWorld();
-              const G = new h.Box3().setFromObject(F), W = new h.Vector3();
-              G.getSize(W);
-              const K = new h.Vector3(0, 1, 0).applyQuaternion(F.quaternion), $ = K.dot(new h.Vector3(0, 1, 0)), N = Math.acos(Math.max(-1, Math.min(1, $))) * 180 / Math.PI;
+              const G = new h.Box3().setFromObject(F), Y = new h.Vector3();
+              G.getSize(Y);
+              const Z = new h.Vector3(0, 1, 0).applyQuaternion(F.quaternion), $ = Z.dot(new h.Vector3(0, 1, 0)), k = Math.acos(Math.max(-1, Math.min(1, $))) * 180 / Math.PI;
               console.log("[DualCanvasViewer] ✅ Z-up 模型已旋转到 Y-up:", {
-                模型: P,
+                模型: E,
                 旋转方式: "绕X轴-90°",
-                新边界框: `X=${W.x.toFixed(2)}m, Y=${W.y.toFixed(2)}m, Z=${W.z.toFixed(2)}m`,
-                新高度: W.y.toFixed(2) + "m",
-                模型Up向量: `(${K.x.toFixed(4)}, ${K.y.toFixed(4)}, ${K.z.toFixed(4)})`,
+                新边界框: `X=${Y.x.toFixed(2)}m, Y=${Y.y.toFixed(2)}m, Z=${Y.z.toFixed(2)}m`,
+                新高度: Y.y.toFixed(2) + "m",
+                模型Up向量: `(${Z.x.toFixed(4)}, ${Z.y.toFixed(4)}, ${Z.z.toFixed(4)})`,
                 与Y轴对齐度: $.toFixed(4),
-                偏离角度: N.toFixed(2) + "°"
+                偏离角度: k.toFixed(2) + "°"
               });
             } else
               (!F.userData.enuCompensation || !F.userData.enuCompensation.compensationMatrix) && F.quaternion.set(0, 0, 0, 1), F.updateMatrixWorld(), console.log("[DualCanvasViewer] ✅ Y-up 模型无需旋转:", {
-                模型: P,
+                模型: E,
                 说明: "模型已使用标准 Y-up 坐标系"
               });
             F.userData._zupYupConversionDone = !0;
@@ -7998,58 +8020,58 @@ var Rn = {
           p++;
           const O = new h.Box3().setFromObject(F).min.y;
           (O > 0.1 || O < -0.1) && (console.log("[DualCanvasViewer] 🔧 调整模型底部到地面:", {
-            模型: P,
+            模型: E,
             原底部Y: O.toFixed(2) + "m",
             调整量: (-O).toFixed(2) + "m"
           }), F.position.y -= O, F.updateMatrixWorld()), console.log("[DualCanvasViewer] ✅ 大坐标模型位置已更新:", {
-            模型: P,
+            模型: E,
             ENU位置: `(${H.x.toFixed(2)}, ${H.y.toFixed(2)}, ${H.z.toFixed(2)})`,
             实际位置: `(${F.position.x.toFixed(2)}, ${F.position.y.toFixed(2)}, ${F.position.z.toFixed(2)})`
           });
         }
       }
       if (C) for (const F of d) {
-        const P = F.userData.originalLocation;
-        if (P && P.cartographic) continue;
-        const R = F.name || F.userData.fileName || "未知", L = f.get(F.uuid);
+        const E = F.userData.originalLocation;
+        if (E && E.cartographic) continue;
+        const A = F.name || F.userData.fileName || "未知", L = f.get(F.uuid);
         if (!L) {
-          console.warn("[DualCanvasViewer] ⚠️ 找不到模型的原始位置:", R);
+          console.warn("[DualCanvasViewer] ⚠️ 找不到模型的原始位置:", A);
           continue;
         }
-        const A = f.get(d[0].uuid);
-        if (!A) {
+        const R = f.get(d[0].uuid);
+        if (!R) {
           console.warn("[DualCanvasViewer] ⚠️ 找不到参考模型的原始位置");
           continue;
         }
-        const U = new h.Vector3().subVectors(L, A);
+        const U = new h.Vector3().subVectors(L, R);
         console.log("[DualCanvasViewer] 🔍 小模型相对位置计算:", {
-          模型: R,
+          模型: A,
           原始位置: `(${L.x.toFixed(2)}, ${L.y.toFixed(2)}, ${L.z.toFixed(2)})`,
-          参考模型原始位置: `(${A.x.toFixed(2)}, ${A.y.toFixed(2)}, ${A.z.toFixed(2)})`,
+          参考模型原始位置: `(${R.x.toFixed(2)}, ${R.y.toFixed(2)}, ${R.z.toFixed(2)})`,
           相对偏移: `(${U.x.toFixed(2)}, ${U.y.toFixed(2)}, ${U.z.toFixed(2)})`
         });
         const H = new h.Vector3().addVectors(C, U);
         F.position.copy(H);
-        const ee = new h.Box3().setFromObject(F), O = new h.Vector3();
-        if (ee.getSize(O), O.z > O.y && O.z > O.x) {
+        const q = new h.Box3().setFromObject(F), O = new h.Vector3();
+        if (q.getSize(O), O.z > O.y && O.z > O.x) {
           const B = new h.Matrix4();
           B.makeRotationX(-Math.PI / 2);
-          const k = new h.Quaternion();
-          k.setFromRotationMatrix(B), F.quaternion.copy(k), F.updateMatrixWorld(), console.log("[DualCanvasViewer] 📐 小模型已旋转（Z-up → Y-up）:", {
-            模型: R,
+          const N = new h.Quaternion();
+          N.setFromRotationMatrix(B), F.quaternion.copy(N), F.updateMatrixWorld(), console.log("[DualCanvasViewer] 📐 小模型已旋转（Z-up → Y-up）:", {
+            模型: A,
             旋转方式: "绕X轴-90°"
           });
         } else
-          F.quaternion.set(0, 0, 0, 1), F.updateMatrixWorld(), console.log("[DualCanvasViewer] 📐 小模型无需旋转（Y-up）:", { 模型: R });
+          F.quaternion.set(0, 0, 0, 1), F.updateMatrixWorld(), console.log("[DualCanvasViewer] 📐 小模型无需旋转（Y-up）:", { 模型: A });
         x++, console.log("[DualCanvasViewer] ✅ 小模型位置已更新 [相对位置]:", {
-          模型: R,
+          模型: A,
           相对偏移: `(${U.x.toFixed(2)}, ${U.y.toFixed(2)}, ${U.z.toFixed(2)})`,
           ENU位置: `(${H.x.toFixed(2)}, ${H.y.toFixed(2)}, ${H.z.toFixed(2)})`
         });
       }
-      console.log("[DualCanvasViewer] 🔍 模型详细信息（ENU转换后）:"), d.forEach((F, P) => {
-        const R = new h.Box3().setFromObject(F), L = new h.Vector3();
-        R.getSize(L), console.log(`[DualCanvasViewer]   模型 ${P + 1}:`, {
+      console.log("[DualCanvasViewer] 🔍 模型详细信息（ENU转换后）:"), d.forEach((F, E) => {
+        const A = new h.Box3().setFromObject(F), L = new h.Vector3();
+        A.getSize(L), console.log(`[DualCanvasViewer]   模型 ${E + 1}:`, {
           名称: F.userData.filePath || F.name,
           缩放: {
             x: F.scale.x,
@@ -8072,37 +8094,37 @@ var Rn = {
       const M = d.find((F) => F.userData.isLargeCoordModel);
       if (M) {
         console.log("[DualCanvasViewer] 🔍 大坐标模型与倾斜摄影尺寸对比分析");
-        const F = new h.Box3().setFromObject(M), P = new h.Vector3();
-        F.getSize(P), console.log("[DualCanvasViewer] 📐 大坐标模型当前尺寸:", {
+        const F = new h.Box3().setFromObject(M), E = new h.Vector3();
+        F.getSize(E), console.log("[DualCanvasViewer] 📐 大坐标模型当前尺寸:", {
           文件名: M.userData.filePath || M.name,
           模型缩放: M.scale.x.toFixed(4),
           实际尺寸: {
-            长度: P.x.toFixed(2) + "m",
-            宽度: P.z.toFixed(2) + "m",
-            高度: P.y.toFixed(2) + "m"
+            长度: E.x.toFixed(2) + "m",
+            宽度: E.z.toFixed(2) + "m",
+            高度: E.y.toFixed(2) + "m"
           }
         });
-        const R = window.__cesiumViewer__;
-        if (R && R.scene && R.scene.primitives) {
+        const A = window.__cesiumViewer__;
+        if (A && A.scene && A.scene.primitives) {
           console.log("[DualCanvasViewer] 🔍 分析倾斜摄影数据...");
-          const L = R.scene.primitives, A = L.length;
-          console.log("[DualCanvasViewer] 📊 场景中的 primitives 数量:", A);
+          const L = A.scene.primitives, R = L.length;
+          console.log("[DualCanvasViewer] 📊 场景中的 primitives 数量:", R);
           try {
-            const U = R.scene.canvas, H = U.clientWidth / 2, ee = U.clientHeight / 2, O = window.Cesium || R.Cesium;
+            const U = A.scene.canvas, H = U.clientWidth / 2, q = U.clientHeight / 2, O = window.Cesium || A.Cesium;
             if (O) {
-              const B = R.camera.getPickRay(new O.Cartesian2(H, ee)), k = R.scene.drillPick(B, new O.Cartesian2(H, ee));
-              if (k && k.length > 0) {
-                console.log("[DualCanvasViewer] 🎯 屏幕中心拾取到", k.length, "个物体");
-                for (let Q = 0; Q < k.length; Q++) {
-                  const X = k[Q];
-                  if (console.log("[DualCanvasViewer] 物体", Q + 1, ":", {
-                    type: X.constructor.name,
-                    hasPrimitive: !!X.primitive,
-                    primitiveType: X.primitive?.constructor?.name
-                  }), X.primitive && X.primitive.tileset) {
-                    const j = X.primitive.tileset, G = X.primitive.tile;
+              const B = A.camera.getPickRay(new O.Cartesian2(H, q)), N = A.scene.drillPick(B, new O.Cartesian2(H, q));
+              if (N && N.length > 0) {
+                console.log("[DualCanvasViewer] 🎯 屏幕中心拾取到", N.length, "个物体");
+                for (let j = 0; j < N.length; j++) {
+                  const W = N[j];
+                  if (console.log("[DualCanvasViewer] 物体", j + 1, ":", {
+                    type: W.constructor.name,
+                    hasPrimitive: !!W.primitive,
+                    primitiveType: W.primitive?.constructor?.name
+                  }), W.primitive && W.primitive.tileset) {
+                    const X = W.primitive.tileset, G = W.primitive.tile;
                     if (console.log("[DualCanvasViewer] ✅ 找到3D Tileset:", {
-                      url: j.url,
+                      url: X.url,
                       tile: G ? {
                         level: G.level,
                         x: G.x,
@@ -8111,19 +8133,19 @@ var Rn = {
                         hasContentAvailable: G.hasContentAvailable
                       } : "N/A"
                     }), G && G.content && G.content.boundingSphere) {
-                      const W = G.content.boundingSphere.radius;
+                      const Y = G.content.boundingSphere.radius;
                       console.log("[DualCanvasViewer] 📊 当前B3DM块边界球:", {
-                        半径: W ? W.toFixed(2) + "m" : "unknown",
-                        直径: W ? (W * 2).toFixed(2) + "m" : "unknown"
+                        半径: Y ? Y.toFixed(2) + "m" : "unknown",
+                        直径: Y ? (Y * 2).toFixed(2) + "m" : "unknown"
                       });
-                      const K = Math.max(P.x || 0, P.z || 0), $ = W * 2;
-                      if (isFinite(K) && isFinite($) && K > 0 && $ > 0) if (K < $ * 0.5) {
-                        const N = ($ / K).toFixed(2);
+                      const Z = Math.max(E.x || 0, E.z || 0), $ = Y * 2;
+                      if (isFinite(Z) && isFinite($) && Z > 0 && $ > 0) if (Z < $ * 0.5) {
+                        const k = ($ / Z).toFixed(2);
                         console.warn("[DualCanvasViewer] ⚠️ 模型与当前B3DM块尺寸对比:", {
-                          模型最大尺寸: K.toFixed(2) + "m",
+                          模型最大尺寸: Z.toFixed(2) + "m",
                           B3DM块直径: $.toFixed(2) + "m",
-                          建议缩放倍数: N + "x",
-                          应用命令: `const m=window.__dualCanvasViewer.modelGroup1.children.find(m=>m.userData.isLargeCoordModel);if(m){m.scale.set(${N},${N},${N});m.updateMatrixWorld(true);console.log('模型已缩放至${N}倍');}`
+                          建议缩放倍数: k + "x",
+                          应用命令: `const m=window.__dualCanvasViewer.modelGroup1.children.find(m=>m.userData.isLargeCoordModel);if(m){m.scale.set(${k},${k},${k});m.updateMatrixWorld(true);console.log('模型已缩放至${k}倍');}`
                         });
                       } else console.log("[DualCanvasViewer] ✅ 模型尺寸与当前B3DM块基本匹配");
                     }
@@ -8136,12 +8158,12 @@ var Rn = {
             console.warn("[DualCanvasViewer] 拾取屏幕中心失败:", U.message);
           }
           console.log("[DualCanvasViewer] 使用整体边界球计算缩放比例...");
-          for (let U = 0; U < A; U++) try {
+          for (let U = 0; U < R; U++) try {
             const H = L.get(U);
             if (H && (H._tileset || H.ready || H.constructor.name === "Cesium3DTileset")) {
-              const ee = (H._tileset || H).boundingSphere;
-              if (ee && ee.radius && ee.center) {
-                const O = ee.radius, B = ee.center;
+              const q = (H._tileset || H).boundingSphere;
+              if (q && q.radius && q.center) {
+                const O = q.radius, B = q.center;
                 console.log("[DualCanvasViewer] 📊 倾斜摄影整体边界球:", {
                   半径: O && typeof O.toFixed == "function" ? O.toFixed(2) + "m" : O + "m",
                   直径: O * 2 && typeof (O * 2).toFixed == "function" ? (O * 2).toFixed(2) + "m" : O * 2 + "m",
@@ -8151,20 +8173,20 @@ var Rn = {
                     z: B.z && typeof B.z.toFixed == "function" ? B.z.toFixed(2) : B.z
                   }
                 });
-                const k = Math.max(P.x || 0, P.z || 0), Q = O * 2;
-                if (isFinite(k) && isFinite(Q) && k > 0 && Q > 0) if (k < Q * 0.5) {
-                  const X = (Q / k).toFixed(2);
+                const N = Math.max(E.x || 0, E.z || 0), j = O * 2;
+                if (isFinite(N) && isFinite(j) && N > 0 && j > 0) if (N < j * 0.5) {
+                  const W = (j / N).toFixed(2);
                   console.warn("[DualCanvasViewer] ⚠️ 模型尺寸分析结果（整体区域）:", {
-                    模型最大尺寸: k.toFixed(2) + "m",
-                    倾斜摄影直径: Q.toFixed(2) + "m",
+                    模型最大尺寸: N.toFixed(2) + "m",
+                    倾斜摄影直径: j.toFixed(2) + "m",
                     当前问题: "模型明显小于倾斜摄影覆盖区域",
-                    建议缩放倍数: X + "x",
-                    应用命令: `const m=window.__dualCanvasViewer.modelGroup1.children.find(m=>m.userData.isLargeCoordModel);if(m){m.scale.set(${X},${X},${X});m.updateMatrixWorld(true);}`
+                    建议缩放倍数: W + "x",
+                    应用命令: `const m=window.__dualCanvasViewer.modelGroup1.children.find(m=>m.userData.isLargeCoordModel);if(m){m.scale.set(${W},${W},${W});m.updateMatrixWorld(true);}`
                   });
                 } else console.log("[DualCanvasViewer] ✅ 模型尺寸与倾斜摄影区域基本匹配");
                 else console.warn("[DualCanvasViewer] ⚠️ 无法计算缩放比例 - 数值无效:", {
-                  modelMaxDim: k,
-                  obliqueDiameter: Q
+                  modelMaxDim: N,
+                  obliqueDiameter: j
                 });
                 break;
               }
@@ -8216,15 +8238,15 @@ var Rn = {
         初始GridHelperY: b.toFixed(2) + "米"
       }), T) {
         console.log("[DualCanvasViewer] ✅ 检测到局部坐标系模式，GridHelper保持在场景底部");
-        const F = d.find((P) => P.userData.originalLocation?.cartographic);
+        const F = d.find((E) => E.userData.originalLocation?.cartographic);
         if (console.log("[DualCanvasViewer] 🔍 查找大坐标模型:", {
           找到: !!F,
           模型总数: d.length
         }), F) {
-          const P = F.userData.originalLocation.cartographic.height || 0;
+          const E = F.userData.originalLocation.cartographic.height || 0;
           console.log("[DualCanvasViewer] ✅ 局部坐标系模式：GridHelper与模型底部对齐", {
             场景底部: y.min.y.toFixed(2) + "米",
-            模型海拔: P.toFixed(2) + "米（由 MercatorProjectionManager 管理）",
+            模型海拔: E.toFixed(2) + "米（由 MercatorProjectionManager 管理）",
             GridHelperY: b.toFixed(2) + "米",
             说明: "GridHelper 在场景底部，与模型底部对齐"
           });
@@ -8239,8 +8261,8 @@ var Rn = {
         latitude: t.latitude,
         height: t.height
       }, console.log("[DualCanvasViewer] ✅ ENU坐标系已启用，坐标信息面板将显示ENU坐标"), this.applyControlsRestrictions(), console.log("[DualCanvasViewer] ✅ ENU模式下控制器限制已更新：允许翻转");
-      const E = window.__cesiumViewer__ || this.syncManager?.cesiumViewer;
-      if (E && this.camera1 && e) try {
+      const P = window.__cesiumViewer__ || this.syncManager?.cesiumViewer;
+      if (P && this.camera1 && e) try {
         console.log("[DualCanvasViewer] 开始同步Cesium相机到ENU位置...");
         const F = this.camera1.position.clone();
         console.log("[DualCanvasViewer] Three.js相机ENU位置:", {
@@ -8248,55 +8270,42 @@ var Rn = {
           y: F.y.toFixed(2),
           z: F.z.toFixed(2)
         });
-        const P = e.enuToECEF(F);
+        const E = e.enuToECEF(F);
         console.log("[DualCanvasViewer] Three.js相机ECEF位置:", {
-          x: P.x.toFixed(2),
-          y: P.y.toFixed(2),
-          z: P.z.toFixed(2)
+          x: E.x.toFixed(2),
+          y: E.y.toFixed(2),
+          z: E.z.toFixed(2)
         });
-        const R = new Cesium.Cartesian3(P.x, P.y, P.z), L = (E.scene.globe.ellipsoid || Cesium.Ellipsoid.WGS84).cartesianToCartographic(R);
+        const A = new Cesium.Cartesian3(E.x, E.y, E.z), L = (P.scene.globe.ellipsoid || Cesium.Ellipsoid.WGS84).cartesianToCartographic(A);
         if (L) {
-          const A = Cesium.Cartesian3.fromRadians(L.longitude, L.latitude, L.height);
+          const R = Cesium.Cartesian3.fromRadians(L.longitude, L.latitude, L.height);
           console.log("[DualCanvasViewer] 准备设置Cesium相机位置:", {
             destination: {
-              x: A.x.toFixed(2),
-              y: A.y.toFixed(2),
-              z: A.z.toFixed(2)
+              x: R.x.toFixed(2),
+              y: R.y.toFixed(2),
+              z: R.z.toFixed(2)
             },
             经度: Cesium.Math.toDegrees(L.longitude).toFixed(6) + "°",
             纬度: Cesium.Math.toDegrees(L.latitude).toFixed(6) + "°",
             高度: L.height.toFixed(2) + "m"
-          }), E.camera.setView({
-            destination: A,
-            orientation: {
-              heading: 0,
-              pitch: -Cesium.Math.PI_OVER_FOUR,
-              roll: 0
+          }), console.log("[DualCanvasViewer] ⏭️ 跳过Cesium相机同步（ENU初始化已定位，用户点击后自动对齐）"), (() => {
+            if (this.syncManager?.unifiedCameraState && this.camera1 && this.controls1) {
+              const U = this.camera1.position, H = this.controls1.target, q = H.x - U.x, O = H.y - U.y, B = H.z - U.z, N = Math.sqrt(q * q + O * O + B * B) || 1, j = this.syncManager.unifiedCameraState;
+              j.position.x = U.x, j.position.y = U.y, j.position.z = U.z, j.target.x = H.x, j.target.y = H.y, j.target.z = H.z, j.direction.x = q / N, j.direction.y = O / N, j.direction.z = B / N, j.height = N, this.syncManager._rebuildOrthonormalBasis();
             }
-          });
-          const U = E.camera.positionCartographic;
-          console.log("[DualCanvasViewer] ✅ Cesium相机setView完成，当前位置:", {
-            经度: Cesium.Math.toDegrees(U.longitude).toFixed(6) + "°",
-            纬度: Cesium.Math.toDegrees(U.latitude).toFixed(6) + "°",
-            高度: U.height.toFixed(2) + "m"
-          }), setTimeout(() => {
-            const H = E.camera.positionCartographic;
-            console.log("[DualCanvasViewer] ⏰ 1秒后Cesium相机位置:", {
-              经度: Cesium.Math.toDegrees(H.longitude).toFixed(6) + "°",
-              纬度: Cesium.Math.toDegrees(H.latitude).toFixed(6) + "°",
-              高度: H.height.toFixed(2) + "m"
-            });
-          }, 1e3), console.log("[DualCanvasViewer] ✅ Cesium相机setView已调用");
+          })();
         }
       } catch (F) {
         console.warn("[DualCanvasViewer] Cesium相机同步失败:", F);
       }
       else console.warn("[DualCanvasViewer] 无法同步Cesium相机:", {
-        有CesiumViewer: !!E,
+        有CesiumViewer: !!P,
         有camera1: !!this.camera1,
         有enuManager: !!e
       });
-      console.log("[DualCanvasViewer] ✅ 模型重新定位完成（ENU坐标系模式）"), console.log("[DualCanvasViewer] 💡 关键：每个模型已根据其地理位置（经纬度、高度）正确放置在ENU坐标系中");
+      console.log("[DualCanvasViewer] ✅ 模型重新定位完成（ENU坐标系模式）"), console.log("[DualCanvasViewer] 💡 关键：每个模型已根据其地理位置（经纬度、高度）正确放置在ENU坐标系中"), this.syncManager?.syncAlignCesiumAfterENULoad && (this._enuAlignmentTimeout && clearTimeout(this._enuAlignmentTimeout), this._enuAlignmentTimeout = setTimeout(() => {
+        this.syncManager.syncAlignCesiumAfterENULoad(), this._enuAlignmentTimeout = null;
+      }, 1500));
     },
     initPrecisionModelLoader(e = 0) {
       try {
@@ -8881,7 +8890,7 @@ var Rn = {
       }
       this.containerElement1 = e, this.scene1 = new h.Scene();
       const t = e.clientWidth || window.innerWidth, o = e.clientHeight || window.innerHeight;
-      this.camera1 = new h.PerspectiveCamera(75, t / o, 0.1, 1e6), this.camera1.position.set(5, 5, 5), this.controls1 = new Ue(this.camera1, e), this.controls1.enableDamping = !1, this.controls1.dampingFactor = 0.05, this.modelGroup1 = new h.Group(), this.scene1.add(this.modelGroup1);
+      this.camera1 = new h.PerspectiveCamera(75, t / o, 0.1, 1e6), this.camera1.position.set(5, 5, 5), this.controls1 = new Ie(this.camera1, e), this.controls1.enableDamping = !1, this.controls1.dampingFactor = 0.05, this.modelGroup1 = new h.Group(), this.scene1.add(this.modelGroup1);
       const i = new h.AmbientLight(16777215, 0.6);
       this.scene1.add(i);
       const n = new h.DirectionalLight(16777215, 0.8);
@@ -8922,7 +8931,7 @@ var Rn = {
       }
       this.containerElement2 = e, this.scene2 = new h.Scene();
       const t = e.clientWidth || window.innerWidth, o = e.clientHeight || window.innerHeight;
-      this.camera2 = new h.PerspectiveCamera(75, t / o, 0.1, 1e6), this.camera2.position.set(5, 5, 5), this.controls2 = new Ue(this.camera2, e), this.controls2.enableDamping = !1, this.controls2.dampingFactor = 0.05, this.modelGroup2 = new h.Group(), this.scene2.add(this.modelGroup2);
+      this.camera2 = new h.PerspectiveCamera(75, t / o, 0.1, 1e6), this.camera2.position.set(5, 5, 5), this.controls2 = new Ie(this.camera2, e), this.controls2.enableDamping = !1, this.controls2.dampingFactor = 0.05, this.modelGroup2 = new h.Group(), this.scene2.add(this.modelGroup2);
       const i = new h.AmbientLight(16777215, 0.6);
       this.scene2.add(i);
       const n = new h.DirectionalLight(16777215, 0.8);
@@ -10886,8 +10895,8 @@ var Rn = {
                   const y = c.longitude, w = c.latitude, V = c.altitude || 0, S = 6378137, T = y * Math.PI / 180, v = w * Math.PI / 180, D = T * S, _ = Math.log(Math.tan(Math.PI / 4 + v / 2)) * S;
                   let b = 0;
                   try {
-                    const F = this.syncManager?.getCesium() || window.Cesium, P = window.__cesiumViewer__;
-                    F && P && (b = await this._getTerrainHeightAtPosition(y, w, F, P), console.log("[DualCanvasViewer] ⭐ 地形高度采样（局部坐标系初始化）:", {
+                    const F = this.syncManager?.getCesium() || window.Cesium, E = window.__cesiumViewer__;
+                    F && E && (b = await this._getTerrainHeightAtPosition(y, w, F, E), console.log("[DualCanvasViewer] ⭐ 地形高度采样（局部坐标系初始化）:", {
                       位置: `(${y.toFixed(6)}°, ${w.toFixed(6)}°)`,
                       模型海拔: V.toFixed(2) + "米",
                       地形高度: b.toFixed(2) + "米",
@@ -10901,8 +10910,8 @@ var Rn = {
                     y: _,
                     z: b
                   }, u.setFloorCenter && (u.setFloorCenter(d, V), u.setDualFloorHeightToTerrain(b));
-                  const E = u.useLocalCoordinateSystem;
-                  console.log(`[DualCanvasViewer] ✅ ${E ? "局部坐标系模式" : "非局部坐标系模式"}：地板中心已设置（含地形高度）:`, {
+                  const P = u.useLocalCoordinateSystem;
+                  console.log(`[DualCanvasViewer] ✅ ${P ? "局部坐标系模式" : "非局部坐标系模式"}：地板中心已设置（含地形高度）:`, {
                     经纬度: `(${y.toFixed(6)}°, ${w.toFixed(6)}°)`,
                     墨卡托坐标: `(${D.toFixed(2)}, ${_.toFixed(2)})`,
                     模型海拔: V.toFixed(2) + "米",
@@ -10996,12 +11005,12 @@ var Rn = {
                     });
                     const f = d[0][0], C = d[0][1], M = d[0][2], y = -f, w = C, V = -M, S = Math.atan2(w, y), T = Math.cos(S), v = Math.sin(S), D = new h.Vector3(T, 0, v), _ = new h.Vector3(0, 1, 0), b = new h.Vector3(-v, 0, T);
                     p.set(D.x, D.y, D.z, 0, _.x, _.y, _.z, 0, b.x, b.y, b.z, 0, 0, 0, 0, 1);
-                    const E = S * 180 / Math.PI;
+                    const P = S * 180 / Math.PI;
                     console.log("[DualCanvasViewer] 📐 ENU水平面补偿（局部坐标系）:", {
                       ENU_North_原始: `(${x[0].toFixed(4)}, ${x[1].toFixed(4)}, ${x[2].toFixed(4)})`,
                       ENU_East_ECEF_原始: `(${f.toFixed(4)}, ${C.toFixed(4)}, ${M.toFixed(4)})`,
                       ENU_East_X取反后_Three: `(${y.toFixed(4)}, ${w.toFixed(4)}, ${V.toFixed(4)})`,
-                      水平旋转角度: E.toFixed(2) + "°",
+                      水平旋转角度: P.toFixed(2) + "°",
                       说明: "ENU East X取反 → Three.js → 计算水平旋转角度（期望: -25°）"
                     });
                   } else p.set(d[0][0], d[0][1], d[0][2], 0, d[1][0], d[1][1], d[1][2], 0, d[2][0], d[2][1], d[2][2], 0, 0, 0, 0, 1);
@@ -11597,7 +11606,7 @@ var Rn = {
                 const v = new h.Group();
                 v.userData.filePath = t, v.userData.fileName = t, v.userData.fileUrl = e, v.userData.originalFile = o, v.userData.isXKTModel = !0, v.userData.renderedByXeokit = !0, v.userData.xeokitViewer = d, this.modelGroup2.add(v), this.bimObjectCount++;
                 const D = w.aabb;
-                let _, b, E, F = !1;
+                let _, b, P, F = !1;
                 if (D) {
                   _ = {
                     x: (D[0] + D[3]) / 2,
@@ -11607,16 +11616,16 @@ var Rn = {
                     x: D[3] - D[0],
                     y: D[4] - D[1],
                     z: D[5] - D[2]
-                  }, E = Math.sqrt(_.x * _.x + _.y * _.y + _.z * _.z), F = E > 1e4;
+                  }, P = Math.sqrt(_.x * _.x + _.y * _.y + _.z * _.z), F = P > 1e4;
                   const L = F;
                   n && F && (console.log("[DualCanvasViewer] 重新加载模式：将大坐标模型重置为从原点开始"), F = !1), v.userData.hasLargeCoordinates = L, v.userData.originallyHadLargeCoordinates = L, console.log("[DualCanvasViewer] XKT 模型坐标分析:", {
                     xeokitCenter: _,
                     xeokitSize: b,
-                    centerLength: E.toFixed(2),
+                    centerLength: P.toFixed(2),
                     hasLargeCoordinates: F,
                     isReloading: n
                   });
-                  let A = [
+                  let R = [
                     _.x,
                     _.y,
                     _.z
@@ -11628,48 +11637,48 @@ var Rn = {
                       z: _.z
                     };
                     v.userData.originalXeokitCenter = $;
-                    let N = null;
-                    const Y = (this.modelGroup1?.children || []).find((te) => te.userData.isLargeCoordModel || te.userData.hasLargeCoordinates);
-                    if (Y) {
-                      const te = Y.position.clone(), Ee = new h.Box3().setFromObject(Y), we = new h.Vector3();
+                    let k = null;
+                    const K = (this.modelGroup1?.children || []).find((te) => te.userData.isLargeCoordModel || te.userData.hasLargeCoordinates);
+                    if (K) {
+                      const te = K.position.clone(), Ee = new h.Box3().setFromObject(K), we = new h.Vector3();
                       Ee.getSize(we);
                       const Pe = Math.max(we.x, we.y, we.z) * 0.1 + 10;
-                      N = te.clone(), N.x += Pe, console.log("[DualCanvasViewer] 检测到层1大坐标模型，将XKT模型移动到附近:", {
-                        layer1Model: Y.userData?.filePath || Y.name,
+                      k = te.clone(), k.x += Pe, console.log("[DualCanvasViewer] 检测到层1大坐标模型，将XKT模型移动到附近:", {
+                        layer1Model: K.userData?.filePath || K.name,
                         largeModelPosition: `(${te.x.toFixed(2)}, ${te.y.toFixed(2)}, ${te.z.toFixed(2)})`,
-                        targetPosition: `(${N.x.toFixed(2)}, ${N.y.toFixed(2)}, ${N.z.toFixed(2)})`
+                        targetPosition: `(${k.x.toFixed(2)}, ${k.y.toFixed(2)}, ${k.z.toFixed(2)})`
                       });
                     } else
-                      console.log("[DualCanvasViewer] 未检测到层1大坐标模型，将XKT模型移动到原点"), N = new h.Vector3(0, 0, 0);
+                      console.log("[DualCanvasViewer] 未检测到层1大坐标模型，将XKT模型移动到原点"), k = new h.Vector3(0, 0, 0);
                     const he = d.scene.models, ge = Object.keys(he);
                     if (ge.length > 0) {
                       const te = he[ge[0]];
                       te.position = [
-                        N.x - $.x,
-                        N.y - $.y,
-                        N.z - $.z
+                        k.x - $.x,
+                        k.y - $.y,
+                        k.z - $.z
                       ], console.log("[DualCanvasViewer] 大坐标 XKT 模型已移动:", {
                         fileName: t,
                         originalPosition: `(${$.x.toFixed(2)}, ${$.y.toFixed(2)}, ${$.z.toFixed(2)})`,
-                        targetPosition: `(${N.x.toFixed(2)}, ${N.y.toFixed(2)}, ${N.z.toFixed(2)})`,
+                        targetPosition: `(${k.x.toFixed(2)}, ${k.y.toFixed(2)}, ${k.z.toFixed(2)})`,
                         newPosition: `(${te.position[0].toFixed(2)}, ${te.position[1].toFixed(2)}, ${te.position[2].toFixed(2)})`
                       });
                     } else console.warn("[DualCanvasViewer] 警告：xeokit scene.models 为空，无法移动模型");
-                    A = [
-                      N.x,
-                      N.y,
-                      N.z
+                    R = [
+                      k.x,
+                      k.y,
+                      k.z
                     ], U = {
-                      x: N.x,
-                      y: N.y,
-                      z: N.z
-                    }, v.position.copy(N), v.userData.positionOffset = {
-                      x: N.x,
-                      y: N.y,
-                      z: N.z
+                      x: k.x,
+                      y: k.y,
+                      z: k.z
+                    }, v.position.copy(k), v.userData.positionOffset = {
+                      x: k.x,
+                      y: k.y,
+                      z: k.z
                     }, console.log("[DualCanvasViewer] 大坐标 XKT 模型 - 初次加载，移动完成", {
                       originalCenter: $,
-                      targetPosition: `(${N.x.toFixed(2)}, ${N.y.toFixed(2)}, ${N.z.toFixed(2)})`,
+                      targetPosition: `(${k.x.toFixed(2)}, ${k.y.toFixed(2)}, ${k.z.toFixed(2)})`,
                       logarithmicDepthBuffer: "始终启用"
                     });
                   } else if (L && n) {
@@ -11679,9 +11688,9 @@ var Rn = {
                       z: _.z
                     };
                     v.userData.originalXeokitCenter = $;
-                    const N = d.scene.models, Y = Object.keys(N);
-                    if (Y.length > 0) {
-                      const he = N[Y[0]];
+                    const k = d.scene.models, K = Object.keys(k);
+                    if (K.length > 0) {
+                      const he = k[K[0]];
                       he.position = [
                         0,
                         0,
@@ -11691,7 +11700,7 @@ var Rn = {
                         modelPosition: he.position
                       });
                     }
-                    i && this.isInRealWorldCoordinates ? (A = [
+                    i && this.isInRealWorldCoordinates ? (R = [
                       i.x,
                       i.y,
                       i.z
@@ -11702,8 +11711,8 @@ var Rn = {
                     }, console.log("[DualCanvasViewer] 重新加载大坐标模型 - 真实世界坐标系统，使用目标位置", {
                       originalCenter: $,
                       targetPosition: i,
-                      cameraLookTarget: A
-                    })) : (A = [
+                      cameraLookTarget: R
+                    })) : (R = [
                       _.x,
                       _.y,
                       _.z
@@ -11714,23 +11723,23 @@ var Rn = {
                     }, console.log("[DualCanvasViewer] 重新加载大坐标模型 - 虚拟坐标系，使用大坐标位置", {
                       originalCenter: $,
                       logarithmicDepthBuffer: "始终启用",
-                      cameraLookTarget: A
+                      cameraLookTarget: R
                     }));
                   }
                   const H = Math.max(b.x, b.y, b.z) * 2;
                   if (d.camera.eye = [
-                    A[0] + H,
-                    A[1] + H * 0.5,
-                    A[2] + H
-                  ], d.camera.look = A, d.camera.up = [
+                    R[0] + H,
+                    R[1] + H * 0.5,
+                    R[2] + H
+                  ], d.camera.look = R, d.camera.up = [
                     0,
                     1,
                     0
                   ], F || L) if (n && L) {
-                    const $ = Math.max(b.x, b.y, b.z), N = H || $ * 2, Y = $ / 100, he = N / 100;
-                    d.camera.project.near = Math.max(0.1, Math.min(Y, he)), d.camera.project.far = N * 100, console.log("[DualCanvasViewer] 重新加载大坐标模型：根据模型尺寸动态调整 near/far", {
+                    const $ = Math.max(b.x, b.y, b.z), k = H || $ * 2, K = $ / 100, he = k / 100;
+                    d.camera.project.near = Math.max(0.1, Math.min(K, he)), d.camera.project.far = k * 100, console.log("[DualCanvasViewer] 重新加载大坐标模型：根据模型尺寸动态调整 near/far", {
                       modelSize: $.toFixed(2),
-                      distToModel: N.toFixed(2),
+                      distToModel: k.toFixed(2),
                       near: d.camera.project.near,
                       far: d.camera.project.far,
                       ratio: (d.camera.project.far / d.camera.project.near).toFixed(2)
@@ -11751,7 +11760,7 @@ var Rn = {
                     hasLargeCoordinates: F,
                     actualCenter: U
                   });
-                  const ee = {
+                  const q = {
                     get eye() {
                       return d.camera.eye;
                     },
@@ -11773,12 +11782,12 @@ var Rn = {
                     toThreeCamera: () => {
                       const $ = new h.PerspectiveCamera();
                       $.position.set(d.camera.eye[0], d.camera.eye[1], d.camera.eye[2]);
-                      const N = new h.Vector3(d.camera.look[0], d.camera.look[1], d.camera.look[2]), Y = new h.Vector3(d.camera.up[0], d.camera.up[1], d.camera.up[2]);
-                      return $.up.copy(Y), $.lookAt(N), $;
+                      const k = new h.Vector3(d.camera.look[0], d.camera.look[1], d.camera.look[2]), K = new h.Vector3(d.camera.up[0], d.camera.up[1], d.camera.up[2]);
+                      return $.up.copy(K), $.lookAt(k), $;
                     }
                   }, O = "xeokit_" + t;
                   this.viewportManager.registerLayer(O, {
-                    camera: ee,
+                    camera: q,
                     scene: this.scene2,
                     container: V,
                     raycaster: null,
@@ -11789,7 +11798,7 @@ var Rn = {
                     transformControls: null,
                     isXeokitLayer: !0,
                     xeokitViewer: d,
-                    xeokitCamera: ee
+                    xeokitCamera: q
                   }), console.log("[DualCanvasViewer] 已将 xeokit viewer 注册到统一视口管理器:", O), v.userData.xeokitLayerId = O, console.log("[DualCanvasViewer] ===== 坐标系调试信息 ====="), console.log("[DualCanvasViewer] scene2 变换:", {
                     position: `(${this.scene2.position.x.toFixed(2)}, ${this.scene2.position.y.toFixed(2)}, ${this.scene2.position.z.toFixed(2)})`,
                     rotation: `(${this.scene2.rotation.x.toFixed(2)}, ${this.scene2.rotation.y.toFixed(2)}, ${this.scene2.rotation.z.toFixed(2)})`,
@@ -11804,9 +11813,9 @@ var Rn = {
                     y: Math.abs(D[4] - D[1]),
                     z: Math.abs(D[5] - D[2])
                   };
-                  let k, Q, X, j, G;
-                  if (n && E > 1e4)
-                    console.log("[DualCanvasViewer] 重新加载大坐标模型 - 使用虚拟AABB（原点）"), j = new h.Vector3(B.x, B.y, B.z), X = new h.Vector3(0, 0, 0), k = new h.Vector3(-j.x / 2, -j.y / 2, -j.z / 2), Q = new h.Vector3(j.x / 2, j.y / 2, j.z / 2), G = new h.Box3(k, Q);
+                  let N, j, W, X, G;
+                  if (n && P > 1e4)
+                    console.log("[DualCanvasViewer] 重新加载大坐标模型 - 使用虚拟AABB（原点）"), X = new h.Vector3(B.x, B.y, B.z), W = new h.Vector3(0, 0, 0), N = new h.Vector3(-X.x / 2, -X.y / 2, -X.z / 2), j = new h.Vector3(X.x / 2, X.y / 2, X.z / 2), G = new h.Box3(N, j);
                   else {
                     const $ = {
                       x: (D[0] + D[3]) / 2,
@@ -11814,11 +11823,11 @@ var Rn = {
                       z: (D[2] + D[5]) / 2
                     };
                     console.log("[DualCanvasViewer] 原始 AABB 尺寸:", `(${B.x.toFixed(2)}, ${B.y.toFixed(2)}, ${B.z.toFixed(2)})`), console.log("[DualCanvasViewer] 原始 AABB 中心:", `(${$.x.toFixed(2)}, ${$.y.toFixed(2)}, ${$.z.toFixed(2)})`);
-                    const N = (Ee, we, Pe) => ({
+                    const k = (Ee, we, Pe) => ({
                       x: Ee,
                       y: we,
                       z: -Pe
-                    }), Y = {
+                    }), K = {
                       x: D[0],
                       y: D[1],
                       z: D[2]
@@ -11826,23 +11835,23 @@ var Rn = {
                       x: D[3],
                       y: D[4],
                       z: D[5]
-                    }, ge = N(Y.x, Y.y, Y.z), te = N(he.x, he.y, he.z);
-                    k = new h.Vector3(Math.min(ge.x, te.x), Math.min(ge.y, te.y), Math.min(ge.z, te.z)), Q = new h.Vector3(Math.max(ge.x, te.x), Math.max(ge.y, te.y), Math.max(ge.z, te.z)), G = new h.Box3(k, Q), X = G.getCenter(new h.Vector3()), j = G.getSize(new h.Vector3());
+                    }, ge = k(K.x, K.y, K.z), te = k(he.x, he.y, he.z);
+                    N = new h.Vector3(Math.min(ge.x, te.x), Math.min(ge.y, te.y), Math.min(ge.z, te.z)), j = new h.Vector3(Math.max(ge.x, te.x), Math.max(ge.y, te.y), Math.max(ge.z, te.z)), G = new h.Box3(N, j), W = G.getCenter(new h.Vector3()), X = G.getSize(new h.Vector3());
                   }
-                  let W = X.clone(), K = G.clone();
+                  let Y = W.clone(), Z = G.clone();
                   if (F && v.userData.positionOffset && !n) {
                     const $ = v.position;
-                    W.set(X.x + $.x, X.y + $.y, X.z + $.z), K.min.set(G.min.x + $.x, G.min.y + $.y, G.min.z + $.z), K.max.set(G.max.x + $.x, G.max.y + $.y, G.max.z + $.z), console.log("[DualCanvasViewer] 大坐标模型 - 包围盒已调整到移动后的位置:", {
-                      originalCenter: `(${X.x.toFixed(2)}, ${X.y.toFixed(2)}, ${X.z.toFixed(2)})`,
+                    Y.set(W.x + $.x, W.y + $.y, W.z + $.z), Z.min.set(G.min.x + $.x, G.min.y + $.y, G.min.z + $.z), Z.max.set(G.max.x + $.x, G.max.y + $.y, G.max.z + $.z), console.log("[DualCanvasViewer] 大坐标模型 - 包围盒已调整到移动后的位置:", {
+                      originalCenter: `(${W.x.toFixed(2)}, ${W.y.toFixed(2)}, ${W.z.toFixed(2)})`,
                       originalBox: {
                         min: `(${G.min.x.toFixed(2)}, ${G.min.y.toFixed(2)}, ${G.min.z.toFixed(2)})`,
                         max: `(${G.max.x.toFixed(2)}, ${G.max.y.toFixed(2)}, ${G.max.z.toFixed(2)})`
                       },
                       modelPosition: `(${$.x.toFixed(2)}, ${$.y.toFixed(2)}, ${$.z.toFixed(2)})`,
-                      adjustedCenter: `(${W.x.toFixed(2)}, ${W.y.toFixed(2)}, ${W.z.toFixed(2)})`,
+                      adjustedCenter: `(${Y.x.toFixed(2)}, ${Y.y.toFixed(2)}, ${Y.z.toFixed(2)})`,
                       adjustedBox: {
-                        min: `(${K.min.x.toFixed(2)}, ${K.min.y.toFixed(2)}, ${K.min.z.toFixed(2)})`,
-                        max: `(${K.max.x.toFixed(2)}, ${K.max.y.toFixed(2)}, ${K.max.z.toFixed(2)})`
+                        min: `(${Z.min.x.toFixed(2)}, ${Z.min.y.toFixed(2)}, ${Z.min.z.toFixed(2)})`,
+                        max: `(${Z.max.x.toFixed(2)}, ${Z.max.y.toFixed(2)}, ${Z.max.z.toFixed(2)})`
                       },
                       positionOffset: v.userData.positionOffset
                     });
@@ -11850,32 +11859,32 @@ var Rn = {
                   console.log("[DualCanvasViewer] XKT 模型包围盒信息 (Three.js 坐标系):", {
                     fileName: t,
                     layerId: O,
-                    center: `(${W.x.toFixed(2)}, ${W.y.toFixed(2)}, ${W.z.toFixed(2)})`,
-                    size: `(${j.x.toFixed(2)}, ${j.y.toFixed(2)}, ${j.z.toFixed(2)})`,
-                    maxSize: Math.max(j.x, j.y, j.z).toFixed(2) + " 米",
+                    center: `(${Y.x.toFixed(2)}, ${Y.y.toFixed(2)}, ${Y.z.toFixed(2)})`,
+                    size: `(${X.x.toFixed(2)}, ${X.y.toFixed(2)}, ${X.z.toFixed(2)})`,
+                    maxSize: Math.max(X.x, X.y, X.z).toFixed(2) + " 米",
                     hasLargeCoordinates: F,
                     注意: F ? "大坐标模型已移动到原点" : "正常坐标模型"
-                  }), console.log("[DualCanvasViewer] XKT 模型包围盒数据已保存（不创建可视化）"), v.userData.boundingBox = K, v.userData.boundingBoxCenter = W, v.userData.boundingBoxSize = j, F ? (v.userData.originalWorldPosition || (v.userData.originalWorldPosition = X.clone(), console.log("[DualCanvasViewer] 保存原始大坐标到 originalWorldPosition:", X)), v.userData.originalCenter = n ? W.clone() : X.clone()) : v.userData.originalCenter = W.clone(), console.log("[DualCanvasViewer] 已将包围盒数据存储到 model.userData:", {
-                    boundingBoxCenter: `(${W.x.toFixed(2)}, ${W.y.toFixed(2)}, ${W.z.toFixed(2)})`,
-                    size: `(${j.x.toFixed(2)}, ${j.y.toFixed(2)}, ${j.z.toFixed(2)})`,
+                  }), console.log("[DualCanvasViewer] XKT 模型包围盒数据已保存（不创建可视化）"), v.userData.boundingBox = Z, v.userData.boundingBoxCenter = Y, v.userData.boundingBoxSize = X, F ? (v.userData.originalWorldPosition || (v.userData.originalWorldPosition = W.clone(), console.log("[DualCanvasViewer] 保存原始大坐标到 originalWorldPosition:", W)), v.userData.originalCenter = n ? Y.clone() : W.clone()) : v.userData.originalCenter = Y.clone(), console.log("[DualCanvasViewer] 已将包围盒数据存储到 model.userData:", {
+                    boundingBoxCenter: `(${Y.x.toFixed(2)}, ${Y.y.toFixed(2)}, ${Y.z.toFixed(2)})`,
+                    size: `(${X.x.toFixed(2)}, ${X.y.toFixed(2)}, ${X.z.toFixed(2)})`,
                     originalCenter: `(${v.userData.originalCenter.x.toFixed(2)}, ${v.userData.originalCenter.y.toFixed(2)}, ${v.userData.originalCenter.z.toFixed(2)})`,
                     hasLargeCoordinates: F
                   });
                 }
                 u.remove(), this.initXeokitInteraction();
-                const P = typeof window < "u" && window.__syncManager__, R = P && P.mercatorProjection && P.mercatorProjection.isUsingLocalCoordinateSystem && P.mercatorProjection.isUsingLocalCoordinateSystem();
+                const E = typeof window < "u" && window.__syncManager__, A = E && E.mercatorProjection && E.mercatorProjection.isUsingLocalCoordinateSystem && E.mercatorProjection.isUsingLocalCoordinateSystem();
                 if (console.log("[DualCanvasViewer] XKT模型加载完成 - 坐标系检测:", {
-                  hasSyncManager: !!P,
-                  hasMercatorProjection: !!(P && P.mercatorProjection),
-                  hasIsUsingLocalCoordinateSystem: !!(P && P.mercatorProjection && P.mercatorProjection.isUsingLocalCoordinateSystem),
-                  isUsingLocalCoord: R,
-                  floorCenterMercator: P && P.floorCenterMercator ? `(${P.floorCenterMercator.x.toFixed(2)}, ${P.floorCenterMercator.y.toFixed(2)})` : "null"
-                }), this.camera2 && d.camera) if (R)
+                  hasSyncManager: !!E,
+                  hasMercatorProjection: !!(E && E.mercatorProjection),
+                  hasIsUsingLocalCoordinateSystem: !!(E && E.mercatorProjection && E.mercatorProjection.isUsingLocalCoordinateSystem),
+                  isUsingLocalCoord: A,
+                  floorCenterMercator: E && E.floorCenterMercator ? `(${E.floorCenterMercator.x.toFixed(2)}, ${E.floorCenterMercator.y.toFixed(2)})` : "null"
+                }), this.camera2 && d.camera) if (A)
                   console.log("[DualCanvasViewer] 局部坐标系模式：camera2 与 camera1 保持同步（XKT模型加载完成后）"), this.camera1 && (this.camera2.position.copy(this.camera1.position), this.camera2.quaternion.copy(this.camera1.quaternion), this.camera2.up.copy(this.camera1.up), this.controls2 && this.controls1 && this.controls2.target.copy(this.controls1.target), this.camera2.updateMatrixWorld(!0));
                 else {
                   console.log("[DualCanvasViewer] 真实世界模式：同步 camera2 到 xeokit 相机（XKT模型加载完成后）"), this.camera2.position.set(d.camera.eye[0], d.camera.eye[1], d.camera.eye[2]);
-                  const L = new h.Vector3(d.camera.look[0], d.camera.look[1], d.camera.look[2]), A = new h.Vector3(d.camera.up[0], d.camera.up[1], d.camera.up[2]);
-                  this.camera2.up.copy(A), this.camera2.lookAt(L), this.camera2.updateMatrixWorld(!0), this.controls2 && this.controls2.target.copy(L), console.log("[DualCanvasViewer] camera2 已同步到 xeokit 相机:", {
+                  const L = new h.Vector3(d.camera.look[0], d.camera.look[1], d.camera.look[2]), R = new h.Vector3(d.camera.up[0], d.camera.up[1], d.camera.up[2]);
+                  this.camera2.up.copy(R), this.camera2.lookAt(L), this.camera2.updateMatrixWorld(!0), this.controls2 && this.controls2.target.copy(L), console.log("[DualCanvasViewer] camera2 已同步到 xeokit 相机:", {
                     camera2Position: `(${this.camera2.position.x.toFixed(2)}, ${this.camera2.position.y.toFixed(2)}, ${this.camera2.position.z.toFixed(2)})`,
                     xeokitEye: `(${d.camera.eye[0].toFixed(2)}, ${d.camera.eye[1].toFixed(2)}, ${d.camera.eye[2].toFixed(2)})`
                   });
@@ -11888,19 +11897,19 @@ var Rn = {
                     z: i.z
                   };
                   if (w.position !== void 0) {
-                    let A = [
+                    let R = [
                       0,
                       0,
                       0
                     ];
-                    D ? (A = [
+                    D ? (R = [
                       (D[0] + D[3]) / 2,
                       (D[1] + D[4]) / 2,
                       (D[2] + D[5]) / 2
                     ], console.log("[DualCanvasViewer] 使用真实 AABB 中心:", {
-                      modelCenter: A,
+                      modelCenter: R,
                       aabb: ` [${D[0].toFixed(2)}, ${D[1].toFixed(2)}, ${D[2].toFixed(2)}, ${D[3].toFixed(2)}, ${D[4].toFixed(2)}, ${D[5].toFixed(2)}] `
-                    })) : A = [
+                    })) : R = [
                       (D[0] + D[3]) / 2,
                       (D[1] + D[4]) / 2,
                       (D[2] + D[5]) / 2
@@ -11911,36 +11920,36 @@ var Rn = {
                       L.y,
                       L.z
                     ] : v.userData.originallyHadLargeCoordinates && n ? (U = [
-                      L.x - A[0],
-                      L.y - A[1],
-                      L.z - A[2]
+                      L.x - R[0],
+                      L.y - R[1],
+                      L.z - R[2]
                     ], console.log("[DualCanvasViewer] 重新加载大坐标模型：计算从大坐标到目标位置的偏移", {
-                      modelCenter: A,
+                      modelCenter: R,
                       targetPosition: L,
                       positionOffset: U,
                       positionOffsetType: "平移偏移（从大坐标到小坐标）"
                     })) : U = [
-                      L.x - A[0],
-                      L.y - A[1],
-                      L.z - A[2]
+                      L.x - R[0],
+                      L.y - R[1],
+                      L.z - R[2]
                     ], w.position = U, console.log("[DualCanvasViewer] xeokit 模型变换已设置（位置）:", {
                       initialPosition: i,
                       targetPositionXeokit: L,
-                      modelCenter: A,
+                      modelCenter: R,
                       positionOffset: U,
                       newPosition: w.position
                     });
                   }
                   if (v.position.set(i.x, i.y, i.z), v.updateMatrixWorld(), v.userData.boundingBoxSize) {
-                    const A = v.userData.boundingBoxSize, U = new h.Box3(new h.Vector3(i.x - A.x / 2, i.y - A.y / 2, i.z - A.z / 2), new h.Vector3(i.x + A.x / 2, i.y + A.y / 2, i.z + A.z / 2)), H = U.getCenter(new h.Vector3());
+                    const R = v.userData.boundingBoxSize, U = new h.Box3(new h.Vector3(i.x - R.x / 2, i.y - R.y / 2, i.z - R.z / 2), new h.Vector3(i.x + R.x / 2, i.y + R.y / 2, i.z + R.z / 2)), H = U.getCenter(new h.Vector3());
                     v.userData.boundingBox = U, v.userData.boundingBoxCenter = H, console.log("[DualCanvasViewer] Three.js 占位符包围盒已更新:", {
                       position: v.position,
                       boundingBoxCenter: H,
-                      boundingBoxSize: A
+                      boundingBoxSize: R
                     });
                   }
                   if (v.userData.boundingBoxSize) {
-                    const A = v.userData.boundingBoxSize, U = Math.max(A.x, A.y, A.z) * 2;
+                    const R = v.userData.boundingBoxSize, U = Math.max(R.x, R.y, R.z) * 2;
                     if (d.camera.eye = [
                       i.x + U,
                       i.y + U * 0.5,
@@ -12171,27 +12180,27 @@ var Rn = {
                         z: V.z
                       };
                       if (y.userData.originalXeokitCenter = O, p.position !== void 0) {
-                        const k = {
+                        const N = {
                           x: -V.x,
                           y: -V.y,
                           z: -V.z
                         };
                         p.position = [
-                          k.x,
-                          k.y,
-                          k.z
-                        ], y.userData.positionOffset = k, console.log("[DualCanvasViewer] 大坐标模型 - 已应用位置偏移到原点", {
+                          N.x,
+                          N.y,
+                          N.z
+                        ], y.userData.positionOffset = N, console.log("[DualCanvasViewer] 大坐标模型 - 已应用位置偏移到原点", {
                           originalCenter: O,
-                          positionOffset: k,
+                          positionOffset: N,
                           newPosition: p.position
                         });
                       } else {
                         console.warn("[DualCanvasViewer] 警告：sceneModel.position 不可用，无法平移模型"), console.warn("[DualCanvasViewer] 使用相机跟随模式作为备选方案");
-                        const k = Math.max(S.x, S.y, S.z) * 2;
+                        const N = Math.max(S.x, S.y, S.z) * 2;
                         l.camera.eye = [
-                          V.x + k,
-                          V.y + k * 0.5,
-                          V.z + k
+                          V.x + N,
+                          V.y + N * 0.5,
+                          V.z + N
                         ], l.camera.look = [
                           V.x,
                           V.y,
@@ -12255,8 +12264,8 @@ var Rn = {
                       toThreeCamera: () => {
                         const O = new h.PerspectiveCamera();
                         O.position.set(l.camera.eye[0], l.camera.eye[1], l.camera.eye[2]);
-                        const B = new h.Vector3(l.camera.look[0], l.camera.look[1], l.camera.look[2]), k = new h.Vector3(l.camera.up[0], l.camera.up[1], l.camera.up[2]);
-                        return O.up.copy(k), O.lookAt(B), O;
+                        const B = new h.Vector3(l.camera.look[0], l.camera.look[1], l.camera.look[2]), N = new h.Vector3(l.camera.up[0], l.camera.up[1], l.camera.up[2]);
+                        return O.up.copy(N), O.lookAt(B), O;
                       }
                     }, _ = "xeokit_" + t;
                     this.viewportManager.registerLayer(_, {
@@ -12273,11 +12282,11 @@ var Rn = {
                       xeokitViewer: l,
                       xeokitCamera: D
                     }), console.log("[DualCanvasViewer] 已将 IFC xeokit viewer 注册到统一视口管理器:", _), y.userData.xeokitLayerId = _, console.log("[DualCanvasViewer] ===== IFC 坐标系调试信息 ====="), console.log("[DualCanvasViewer] IFC xeokit 原始 AABB (xeokit 坐标系):", { aabb: `[${w[0].toFixed(2)}, ${w[1].toFixed(2)}, ${w[2].toFixed(2)}, ${w[3].toFixed(2)}, ${w[4].toFixed(2)}, ${w[5].toFixed(2)}]` });
-                    const b = (O, B, k) => ({
+                    const b = (O, B, N) => ({
                       x: O,
                       y: B,
-                      z: -k
-                    }), E = {
+                      z: -N
+                    }), P = {
                       x: w[0],
                       y: w[1],
                       z: w[2]
@@ -12285,20 +12294,20 @@ var Rn = {
                       x: w[3],
                       y: w[4],
                       z: w[5]
-                    }, P = b(E.x, E.y, E.z), R = b(F.x, F.y, F.z), L = new h.Vector3(Math.min(P.x, R.x), Math.min(P.y, R.y), Math.min(P.z, R.z)), A = new h.Vector3(Math.max(P.x, R.x), Math.max(P.y, R.y), Math.max(P.z, R.z));
+                    }, E = b(P.x, P.y, P.z), A = b(F.x, F.y, F.z), L = new h.Vector3(Math.min(E.x, A.x), Math.min(E.y, A.y), Math.min(E.z, A.z)), R = new h.Vector3(Math.max(E.x, A.x), Math.max(E.y, A.y), Math.max(E.z, A.z));
                     console.log("[DualCanvasViewer] IFC 转换后 AABB (Three.js 坐标系):", {
                       boxMin: `(${L.x.toFixed(2)}, ${L.y.toFixed(2)}, ${L.z.toFixed(2)})`,
-                      boxMax: `(${A.x.toFixed(2)}, ${A.y.toFixed(2)}, ${A.z.toFixed(2)})`
+                      boxMax: `(${R.x.toFixed(2)}, ${R.y.toFixed(2)}, ${R.z.toFixed(2)})`
                     });
-                    const U = new h.Box3(L, A), H = U.getCenter(new h.Vector3()), ee = U.getSize(new h.Vector3());
+                    const U = new h.Box3(L, R), H = U.getCenter(new h.Vector3()), q = U.getSize(new h.Vector3());
                     console.log("[DualCanvasViewer] IFC 模型包围盒信息 (Three.js 坐标系):", {
                       fileName: t,
                       layerId: _,
                       center: `(${H.x.toFixed(2)}, ${H.y.toFixed(2)}, ${H.z.toFixed(2)})`,
-                      size: `(${ee.x.toFixed(2)}, ${ee.y.toFixed(2)}, ${ee.z.toFixed(2)})`
-                    }), y.userData.boundingBox = U, y.userData.boundingBoxCenter = H, y.userData.boundingBoxSize = ee, y.userData.hasLargeCoordinates = v, y.userData.originalCenter = H.clone(), console.log("[DualCanvasViewer] 已将 IFC 包围盒数据存储到 model.userData:", {
+                      size: `(${q.x.toFixed(2)}, ${q.y.toFixed(2)}, ${q.z.toFixed(2)})`
+                    }), y.userData.boundingBox = U, y.userData.boundingBoxCenter = H, y.userData.boundingBoxSize = q, y.userData.hasLargeCoordinates = v, y.userData.originalCenter = H.clone(), console.log("[DualCanvasViewer] 已将 IFC 包围盒数据存储到 model.userData:", {
                       center: `(${H.x.toFixed(2)}, ${H.y.toFixed(2)}, ${H.z.toFixed(2)})`,
-                      size: `(${ee.x.toFixed(2)}, ${ee.y.toFixed(2)}, ${ee.z.toFixed(2)})`,
+                      size: `(${q.x.toFixed(2)}, ${q.y.toFixed(2)}, ${q.z.toFixed(2)})`,
                       hasLargeCoordinates: v,
                       originalCenter: "已设置 - IFC模型真实世界坐标中心"
                     });
@@ -12672,7 +12681,7 @@ ${t || "未知错误"}
       }), r.userData.isXKTModel && r.userData.originallyHadLargeCoordinates && !this.isInRealWorldCoordinates) {
         console.log("[DualCanvasViewer] 检测到大坐标XKT模型，需要变换到选中GLB底图位置");
         let M = null;
-        if (this.activeLayer === "three" || this.activeLayer === "both" ? M = this.selectedModel1 : this.modelGroup1 && this.modelGroup1.children.length > 0 && (M = this.modelGroup1.children.find((E) => E.userData.hasLargeCoordinates && !E.userData.isXKTModel && E.userData.filePath?.toLowerCase().endsWith(".glb"))), !M || !M.userData.hasLargeCoordinates) {
+        if (this.activeLayer === "three" || this.activeLayer === "both" ? M = this.selectedModel1 : this.modelGroup1 && this.modelGroup1.children.length > 0 && (M = this.modelGroup1.children.find((P) => P.userData.hasLargeCoordinates && !P.userData.isXKTModel && P.userData.filePath?.toLowerCase().endsWith(".glb"))), !M || !M.userData.hasLargeCoordinates) {
           console.warn("[DualCanvasViewer] 未找到选中的大坐标GLB底图模型"), this.$message?.warning("无法定位XKT模型，请先选中底图GLB大坐标模型");
           return;
         }
@@ -12682,7 +12691,7 @@ ${t || "未知错误"}
           return;
         }
         console.log("[DualCanvasViewer] 找到GLB底图模型，几何中心:", y);
-        const w = r.userData.fileName || r.userData.filePath, V = this.xeokitViewers.find((E) => E.fileName === w), S = V ? V.viewer : r.userData.xeokitViewer;
+        const w = r.userData.fileName || r.userData.filePath, V = this.xeokitViewers.find((P) => P.fileName === w), S = V ? V.viewer : r.userData.xeokitViewer;
         if (!S || !S.scene) {
           console.warn("[DualCanvasViewer] xeokit viewer无效");
           return;
@@ -12717,39 +12726,39 @@ ${t || "未知错误"}
           glbCenter: b,
           targetPosition: b
         }), D.position !== void 0) {
-          let E;
+          let P;
           const F = D.aabb;
           if (F) {
-            const R = [
+            const A = [
               (F[0] + F[3]) / 2,
               (F[1] + F[4]) / 2,
               (F[2] + F[5]) / 2
             ];
-            Math.sqrt(R[0] * R[0] + R[1] * R[1] + R[2] * R[2]) > 1e4 ? (E = [
-              b.x - R[0],
-              b.y - R[1],
-              b.z - R[2]
+            Math.sqrt(A[0] * A[0] + A[1] * A[1] + A[2] * A[2]) > 1e4 ? (P = [
+              b.x - A[0],
+              b.y - A[1],
+              b.z - A[2]
             ], console.log("[DualCanvasViewer] 大坐标XKT模型：计算从大坐标到小坐标的平移偏移", {
-              modelCenter: R,
+              modelCenter: A,
               targetPosition: b,
-              positionOffset: E,
+              positionOffset: P,
               说明: "平移变换：从大坐标位置移动到小坐标位置，不涉及缩放"
-            })) : E = [
+            })) : P = [
               b.x,
               b.y,
               b.z
             ];
-          } else E = [
+          } else P = [
             b.x,
             b.y,
             b.z
           ];
-          D.position = E, r.position.set(b.x, b.y, b.z), r.rotation.set(0, 0, 0), r.scale.set(1, 1, 1), r.updateMatrixWorld();
-          const P = r.userData.boundingBoxSize;
-          if (P) {
-            const R = new h.Box3(new h.Vector3(b.x - P.x / 2, b.y - P.y / 2, b.z - P.z / 2), new h.Vector3(b.x + P.x / 2, b.y + P.y / 2, b.z + P.z / 2));
-            r.userData.boundingBox = R;
-            const L = R.getCenter(new h.Vector3());
+          D.position = P, r.position.set(b.x, b.y, b.z), r.rotation.set(0, 0, 0), r.scale.set(1, 1, 1), r.updateMatrixWorld();
+          const E = r.userData.boundingBoxSize;
+          if (E) {
+            const A = new h.Box3(new h.Vector3(b.x - E.x / 2, b.y - E.y / 2, b.z - E.z / 2), new h.Vector3(b.x + E.x / 2, b.y + E.y / 2, b.z + E.z / 2));
+            r.userData.boundingBox = A;
+            const L = A.getCenter(new h.Vector3());
             r.userData.boundingBoxCenter = L;
           }
           u.set(b.x, b.y, b.z), console.log("[DualCanvasViewer] XKT模型已变换到GLB底图位置（包含完整变换）:", {
@@ -12795,7 +12804,7 @@ ${t || "未知错误"}
         if (y && r.userData.originallyHadLargeCoordinates && !this.isInRealWorldCoordinates) {
           console.log("[DualCanvasViewer] 检测到大坐标XKT模型，需要变换到选中GLB底图位置");
           let w = null;
-          if (this.activeLayer === "three" || this.activeLayer === "both" ? w = this.selectedModel1 : this.modelGroup1 && this.modelGroup1.children.length > 0 && (w = this.modelGroup1.children.find((P) => P.userData.hasLargeCoordinates && !P.userData.isXKTModel && P.userData.filePath?.toLowerCase().endsWith(".glb"))), !w || !w.userData.hasLargeCoordinates) {
+          if (this.activeLayer === "three" || this.activeLayer === "both" ? w = this.selectedModel1 : this.modelGroup1 && this.modelGroup1.children.length > 0 && (w = this.modelGroup1.children.find((E) => E.userData.hasLargeCoordinates && !E.userData.isXKTModel && E.userData.filePath?.toLowerCase().endsWith(".glb"))), !w || !w.userData.hasLargeCoordinates) {
             console.warn("[DualCanvasViewer] 未找到选中的大坐标GLB底图模型"), this.$message?.warning("无法定位XKT模型，请先选中底图GLB大坐标模型");
             return;
           }
@@ -12805,7 +12814,7 @@ ${t || "未知错误"}
             return;
           }
           console.log("[DualCanvasViewer] 找到GLB底图模型，几何中心:", V);
-          const S = r.userData.fileName || r.userData.filePath, T = this.xeokitViewers.find((P) => P.fileName === S), v = T ? T.viewer : r.userData.xeokitViewer;
+          const S = r.userData.fileName || r.userData.filePath, T = this.xeokitViewers.find((E) => E.fileName === S), v = T ? T.viewer : r.userData.xeokitViewer;
           if (!v || !v.scene) {
             console.warn("[DualCanvasViewer] xeokit viewer无效");
             return;
@@ -12820,8 +12829,8 @@ ${t || "未知错误"}
             console.warn("[DualCanvasViewer] xeokit场景中没有模型");
             return;
           }
-          const b = D[_[0]], E = r.userData.originalCenter;
-          if (!E) {
+          const b = D[_[0]], P = r.userData.originalCenter;
+          if (!P) {
             console.warn("[DualCanvasViewer] XKT模型缺少原始中心点数据");
             return;
           }
@@ -12831,43 +12840,43 @@ ${t || "未知错误"}
             z: V.z
           };
           if (console.log("[DualCanvasViewer] 坐标变换：原点 → GLB底图中心", {
-            originalCenter: E,
+            originalCenter: P,
             glbCenter: F,
             targetPosition: F
           }), b.position !== void 0) {
-            let P;
-            const R = b.aabb;
-            if (R) {
-              const A = [
-                (R[0] + R[3]) / 2,
-                (R[1] + R[4]) / 2,
-                (R[2] + R[5]) / 2
+            let E;
+            const A = b.aabb;
+            if (A) {
+              const R = [
+                (A[0] + A[3]) / 2,
+                (A[1] + A[4]) / 2,
+                (A[2] + A[5]) / 2
               ];
-              Math.sqrt(A[0] * A[0] + A[1] * A[1] + A[2] * A[2]) > 1e4 ? (P = [
-                F.x - A[0],
-                F.y - A[1],
-                F.z - A[2]
+              Math.sqrt(R[0] * R[0] + R[1] * R[1] + R[2] * R[2]) > 1e4 ? (E = [
+                F.x - R[0],
+                F.y - R[1],
+                F.z - R[2]
               ], console.log("[DualCanvasViewer] 大坐标XKT模型：计算从大坐标到小坐标的平移偏移", {
-                modelCenter: A,
+                modelCenter: R,
                 targetPosition: F,
-                positionOffset: P,
+                positionOffset: E,
                 说明: "平移变换：从大坐标位置移动到小坐标位置，不涉及缩放"
-              })) : P = [
+              })) : E = [
                 F.x,
                 F.y,
                 F.z
               ];
-            } else P = [
+            } else E = [
               F.x,
               F.y,
               F.z
             ];
-            b.position = P, r.position.set(F.x, F.y, F.z), r.rotation.set(0, 0, 0), r.scale.set(1, 1, 1), r.updateMatrixWorld();
+            b.position = E, r.position.set(F.x, F.y, F.z), r.rotation.set(0, 0, 0), r.scale.set(1, 1, 1), r.updateMatrixWorld();
             const L = r.userData.boundingBoxSize;
             if (L) {
-              const A = new h.Box3(new h.Vector3(F.x - L.x / 2, F.y - L.y / 2, F.z - L.z / 2), new h.Vector3(F.x + L.x / 2, F.y + L.y / 2, F.z + L.z / 2));
-              r.userData.boundingBox = A;
-              const U = A.getCenter(new h.Vector3());
+              const R = new h.Box3(new h.Vector3(F.x - L.x / 2, F.y - L.y / 2, F.z - L.z / 2), new h.Vector3(F.x + L.x / 2, F.y + L.y / 2, F.z + L.z / 2));
+              r.userData.boundingBox = R;
+              const U = R.getCenter(new h.Vector3());
               r.userData.boundingBoxCenter = U;
             }
             u.set(F.x, F.y, F.z), console.log("[DualCanvasViewer] XKT模型已变换到GLB底图位置（包含完整变换）:", {
@@ -13890,13 +13899,13 @@ ${t || "未知错误"}
       e.terrainHeight !== void 0 && this.heightAlignmentManager.setTerrainHeight(e.terrainHeight), e.obliqueOffset !== void 0 && this.heightAlignmentManager.setObliqueOffset(e.obliqueOffset), e.modelAltitude !== void 0 && this.heightAlignmentManager.setModelAltitude(e.modelAltitude), e.dualFloorHeight !== void 0 && this.heightAlignmentManager.setDualFloorHeight(e.dualFloorHeight), this.updateAnchorContainerPosition();
     }
   }
-}, kn = { class: "dual-canvas-viewer" }, Nn = {
+}, Nn = { class: "dual-canvas-viewer" }, kn = {
   ref: "eventContainer",
   class: "layer-container event-layer"
 };
-function In(e, t, o, i, n, r) {
+function Un(e, t, o, i, n, r) {
   const a = et("DualCanvasControlPanel"), s = et("CoordinateInfoPanel");
-  return Z(), q("div", kn, [
+  return Q(), J("div", Nn, [
     t[0] || (t[0] = z("div", { class: "map-test-layer" }, null, -1)),
     z("div", {
       ref: "threeContainer",
@@ -13907,7 +13916,7 @@ function In(e, t, o, i, n, r) {
       class: ue(["layer-container bim-layer", { "layer-hidden": !n.showBimLayer }]),
       style: Dt({ opacity: n.bimOpacity / 100 })
     }, null, 6),
-    z("div", Nn, null, 512),
+    z("div", kn, null, 512),
     Qe(a, {
       ref: "controlPanel",
       "active-layer": n.activeLayer,
@@ -13978,7 +13987,7 @@ function In(e, t, o, i, n, r) {
     ])
   ]);
 }
-var Xn = /* @__PURE__ */ Je(Rn, [["render", In], ["__scopeId", "data-v-5a2f9b3e"]]);
+var Xn = /* @__PURE__ */ Je(Rn, [["render", Un], ["__scopeId", "data-v-74972f91"]]);
 export {
   Xn as default
 };

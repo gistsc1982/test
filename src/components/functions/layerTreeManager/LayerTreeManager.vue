@@ -3211,7 +3211,7 @@ export default {
                   // 检测瓦片是否有可见内容
                   let hasContent = false;
                   try {
-                    const ctx = canvas.getContext('2d');
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
                     const w = Math.min(canvas.width, 10);
                     const h = Math.min(canvas.height, 10);
                     const imgData = ctx.getImageData(0, 0, w, h);
