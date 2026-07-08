@@ -1,0 +1,31 @@
+{
+  "panelId": "query-result-panel",
+  "panelName": "查询历史",
+  "panelIcon": "📋",
+  "configId": "query-result-history",
+  "featureFolder": "spacialQueryManager",
+  "fieldDefinitions": [
+    { "key": "id", "label": "ID", "type": "text", "required": true },
+    { "key": "type", "label": "绘制类型", "type": "text", "required": true },
+    { "key": "geometry", "label": "GeoJSON几何", "type": "text", "required": true },
+    { "key": "camera", "label": "相机参数(JSON)", "type": "text", "required": false },
+    { "key": "layerName", "label": "图层名", "type": "text", "required": false },
+    { "key": "resultCount", "label": "结果数", "type": "number", "required": false },
+    { "key": "bufferRadius", "label": "缓冲区半径", "type": "number", "required": false },
+    { "key": "time", "label": "时间", "type": "text", "required": true }
+  ],
+  "defaultFormValues": {},
+  "toolbarButtons": {
+    "add": false,
+    "import": false,
+    "export": false,
+    "refresh": true
+  },
+  "dataSource": {
+    "type": "sqlite",
+    "tableName": "QueryResultHistory",
+    "primaryKey": "id",
+    "fileName": "QueryResultHistory",
+    "relativePath": "gis/spacialQueryManager/QueryResultHistory.json"
+  }
+}

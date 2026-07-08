@@ -19,7 +19,7 @@
     :lazy-load="true"
     :header-tools="[
       { key: 'showToolbar', label: '查询工具', defaultVisible: true },
-      { key: 'showResults', label: '查询结果', defaultVisible: true }
+      { key: 'showResults', label: '查询历史', defaultVisible: true }
     ]"
   >
     <!-- ========== 工具栏 ========== -->
@@ -119,6 +119,22 @@
         @retry="executeQuery"
         @clear-highlight="clearHighlights"
       />
+
+      <!-- 查询历史列表 -->
+      <div v-if="queryHistory.length > 0" class="history-section">
+        <div class="history-header">查询历史 ({{ queryHistory.length }})</div>
+        <div v-for="(item, idx) in queryHistory" :key="item.id" class="history-item">
+          <div class="history-info">
+            <span class="history-type">{{ getTypeLabel(item.type) }}</span>
+            <span class="history-layer">{{ item.layerName }}</span>
+            <span class="history-time">{{ formatTime(item.time) }}</span>
+          </div>
+          <div class="history-actions">
+            <button class="history-btn" @click="replayHistory(item)" title="重绘此区域并飞至历史视角">重绘</button>
+            <button class="history-btn del" @click="removeHistory(idx)" title="删除">✕</button>
+          </div>
+        </div>
+      </div>
     </template>
 
     <!-- ========== 列表项（隐藏内置列表） ========== -->
@@ -196,6 +212,8 @@ export default {
 
       // 地图高亮 entity
       _highlightEntities: [],
+      // 查询历史
+      queryHistory: [],
 
       toolLabels: {
         point: '📍 点',
@@ -404,6 +422,8 @@ export default {
       }
 
       // 先清理之前的
+      if (this._historyCamClear) { this._historyCamClear.destroy(); this._historyCamClear = null; }
+      if (this._historyCanvas) { try { this._historyCanvas.parentNode.removeChild(this._historyCanvas); } catch (e) {} this._historyCanvas = null; }
       this.deactivateTool();
       this.clearResults();
 
@@ -434,11 +454,11 @@ export default {
     onDrawingComplete(geometry) {
       console.log('[' + this.componentName + '] 绘图完成:', geometry);
       this.drawnGeometry = geometry;
+      var drawType = this.activeTool; // 保存绘制类型
       this.activeTool = null;
 
-      // 遮罩暂不启用（_addEntityMask 逻辑保留）
-      // this._addEntityMask(geometry);
-      // this._hideCanvasOnCameraMove();
+      // 启动相机变化监听——变化时存入历史并清除绘制
+      this._watchCameraForHistory(geometry, drawType);
 
       // 绘图完成后自动执行查询（如果有图层选择）
       if (this.selectedLayerId) {
@@ -844,9 +864,225 @@ export default {
       }
     },
 
+    // ==================== 历史记录 ====================
+    _watchCameraForHistory(geometry, drawType) {
+      var self = this;
+      var viewer = this.getViewer();
+      var Cesium = this.getCesium();
+      if (!viewer || !Cesium) return;
+
+      // 保存当前相机状态和图形信息
+      var camera = viewer.camera;
+      var camState = {
+        position: camera.position.clone(),
+        heading: camera.heading,
+        pitch: camera.pitch,
+        roll: camera.roll
+      };
+
+      var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      var saved = false;
+
+      function saveToHistory() {
+        if (saved) return;
+        saved = true;
+        handler.destroy();
+
+        // 从 drawer 获取屏幕坐标用于重绘
+        var screenPts = null;
+        if (self._drawingManager && self._drawingManager._activeDrawer && self._drawingManager._activeDrawer.getLonLats) {
+          screenPts = self._drawingManager._activeDrawer.getLonLats();
+        }
+
+        var item = {
+          id: Date.now(),
+          type: drawType || 'unknown',
+          geometry: JSON.parse(JSON.stringify(geometry || self.drawnGeometry)),
+          screenPts: screenPts ? JSON.parse(JSON.stringify(screenPts)) : null,
+          camera: {
+            position: { x: camState.position.x, y: camState.position.y, z: camState.position.z },
+            heading: camState.heading,
+            pitch: camState.pitch,
+            roll: camState.roll
+          },
+          layerName: self.currentLayerName || '',
+          resultCount: self.queryResults ? self.queryResults.length : 0,
+          bufferRadius: self.bufferRadius,
+          time: new Date().toISOString()
+        };
+        self.queryHistory.unshift(item);
+
+        // 清除当前绘制
+        if (self._drawingManager) self._drawingManager.deactivate();
+        self.drawnGeometry = null;
+        self.clearResults();
+      }
+
+      handler.setInputAction(saveToHistory, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+      handler.setInputAction(saveToHistory, Cesium.ScreenSpaceEventType.MIDDLE_DOWN);
+      handler.setInputAction(saveToHistory, Cesium.ScreenSpaceEventType.RIGHT_DOWN);
+      handler.setInputAction(saveToHistory, Cesium.ScreenSpaceEventType.WHEEL);
+      this._historyCamHandler = handler;
+    },
+
+    replayHistory(item) {
+      var viewer = this.getViewer();
+      var Cesium = this.getCesium();
+      if (!viewer || !Cesium || !item) return;
+
+      // 先清除当前绘制
+      if (this._drawingManager) this._drawingManager.deactivate();
+
+      // 飞到历史相机位置
+      var pos = item.camera.position;
+      var self = this;
+      viewer.camera.flyTo({
+        destination: new Cesium.Cartesian3(pos.x, pos.y, pos.z),
+        orientation: {
+          heading: item.camera.heading,
+          pitch: item.camera.pitch,
+          roll: item.camera.roll
+        },
+        duration: 1.0,
+        complete: function () {
+          // 飞行完成后在 canvas 上重绘几何图形
+          self._redrawHistoryGeometry(item);
+        }
+      });
+
+      this.bufferRadius = item.bufferRadius || 500;
+      this.drawnGeometry = item.geometry;
+      this.queryResults = [];
+      this.queryError = null;
+
+      // 自动重新查询
+      if (this.selectedLayerId) {
+        setTimeout(function () {
+          self.executeQuery();
+        }, 1200);
+      }
+    },
+
+    _redrawHistoryGeometry(item) {
+      var viewer = this.getViewer();
+      var Cesium = this.getCesium();
+      if (!viewer || !Cesium || !item.geometry) return;
+      var geom = item.geometry;
+
+      // 清除旧历史 canvas
+      if (this._historyCanvas) {
+        try { this._historyCanvas.parentNode.removeChild(this._historyCanvas); } catch (e) {}
+        this._historyCanvas = null;
+      }
+      if (this._historyCamClear) { this._historyCamClear.destroy(); this._historyCamClear = null; }
+
+      // 创建 canvas
+      var container = viewer.container;
+      var canvas = document.createElement('canvas');
+      var cw = container.clientWidth || 1024;
+      var ch = container.clientHeight || 768;
+      canvas.width = cw; canvas.height = ch;
+      canvas.style.cssText = 'position:absolute;top:0;left:0;width:' + cw + 'px;height:' + ch + 'px;z-index:999;pointer-events:none;';
+      container.appendChild(canvas);
+      var ctx = canvas.getContext('2d');
+      ctx.strokeStyle = 'red';
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+      ctx.lineWidth = 1;
+
+      // 从经纬度投影到屏幕
+      function projectLonLat(lon, lat) {
+        var c = Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+        var s = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, c);
+        if (!Cesium.defined(s)) return null;
+        var r = viewer.scene.canvas.getBoundingClientRect();
+        return { x: s.x - r.left, y: s.y - r.top };
+      }
+
+      if (geom.type === 'Point') {
+        var pt = projectLonLat(geom.coordinates[0], geom.coordinates[1]);
+        if (!pt) { container.removeChild(canvas); return; }
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 200, 0, 0.4)';
+        ctx.fill();
+        ctx.stroke();
+      } else if (geom.type === 'LineString') {
+        var pts = geom.coordinates;
+        if (pts.length < 2) { container.removeChild(canvas); return; }
+        ctx.beginPath();
+        var first = projectLonLat(pts[0][0], pts[0][1]);
+        if (!first) { container.removeChild(canvas); return; }
+        ctx.moveTo(first.x, first.y);
+        for (var i = 1; i < pts.length; i++) {
+          var np = projectLonLat(pts[i][0], pts[i][1]);
+          if (np) ctx.lineTo(np.x, np.y);
+        }
+        ctx.stroke();
+      } else if (geom.type === 'Polygon') {
+        var ring = geom.coordinates[0];
+        if (ring.length < 3) { container.removeChild(canvas); return; }
+        ctx.beginPath();
+        var f = projectLonLat(ring[0][0], ring[0][1]);
+        if (!f) { container.removeChild(canvas); return; }
+        ctx.moveTo(f.x, f.y);
+        for (var j = 1; j < ring.length; j++) {
+          var np2 = projectLonLat(ring[j][0], ring[j][1]);
+          if (np2) ctx.lineTo(np2.x, np2.y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        container.removeChild(canvas);
+        return;
+      }
+
+      this._historyCanvas = canvas;
+
+      // 相机变化时清除历史画布（不重复记录）
+      var self = this;
+      var h = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      var cleared = false;
+      function clearCanvas() {
+        if (cleared) return;
+        cleared = true;
+        h.destroy();
+        if (self._historyCanvas && self._historyCanvas.parentNode) {
+          self._historyCanvas.parentNode.removeChild(self._historyCanvas);
+        }
+        self._historyCanvas = null;
+        self._historyCamClear = null;
+      }
+      h.setInputAction(clearCanvas, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+      h.setInputAction(clearCanvas, Cesium.ScreenSpaceEventType.MIDDLE_DOWN);
+      h.setInputAction(clearCanvas, Cesium.ScreenSpaceEventType.RIGHT_DOWN);
+      h.setInputAction(clearCanvas, Cesium.ScreenSpaceEventType.WHEEL);
+      this._historyCamClear = h;
+    },
+
+    removeHistory(idx) {
+      this.queryHistory.splice(idx, 1);
+    },
+
+    getTypeLabel(type) {
+      var map = { point: '📍点', line: '📏线', circle: '⭕圆', rectangle: '🔲矩形', polygon: '⬢多边形' };
+      return map[type] || type;
+    },
+
+    formatTime(iso) {
+      if (!iso) return '';
+      var d = new Date(iso);
+      return d.getHours().toString().padStart(2,'0') + ':' +
+             d.getMinutes().toString().padStart(2,'0') + ':' +
+             d.getSeconds().toString().padStart(2,'0');
+    },
+
     // ==================== 清理 ====================
     clearAll() {
+      if (this._historyCamHandler) { this._historyCamHandler.destroy(); this._historyCamHandler = null; }
       if (this._maskCamHandler) { this._maskCamHandler.destroy(); this._maskCamHandler = null; }
+      if (this._historyCamClear) { this._historyCamClear.destroy(); this._historyCamClear = null; }
+      if (this._historyCanvas) { try { this._historyCanvas.parentNode.removeChild(this._historyCanvas); } catch (e) {} this._historyCanvas = null; }
       this.deactivateTool();
       this.drawnGeometry = null;
       this.clearResults();
@@ -1011,4 +1247,51 @@ export default {
 .fields-status.loading {
   color: #FFA726;
 }
+
+/* ====== 查询历史 ====== */
+.history-section {
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.history-header {
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.04);
+  color: #aaa;
+  font-size: 12px;
+  font-weight: bold;
+}
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.2s;
+}
+.history-item:hover { background: rgba(255,255,255,0.04); }
+.history-info {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.history-type { color: #FFD600; }
+.history-layer { color: #64B5F6; }
+.history-time { color: #666; font-size: 11px; }
+.history-actions { display: flex; gap: 4px; }
+.history-btn {
+  padding: 2px 8px;
+  background: rgba(33,150,243,0.15);
+  border: 1px solid rgba(33,150,243,0.3);
+  color: #64B5F6;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.history-btn:hover { background: rgba(33,150,243,0.25); }
+.history-btn.del {
+  background: rgba(239,83,80,0.1);
+  border-color: rgba(239,83,80,0.3);
+  color: #EF5350;
+}
+.history-btn.del:hover { background: rgba(239,83,80,0.2); }
 </style>
