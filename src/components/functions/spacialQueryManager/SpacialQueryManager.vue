@@ -134,6 +134,7 @@ import '@componentsLib/JsonConfigPanelBase.mjs.css';
 import CesiumToolbarButton from '@componentsLib/CesiumToolbarButton.mjs';
 import QueryResultPanel from './QueryResultPanel.vue';
 import { DrawingToolManager } from './DrawingToolManager.js';
+import { commonGIS } from './jsDrawLib/commonGIS.js';
 import { geometryForXmlFilter } from './TurfSpatialFilter.js';
 import {
   executeQuery as wfsExecuteQuery,
@@ -241,7 +242,8 @@ export default {
   beforeUnmount() {
     this.deactivateTool();
     this.clearHighlights();
-    this.clearMask();
+    this._clearEntityMask();
+    if (this._maskCamHandler) { this._maskCamHandler.destroy(); this._maskCamHandler = null; }
     if (this._drawingManager) {
       this._drawingManager.destroy();
       this._drawingManager = null;
@@ -434,12 +436,179 @@ export default {
       this.drawnGeometry = geometry;
       this.activeTool = null;
 
+      // 创建 Entity 地理遮罩 + 相机移动时隐藏 Canvas
+      this._addEntityMask(geometry);
+      this._hideCanvasOnCameraMove();
+
       // 绘图完成后自动执行查询（如果有图层选择）
       if (this.selectedLayerId) {
         this.$nextTick(function () {
           this.executeQuery();
         }.bind(this));
       }
+    },
+
+    _hideCanvasOnCameraMove() {
+      var viewer = this.getViewer();
+      var Cesium = this.getCesium();
+      var dm = this._drawingManager;
+      if (!viewer || !Cesium || !dm || !dm._activeDrawer) return;
+      var canvas = dm._activeDrawer.canvas;
+      if (!canvas) return;
+
+      var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      var hidden = false;
+      function hide() {
+        if (!hidden && canvas.parentNode) {
+          hidden = true;
+          canvas.parentNode.removeChild(canvas);
+          handler.destroy();
+        }
+      }
+      handler.setInputAction(hide, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+      handler.setInputAction(hide, Cesium.ScreenSpaceEventType.MIDDLE_DOWN);
+      handler.setInputAction(hide, Cesium.ScreenSpaceEventType.RIGHT_DOWN);
+      handler.setInputAction(hide, Cesium.ScreenSpaceEventType.WHEEL);
+      this._maskCamHandler = handler;
+    },
+
+    _addEntityMask(geometry) {
+      var viewer = this.getViewer();
+      var Cesium = this.getCesium();
+      if (!viewer || !Cesium || !geometry) return;
+      this._clearEntityMask();
+      var flat = this._geomToFlatArray(geometry);
+      if (!flat || flat.length < 6) return;
+
+      // 优先使用 drawer 保存的完整 Cartesian3（含高度，确保投影可逆）
+      var dm = this._drawingManager;
+      var holePositions;
+      if (dm && dm._activeDrawer && dm._activeDrawer.getCartesians) {
+        var carts = dm._activeDrawer.getCartesians();
+        var valid = carts.filter(function (c) { return Cesium.defined(c); });
+        if (valid.length >= 3) {
+          var closed = valid.slice();
+          closed.push(valid[0]);
+          holePositions = closed;
+        }
+      }
+      if (!holePositions) {
+        holePositions = Cesium.Cartesian3.fromDegreesArray(flat);
+      }
+      console.log('[Entity遮罩] holePositions:', holePositions.length, 'points');
+
+      // 基于洞的包围盒计算外环（避开 antimeridian/极点问题）
+      var minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+      for (var i = 0; i < flat.length; i += 2) {
+        if (flat[i] < minLon) minLon = flat[i];
+        if (flat[i] > maxLon) maxLon = flat[i];
+        if (flat[i + 1] < minLat) minLat = flat[i + 1];
+        if (flat[i + 1] > maxLat) maxLat = flat[i + 1];
+      }
+      var margin = 90;
+      var oMinLon = Math.max(-179, minLon - margin);
+      var oMaxLon = Math.min(179, maxLon + margin);
+      var oMinLat = Math.max(-89, minLat - margin);
+      var oMaxLat = Math.min(89, maxLat + margin);
+      var outerFlat = [oMinLon, oMinLat, oMaxLon, oMinLat, oMaxLon, oMaxLat, oMinLon, oMaxLat];
+      var outerRing = Cesium.Cartesian3.fromDegreesArray(outerFlat);
+
+      var maskEntity = new Cesium.Entity({
+        id: 'myMaskPolygon',
+        polygon: {
+          hierarchy: {
+            positions: outerRing,
+            holes: [{ positions: holePositions }]
+          },
+          material: Cesium.Color.fromAlpha(Cesium.Color.fromBytes(15, 38, 84), 0.7)
+        }
+      });
+
+      var holeClosed = flat.slice();
+      holeClosed.push(flat[0], flat[1]);
+      var lineEntity = new Cesium.Entity({
+        id: 'myMaskPolyline',
+        polyline: {
+          positions: Cesium.Cartesian3.fromDegreesArray(holeClosed),
+          width: 3,
+          material: Cesium.Color.YELLOW
+        }
+      });
+
+      viewer.entities.add(maskEntity);
+      viewer.entities.add(lineEntity);
+    },
+
+    _geomToFlatArray(geometry) {
+      var flat = [];
+      var buf = 0.001;
+      if (geometry.type === 'Point') {
+        var lon = geometry.coordinates[0], lat = geometry.coordinates[1];
+        var r = geometry.radius ? geometry.radius / 111320 : buf;
+        for (var i = 0; i <= 32; i++) {
+          var a = (i / 32) * Math.PI * 2;
+          flat.push(lon + r * Math.cos(a), lat + r * Math.sin(a) * Math.cos(lat * Math.PI / 180));
+        }
+      } else if (geometry.type === 'LineString') {
+        var pts = geometry.coordinates;
+        for (var j = 0; j < pts.length; j++) flat.push(pts[j][0], pts[j][1]);
+        for (var k = pts.length - 1; k >= 0; k--)
+          flat.push(pts[k][0] + buf / Math.cos(pts[k][1] * Math.PI / 180), pts[k][1] + buf);
+      } else if (geometry.type === 'Polygon') {
+        var ring = geometry.coordinates[0];
+        for (var m = 0; m < ring.length; m++) flat.push(ring[m][0], ring[m][1]);
+      }
+      return flat.length >= 6 ? flat : null;
+    },
+
+    _clearEntityMask() {
+      var viewer = this.getViewer();
+      if (!viewer) return;
+      ['myMaskPolygon', 'myMaskPolyline'].forEach(function (id) {
+        var e = viewer.entities.getById(id);
+        if (e) viewer.entities.remove(e);
+      });
+    },
+
+    _listenCameraMoveToHideCanvas() {
+      var self = this;
+      var viewer = this.getViewer();
+      if (!viewer || !this._drawingManager || !this._drawingManager._activeDrawer) return;
+      var drawer = this._drawingManager._activeDrawer;
+      var canvas = drawer.canvas;
+      if (!canvas) return;
+      var handler = new (this.getCesium()).ScreenSpaceEventHandler(viewer.scene.canvas);
+      var hidden = false;
+      handler.setInputAction(function () {
+        if (!hidden && canvas.parentNode) {
+          hidden = true;
+          canvas.parentNode.removeChild(canvas);
+          handler.destroy();
+        }
+      }, (this.getCesium()).ScreenSpaceEventType.LEFT_DOWN);
+      handler.setInputAction(function () {
+        if (!hidden && canvas.parentNode) {
+          hidden = true;
+          canvas.parentNode.removeChild(canvas);
+          handler.destroy();
+        }
+      }, (this.getCesium()).ScreenSpaceEventType.MIDDLE_DOWN);
+      handler.setInputAction(function () {
+        if (!hidden && canvas.parentNode) {
+          hidden = true;
+          canvas.parentNode.removeChild(canvas);
+          handler.destroy();
+        }
+      }, (this.getCesium()).ScreenSpaceEventType.RIGHT_DOWN);
+      // 滚轮缩放
+      handler.setInputAction(function (delta) {
+        if (!hidden && canvas.parentNode) {
+          hidden = true;
+          canvas.parentNode.removeChild(canvas);
+          handler.destroy();
+        }
+      }, (this.getCesium()).ScreenSpaceEventType.WHEEL);
+      this._maskCameraHandler = handler;
     },
 
     // ==================== 反遮罩（使用已验证的 commonGIS.addMaskPolygon） ====================
@@ -677,10 +846,11 @@ export default {
 
     // ==================== 清理 ====================
     clearAll() {
+      if (this._maskCamHandler) { this._maskCamHandler.destroy(); this._maskCamHandler = null; }
       this.deactivateTool();
       this.drawnGeometry = null;
       this.clearResults();
-      // 清除地图上所有已绘制的图形标记
+      this._clearEntityMask();
       if (this._drawingManager) {
         this._drawingManager.clearAllDrawings();
       }

@@ -57,22 +57,32 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
   // 直接传 canvas 元素，绕过 getElementById（兼容 shadow DOM）
   DT.init({ canvas: canvas });
 
-  var clickLonLats = [];    // 地理坐标
-  var clickScreenPts = [];  // 屏幕坐标（与 DrawingTools 同源，避免 Cesium 转换偏差）
+  var clickLonLats = [];    // 地理坐标 [lon, lat]
+  var clickCartesians = []; // 完整 Cartesian3（含高度，确保 wgs84ToWindowCoordinates 可逆）
+  var clickScreenPts = [];  // 屏幕坐标（视口绝对坐标）
   var isCancelled = false;
   var isFinalized = false;
 
+  // 使用 Cesium canvas 坐标（非叠加 canvas），确保 pickPosition 准确
+  var cesiumCanvas = viewer.scene.canvas;
+
   function captureLonLat(e) {
-    var rect = canvas.getBoundingClientRect();
+    var rect = cesiumCanvas.getBoundingClientRect();
     var x = e.clientX - rect.left;
     var y = e.clientY - rect.top;
     var c = screenToCartesian(viewer, new Cesium.Cartesian2(x, y));
     return Cesium.defined(c) ? cartesianToLonLat(c) : null;
   }
 
+  // 存储视口绝对坐标（不受 canvas 位置变化影响）
   function captureScreenPt(e) {
-    var rect = canvas.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  // 视口坐标 → cesiumCanvas 相对坐标（动态计算，始终准确）
+  function viewportToCanvas(pt) {
+    var rect = cesiumCanvas.getBoundingClientRect();
+    return { x: pt.x - rect.left, y: pt.y - rect.top };
   }
 
   // point 模式：mousedown 即记录坐标（防止 mouseOut 中断导致丢失）
@@ -136,7 +146,7 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
     ctx.save();
     if (type === 'point') {
       for (var i = 0; i < clickScreenPts.length; i++) {
-        var sc = clickScreenPts[i];
+        var sc = viewportToCanvas(clickScreenPts[i]);
         ctx.fillStyle = 'rgba(255, 200, 0, 0.15)';
         ctx.strokeStyle = 'rgba(255, 200, 0, 0.35)';
         ctx.lineWidth = 1;
@@ -152,7 +162,7 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
       ctx.lineJoin = 'round';
       ctx.beginPath();
       for (var j = 0; j < clickScreenPts.length; j++) {
-        var pt = clickScreenPts[j];
+        var pt = viewportToCanvas(clickScreenPts[j]);
         if (j === 0) ctx.moveTo(pt.x, pt.y);
         else ctx.lineTo(pt.x, pt.y);
       }
@@ -180,6 +190,10 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
   function finalize() {
     if (isFinalized || isCancelled) return;
     isFinalized = true;
+
+    // 用当前相机统一重新计算所有点的经纬度（消除绘制过程中相机移动导致的偏差）
+    recalcLonLats();
+
     var geom = null;
 
     if (type === 'point') {
@@ -211,34 +225,85 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
       }
     }
 
-    // 绘制反遮罩（evenodd 挖洞）
-    addMaskToCanvas();
-    if (geom && onComplete) onComplete(geom);
-  }
-
-  function addMaskToCanvas() {
-    if (clickScreenPts.length < 3) return;
-    var ctx = canvas.getContext('2d');
-    var w = canvas.width, h = canvas.height;
-    ctx.save();
-    ctx.fillStyle = 'rgba(15, 38, 84, 0.65)';
-    // 大矩形 + 洞内形状（反序），evenodd 挖洞
-    ctx.beginPath();
-    ctx.moveTo(0, 0); ctx.lineTo(w, 0); ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
-    for (var i = clickScreenPts.length - 1; i >= 0; i--) {
-      if (i === clickScreenPts.length - 1) ctx.moveTo(clickScreenPts[i].x, clickScreenPts[i].y);
-      else ctx.lineTo(clickScreenPts[i].x, clickScreenPts[i].y);
-    }
-    ctx.closePath();
-    ctx.fill('evenodd');
-    ctx.restore();
-    // 停用 DrawingTools 但保留 canvas，禁用鼠标事件让 Cesium 可交互
+    // 停用 DrawingTools，保留 canvas 供遮罩渲染
     DT.hand();
     canvas.style.cursor = '';
     canvas.style.pointerEvents = 'none';
     canvas.removeEventListener('contextmenu', ctxMenu);
     canvas.removeEventListener('mousedown', onMouseDown);
     canvas.removeEventListener('mouseup', onMouseUp);
+
+    logMaskCoords();
+    drawMaskOnce();
+    if (geom && onComplete) onComplete(geom);
+  }
+
+  // 用当前相机统一重新计算所有点（保存完整 Cartesian3 含高度）
+  function recalcLonLats() {
+    for (var i = 0; i < clickScreenPts.length; i++) {
+      var cp = viewportToCanvas(clickScreenPts[i]);
+      var c = screenToCartesian(viewer, new Cesium.Cartesian2(cp.x, cp.y));
+      if (Cesium.defined(c)) {
+        clickCartesians[i] = c;                              // 含实际高度
+        clickLonLats[i] = cartesianToLonLat(c);              // 扁平化 lon/lat
+      }
+    }
+  }
+
+  // 打印遮罩坐标对比日志
+  function logMaskCoords() {
+    var C = window.Cesium;
+    // 将视口坐标转为当前 canvas 相对坐标
+    var canvasPts = [];
+    for (var k = 0; k < clickScreenPts.length; k++) {
+      canvasPts.push(viewportToCanvas(clickScreenPts[k]));
+    }
+    console.log('===== 遮罩坐标对比 =====');
+    console.log('[Canvas遮罩] 视口坐标:', JSON.parse(JSON.stringify(clickScreenPts)));
+    console.log('[Canvas遮罩] →当前canvas坐标:', JSON.parse(JSON.stringify(canvasPts)));
+    console.log('[Canvas遮罩] 经纬度:', JSON.parse(JSON.stringify(clickLonLats)));
+    // 将经纬度用当前相机重投影到 canvas 坐标
+    var projectedPts = [];
+    var ccRect = cesiumCanvas.getBoundingClientRect();
+    for (var i = 0; i < clickLonLats.length; i++) {
+      var cart = clickCartesians[i] || C.Cartesian3.fromDegrees(clickLonLats[i][0], clickLonLats[i][1], 0);
+      var sc = C.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, cart);
+      if (C.defined(sc)) {
+        projectedPts.push({ x: sc.x - ccRect.left, y: sc.y - ccRect.top });
+      }
+    }
+    console.log('[Entity遮罩] Cartesian3→canvas投影:', JSON.parse(JSON.stringify(projectedPts)));
+    console.log('[坐标参考] Cesium canvas rect:', {left: ccRect.left, top: ccRect.top, w: ccRect.width, h: ccRect.height});
+    console.log('===== 对比结束 ====');
+  }
+
+  // 一次性 Canvas 遮罩（使用地理→屏幕投影，与 Entity 遮罩同源）
+  function drawMaskOnce() {
+    if (clickLonLats.length < 3) return;
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width, h = canvas.height;
+    // 用 Cesium 投影转换（与 Entity 渲染一致）
+    var screenPts = [];
+    for (var i = 0; i < clickLonLats.length; i++) {
+      var cart = clickCartesians[i] || Cesium.Cartesian3.fromDegrees(clickLonLats[i][0], clickLonLats[i][1], 0);
+      var sc = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, cart);
+      if (Cesium.defined(sc)) {
+        var rect = cesiumCanvas.getBoundingClientRect();
+        screenPts.push({ x: sc.x - rect.left, y: sc.y - rect.top });
+      }
+    }
+    if (screenPts.length < 3) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(15, 38, 84, 0.65)';
+    ctx.beginPath();
+    ctx.moveTo(0, 0); ctx.lineTo(w, 0); ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+    for (var j = screenPts.length - 1; j >= 0; j--) {
+      if (j === screenPts.length - 1) ctx.moveTo(screenPts[j].x, screenPts[j].y);
+      else ctx.lineTo(screenPts[j].x, screenPts[j].y);
+    }
+    ctx.closePath();
+    ctx.fill('evenodd');
+    ctx.restore();
   }
 
   function cancel() {
@@ -267,7 +332,7 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
     DT.clear();
     cleanup();
   }
-  return { deactivate: removeCanvas, canvas: canvas };
+  return { deactivate: removeCanvas, canvas: canvas, getCartesians: function () { return clickCartesians; }, getLonLats: function () { return clickLonLats; } };
 }
 
 // ==================== DrawingToolManager ====================
