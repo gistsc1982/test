@@ -36,14 +36,18 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
   var container = viewer.container;
   if (!container) return null;
 
-  // 创建叠加 canvas
+  // 先获取 Cesium canvas 引用，确保叠加 canvas 尺寸完全一致
+  var cesiumCanvas = viewer.scene.canvas;
+
+  // 创建叠加 canvas — 尺寸必须与 Cesium canvas 完全一致
   var canvas = document.createElement('canvas');
-  var cw = container.clientWidth  || container.offsetWidth  || 1024;
-  var ch = container.clientHeight || container.offsetHeight || 768;
+  var cw = cesiumCanvas.clientWidth  || cesiumCanvas.width  || 1024;
+  var ch = cesiumCanvas.clientHeight || cesiumCanvas.height || 768;
   canvas.width  = cw;
   canvas.height = ch;
   canvas.style.cssText = 'position:absolute;top:0;left:0;width:' + cw + 'px;height:' + ch + 'px;z-index:99999;cursor:crosshair;pointer-events:auto;display:block;';
   container.appendChild(canvas);
+  console.log('[DrawingToolManager] canvas: ' + cw + 'x' + ch + ' (Cesium canvas: ' + cesiumCanvas.width + 'x' + cesiumCanvas.height + ')');
 
   var ctxMenu = function (e) { e.preventDefault(); };
   canvas.addEventListener('contextmenu', ctxMenu);
@@ -63,26 +67,25 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
   var isCancelled = false;
   var isFinalized = false;
 
-  // 使用 Cesium canvas 坐标（非叠加 canvas），确保 pickPosition 准确
-  var cesiumCanvas = viewer.scene.canvas;
+  // 设备像素比（Cesium canvas 内部分辨率 = CSS尺寸 × DPR）
+  var dpr = window.devicePixelRatio || 1;
 
   function captureLonLat(e) {
     var rect = cesiumCanvas.getBoundingClientRect();
-    var x = e.clientX - rect.left;
-    var y = e.clientY - rect.top;
+    // pickPosition 使用 canvas 内部坐标（CSS像素 × DPR）
+    var x = (e.clientX - rect.left) * dpr;
+    var y = (e.clientY - rect.top) * dpr;
     var c = screenToCartesian(viewer, new Cesium.Cartesian2(x, y));
     return Cesium.defined(c) ? cartesianToLonLat(c) : null;
   }
 
-  // 存储视口绝对坐标（不受 canvas 位置变化影响）
   function captureScreenPt(e) {
     return { x: e.clientX, y: e.clientY };
   }
 
-  // 视口坐标 → cesiumCanvas 相对坐标（动态计算，始终准确）
   function viewportToCanvas(pt) {
     var rect = cesiumCanvas.getBoundingClientRect();
-    return { x: pt.x - rect.left, y: pt.y - rect.top };
+    return { x: (pt.x - rect.left) * dpr, y: (pt.y - rect.top) * dpr };
   }
 
   // point 模式：mousedown 即记录坐标（防止 mouseOut 中断导致丢失）
@@ -238,14 +241,16 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
     if (geom && onComplete) onComplete(geom);
   }
 
-  // 用当前相机统一重新计算所有点（保存完整 Cartesian3 含高度）
+  // 用当前相机统一重新计算所有点（高度统一归零到椭球面）
   function recalcLonLats() {
     for (var i = 0; i < clickScreenPts.length; i++) {
       var cp = viewportToCanvas(clickScreenPts[i]);
       var c = screenToCartesian(viewer, new Cesium.Cartesian2(cp.x, cp.y));
       if (Cesium.defined(c)) {
-        clickCartesians[i] = c;                              // 含实际高度
-        clickLonLats[i] = cartesianToLonLat(c);              // 扁平化 lon/lat
+        var ll = cartesianToLonLat(c);
+        clickLonLats[i] = ll;
+        // 统一归零到椭球面（空间查询不涉及高度）
+        clickCartesians[i] = Cesium.Cartesian3.fromDegrees(ll[0], ll[1], 0);
       }
     }
   }
@@ -269,10 +274,10 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
       var cart = clickCartesians[i] || C.Cartesian3.fromDegrees(clickLonLats[i][0], clickLonLats[i][1], 0);
       var sc = C.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, cart);
       if (C.defined(sc)) {
-        projectedPts.push({ x: sc.x - ccRect.left, y: sc.y - ccRect.top });
+        projectedPts.push({ x: (sc.x - ccRect.left) / dpr, y: (sc.y - ccRect.top) / dpr });
       }
     }
-    console.log('[Entity遮罩] Cartesian3→canvas投影:', JSON.parse(JSON.stringify(projectedPts)));
+    console.log('[投影] canvas坐标(DPR=' + dpr + '):', JSON.parse(JSON.stringify(projectedPts)));
     console.log('[坐标参考] Cesium canvas rect:', {left: ccRect.left, top: ccRect.top, w: ccRect.width, h: ccRect.height});
     console.log('===== 对比结束 ====');
   }
@@ -289,7 +294,8 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
       var sc = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, cart);
       if (Cesium.defined(sc)) {
         var rect = cesiumCanvas.getBoundingClientRect();
-        screenPts.push({ x: sc.x - rect.left, y: sc.y - rect.top });
+        // wgs84ToWindowCoordinates 返回的是 Cesium 内部坐标（含 DPR），转为 CSS 像素
+        screenPts.push({ x: (sc.x - rect.left) / dpr, y: (sc.y - rect.top) / dpr });
       }
     }
     if (screenPts.length < 3) return;
