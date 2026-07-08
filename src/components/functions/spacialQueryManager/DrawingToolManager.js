@@ -236,8 +236,9 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
     canvas.removeEventListener('mousedown', onMouseDown);
     canvas.removeEventListener('mouseup', onMouseUp);
 
-    logMaskCoords();
-    drawMaskOnce();
+    // 遮罩暂不启用，保留计算逻辑供后续使用
+    // logMaskCoords();
+    // drawMaskOnce();
     if (geom && onComplete) onComplete(geom);
   }
 

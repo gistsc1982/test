@@ -436,9 +436,9 @@ export default {
       this.drawnGeometry = geometry;
       this.activeTool = null;
 
-      // 创建 Entity 地理遮罩 + 相机移动时隐藏 Canvas
-      this._addEntityMask(geometry);
-      this._hideCanvasOnCameraMove();
+      // 遮罩暂不启用（_addEntityMask 逻辑保留）
+      // this._addEntityMask(geometry);
+      // this._hideCanvasOnCameraMove();
 
       // 绘图完成后自动执行查询（如果有图层选择）
       if (this.selectedLayerId) {
