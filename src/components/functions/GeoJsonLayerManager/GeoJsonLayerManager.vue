@@ -502,6 +502,51 @@ export default {
             console.log('[' + this.componentName + '] 🎨 径向渐变圆已应用，Canvas 缓存档位数=' + Object.keys(canvasCache).length);
           }
 
+          // ⭐ pinField：在气泡上叠加 Cesium Label 显示字段值
+          if (geoType === 'Point' && layer.pinField && entities.length > 0) {
+            var pinField = layer.pinField;
+            var pinFontSize = layer.pinFontSize || 18;
+            var pinTextColor = layer.pinTextColor || '#FFFFFF';
+            var measureCanvas = document.createElement('canvas');
+            var measureCtx = measureCanvas.getContext('2d');
+
+            entities.forEach(function (ent) {
+              try {
+                var props = ent.properties ? (ent.properties.getValue ? ent.properties.getValue() : ent.properties) : null;
+                var pinText = props ? String(props[pinField] || '') : '';
+                if (!pinText) return;
+
+                // canvas 实测文字宽度，精确计算气泡所需大小
+                if (ent.billboard && ent.billboard.image) {
+                  var bImg = ent.billboard.image;
+                  var bw = bImg.width || 64;
+                  measureCtx.font = 'bold ' + pinFontSize + 'px sans-serif';
+                  var actualTextW = measureCtx.measureText(pinText).width;
+                  var minBubbleW = actualTextW + pinFontSize;
+                  if (minBubbleW > bw) {
+                    ent.billboard.scale = Math.min(minBubbleW / bw, 5.0);
+                  }
+                }
+
+                ent.label = new Cesium.LabelGraphics({
+                  text: pinText,
+                  font: 'bold ' + pinFontSize + 'px sans-serif',
+                  fillColor: Cesium.Color.fromCssColorString(pinTextColor),
+                  outlineColor: Cesium.Color.BLACK,
+                  outlineWidth: 3,
+                  style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                  horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                  verticalOrigin: Cesium.VerticalOrigin.CENTER,
+                  pixelOffset: new Cesium.Cartesian2(0, (layer.pinPixelOffsetY != null ? layer.pinPixelOffsetY : 30)),
+                  disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                  scale: 1.0,
+                  eyeOffset: new Cesium.Cartesian3(0, 0, -50)
+                });
+              } catch (e) { /* skip */ }
+            });
+            console.log('[' + this.componentName + '] 📌 pinField="' + pinField + '": ' + entities.length + ' 个实体已添加 Label');
+          }
+
           // ⭐ 热力图叠加：点图层 + heatmapEnabled → 渲染 Canvas 叠加到 Cesium 地形上
           if (geoType === 'Point' && layer.heatmapEnabled && entities.length > 0) {
             this._createHeatmapOverlay(layer, geoJsonData, viewer, Cesium);

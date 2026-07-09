@@ -28,6 +28,20 @@
         工具
       </button>
     </template>
+
+    <!-- 工具栏额外按钮：JSON 强制刷新 -->
+    <template #toolbar-extra>
+      <button
+        @click="forceReloadFromJSON"
+        :disabled="refreshLoading"
+        class="oblique-toolbar-refresh-btn"
+        type="button"
+        :title="refreshLoading ? '刷新中...' : '从 JSON 文件强制刷新（忽略缓存）'"
+      >
+        {{ refreshLoading ? '⏳' : '🔄' }}
+      </button>
+    </template>
+
     <!-- 列表项内容（添加复选框和状态显示） -->
     <template #list-item="{ item }">
       <label class="oblique-checkbox">
@@ -170,7 +184,10 @@ export default {
       componentName: 'ObliquePhotoManager',
 
       // ⭐ 配置加载策略实例
-      _configStrategy: null
+      _configStrategy: null,
+
+      // 强制刷新中标记
+      refreshLoading: false
     };
   },
 
@@ -305,6 +322,59 @@ export default {
         console.error(`[${this.componentName}] ❌ 保存失败:`, error);
         alert(`保存失败！\n错误：${error.message}`);
         return false;
+      }
+    },
+
+    /**
+     * 🔄 强制从 JSON 文件刷新（绕过 SQLite 缓存，与 GeoJsonLayerManager/LayerTreeManager 一致）
+     */
+    async forceReloadFromJSON() {
+      const log = (...args) => console.log(`[${this.componentName}] 🔄`, ...args);
+      log('开始从 JSON 文件强制刷新...');
+      this.refreshLoading = true;
+
+      try {
+        const factory = new ConfigStrategyFactory();
+        const jsonStrategy = factory.createJSONFileStrategy(this.panelMetadata.featureFolder);
+
+        log(`加载 JSON: /data/gis/${this.panelMetadata.featureFolder}/${this.panelMetadata.featureFolder}.json`);
+        const jsonData = await jsonStrategy.load();
+
+        if (!jsonData || jsonData.length === 0) {
+          console.warn(`[${this.componentName}] ⚠️ JSON 文件无数据或加载失败`);
+          return;
+        }
+
+        log(`✅ JSON 加载成功，共 ${jsonData.length} 条`);
+
+        // 卸载所有已加载图层
+        if (this._cesiumTilesets && this._cesiumTilesets.size > 0) {
+          log(`🗑️ 卸载 ${this._cesiumTilesets.size} 个已加载图层...`);
+          this._cesiumTilesets.forEach((tileset) => {
+            try {
+              const viewer = this.getCesiumViewer();
+              if (viewer && !viewer.isDestroyed() && !tileset.isDestroyed()) {
+                viewer.scene.primitives.remove(tileset);
+              }
+            } catch (e) { /* ignore */ }
+          });
+          this._cesiumTilesets.clear();
+        }
+
+        // 更新 basePanel 的 configList
+        if (this.$refs.basePanel) {
+          this.$refs.basePanel.configList = jsonData.map(item => ({
+            ...item,
+            loaded: false,
+            loading: false
+          }));
+        }
+
+        log('✅ 强制刷新完成');
+      } catch (e) {
+        console.warn(`[${this.componentName}] ⚠️ 强制刷新失败:`, e.message);
+      } finally {
+        this.refreshLoading = false;
       }
     },
 

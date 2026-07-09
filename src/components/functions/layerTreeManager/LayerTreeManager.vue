@@ -69,6 +69,16 @@
         </svg>
         列表
       </button>
+      <span class="toolbar-sep"></span>
+      <button
+        @click="forceReloadGeoJsonConfig"
+        :disabled="refreshLoading"
+        class="sec-btn"
+        :title="refreshLoading ? '刷新中...' : '从 JSON 文件强制刷新 GeoJSON 图层配置（忽略缓存）'"
+        type="button"
+      >
+        {{ refreshLoading ? '⏳' : '🔄' }}
+      </button>
     </template>
 
     <!-- ===== 树形图层展示区域（before-list 插槽） ===== -->
@@ -1187,6 +1197,9 @@ export default {
       // 图层加载中状态（防止重复点击和并发加载）
       loadingLayerIds: {},
 
+      // GeoJSON 配置刷新中标记
+      refreshLoading: false,
+
       // 图层加载错误信息（非阻塞式错误提示）
       layerErrors: {},
 
@@ -1856,6 +1869,13 @@ export default {
         for (let i = 0; i < layers.length; i++) {
           const layer = layers[i];
           const nodeId = 'local-geojson-' + layer.id;
+
+          // ⭐ 始终更新 _localGeoJsonMeta（即使节点已存在也要刷新样式配置）
+          this._localGeoJsonMeta.set(nodeId, {
+            rawGeoJson: layer.geoJson,
+            config: layer
+          });
+
           if (existingIds.has(nodeId)) continue;
 
           // 解析并缓存 GeoJSON 数据
@@ -1935,6 +1955,44 @@ export default {
       } catch (err) {
         console.warn(`[${this.componentName}] ⚠️ 无法加载本地 GeoJSON 图层目录:`, err.message,
           '(本地 API 可能未启动，已加载的内置/持久化节点不受影响)');
+      }
+    },
+
+    /**
+     * 🔄 强制从 JSON 刷新全部配置（忽略缓存）
+     *    1) 直接读 LayerTreeManager.json → 更新本面板节点树
+     *    2) 直接读 GeoJsonLayerManager.json → 更新图层样式缓存（pinField/sizeField 等）
+     */
+    async forceReloadGeoJsonConfig() {
+      const log = (...args) => console.log(`[${this.componentName}] 🔄`, ...args);
+      this.refreshLoading = true;
+
+      try {
+        // ── 1. 刷新本面板配置：直接读 LayerTreeManager.json（绕过 SQLite） ──
+        log('1/2 直接加载 LayerTreeManager.json 更新节点树...');
+        const fetchURL = '/data/gis/layerTreeManager/LayerTreeManager.json';
+        const resp = await fetch(fetchURL, { cache: 'no-cache' });
+        if (resp.ok) {
+          const jsonData = await resp.json();
+          if (Array.isArray(jsonData) && jsonData.length > 0) {
+            if (this.$refs.basePanel) {
+              this.$refs.basePanel.configList = jsonData.map(item => ({ ...item, loaded: false, loading: false }));
+            }
+            log(`✅ LayerTreeManager.json 加载成功，${jsonData.length} 条节点`);
+          }
+        } else {
+          log(`⚠️ LayerTreeManager.json HTTP ${resp.status}`);
+        }
+
+        // ── 2. 刷新图层样式配置：直接读 GeoJsonLayerManager.json ──
+        log('2/2 重新加载 GeoJsonLayerManager.json 样式缓存...');
+        this._localGeoJsonMeta.clear();
+        await this._loadLocalGeoJsonLayers();
+        log('✅ 全部配置已从 JSON 强制刷新');
+      } catch (e) {
+        console.warn(`[${this.componentName}] ⚠️ 强制刷新失败:`, e.message);
+      } finally {
+        this.refreshLoading = false;
       }
     },
 
@@ -2946,9 +3004,11 @@ export default {
 
             // ⭐ 动态本地图层：按需解析 GeoJSON（不常驻缓存，解析后立即释放）
             let geojsonData;
+            let dynamicLayerConfig = null;  // 保存完整 layer config，供 pinField/sizeField 使用
             if (node._dynamicSource === 'GeoJsonLayerManager') {
               const cacheKey = node._dynamicGeojsonId || node.id;
               const meta = this._localGeoJsonMeta.get(cacheKey);
+              dynamicLayerConfig = meta ? meta.config : null;  // 保存完整配置供后续 pinField 使用
               if (!meta || !meta.rawGeoJson) {
                 throw new Error(`本地 GeoJSON 缓存未命中: ${cacheKey}。请刷新面板重新加载。`);
               }
@@ -3070,6 +3130,56 @@ export default {
             }
             viewer.dataSources.add(dataSource);
             dataSource.name = node.name;
+
+            // ⭐ pinField：在气泡上叠加 Cesium Label 显示字段值
+            const layerCfg = dynamicLayerConfig || {};
+            if (layerCfg.pinField && ents.length > 0) {
+              const pinField = layerCfg.pinField;
+              const pinFontSize = layerCfg.pinFontSize || 18;
+              const pinTextColor = layerCfg.pinTextColor || '#FFFFFF';
+
+              // 预创建一个测量 canvas（所有实体复用）
+              const measureCanvas = document.createElement('canvas');
+              const measureCtx = measureCanvas.getContext('2d');
+
+              for (let pi = 0; pi < ents.length; pi++) {
+                try {
+                  const ent = ents[pi];
+                  const props = ent.properties ? (ent.properties.getValue ? ent.properties.getValue() : ent.properties) : null;
+                  const pinText = props ? String(props[pinField] || '') : '';
+                  if (!pinText) continue;
+
+                  // canvas 实测文字宽度，精确计算气泡所需大小
+                  if (ent.billboard && ent.billboard.image) {
+                    const bImg = ent.billboard.image;
+                    const bw = bImg.width || 64;
+                    measureCtx.font = 'bold ' + pinFontSize + 'px sans-serif';
+                    const actualTextW = measureCtx.measureText(pinText).width;
+                    const minBubbleW = actualTextW + pinFontSize; // 文字宽 + 1 字间距
+                    if (minBubbleW > bw) {
+                      ent.billboard.scale = Math.min(minBubbleW / bw, 5.0);
+                    }
+                  }
+
+                  ent.label = new Cesium.LabelGraphics({
+                    text: pinText,
+                    font: 'bold ' + pinFontSize + 'px sans-serif',
+                    fillColor: Cesium.Color.fromCssColorString(pinTextColor),
+                    outlineColor: Cesium.Color.BLACK,
+                    outlineWidth: 3,
+                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                    horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                    verticalOrigin: Cesium.VerticalOrigin.CENTER,
+                    pixelOffset: new Cesium.Cartesian2(0, (layerCfg.pinPixelOffsetY != null ? layerCfg.pinPixelOffsetY : 30)),
+                    disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                    scale: 1.0,
+                    eyeOffset: new Cesium.Cartesian3(0, 0, -50)
+                  });
+                } catch (e) { /* skip */ }
+              }
+              viewer.scene.requestRender();
+              console.log(`[${this.componentName}] 📌 pinField="${pinField}": ${ents.length} 个实体已添加 Label`);
+            }
 
             // ⭐ 点聚类支持（复用 GeoJsonLayerManager 逻辑）
             if (node.clusterEnabled && entityCount > 0) {
