@@ -77,7 +77,7 @@
     "markerIcon": "",
     "markerSize": 64,
     "clampToGround": false,
-    "labelField": "name",
+    "labelField": "population",
     "labelFontSize": 20,
     "labelColor": "#ff6644",
     "labelVisibleMax": 50000,
@@ -87,7 +87,12 @@
     "sizeField": "population",
     "sizeFieldMin": 10,
     "sizeFieldMax": 64,
-    "fillOpacity": 0.7
+    "fillOpacity": 0.7,
+    "pinField": "population",
+    "pinFontSize": 18,
+    "pinTextColor": "#FFFFFF",
+    "pinBgColor": "rgba(0,0,0,0.75)",
+    "pinPixelOffsetY": -50
   },
   {
     "id": "geojson-point-jian-heatmap",

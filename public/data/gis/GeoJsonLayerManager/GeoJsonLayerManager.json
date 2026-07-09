@@ -77,7 +77,7 @@
     "markerIcon": "",
     "markerSize": 64,
     "clampToGround": false,
-    "labelField": "population",
+    "labelField": "name",
     "labelFontSize": 20,
     "labelColor": "#ff6644",
     "labelVisibleMax": 50000,

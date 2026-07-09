@@ -124,6 +124,7 @@ export default {
       _heatmapLayers: new Map(),
       _heatmapMeta: new Map(),
       _labelStates: {},
+      _toggleLabelManagedLayerIds: new Set(), // ⭐ 记录由 toggleLabels 创建过 label 的图层 ID
       refreshLoading: false,
       // ⭐ 实体选中 & 属性弹窗
       _selectionManager: null,
@@ -635,6 +636,7 @@ export default {
         // ⭐ 移除关联的热力图叠加层
         this._removeHeatmapOverlay(layer.id, viewer);
         this._labelStates = { ...this._labelStates, [layer.id]: false };
+        this._toggleLabelManagedLayerIds.delete(layer.id); // ⭐ 清理 toggleLabels 管理标记
         this.updateItemState(layer.id, { loaded: false, loading: false });
         // ⭐ 强制刷新渲染（SGKJ_SDK 移除 dataSource 后不会自动重绘）
         viewer.scene.requestRender();
@@ -728,89 +730,110 @@ export default {
       const Cesium = this.getCesium();
       if (!Cesium) return;
 
+      const viewer = this.getCesiumViewer();
       const dataSource = this._cesiumLayers.get(item.id);
       if (!dataSource) return;
 
       const labelField = item.labelField || 'name';
       const isShown = this._isLabelsShown(item.id);
       const entities = dataSource.entities.values;
+      const len = entities.length;
 
       if (isShown) {
-        // 隐藏：仅设置 show = false，保留 label 对象避免下次重建
+        // 隐藏：仅翻转 show 标记
         let count = 0;
-        entities.forEach(entity => {
-          if (entity.label) {
+        for (let i = 0; i < len; i++) {
+          const entity = entities[i];
+          if (entity && entity.label) {
             entity.label.show = false;
             count++;
           }
-        });
+        }
         this._labelStates = { ...this._labelStates, [item.id]: false };
+        if (viewer) viewer.scene.requestRender();
         console.log(`[${this.componentName}] 🏷️ 文本标注已隐藏: "${item.name}" (${count} 个)`);
       } else {
-        const fontSize = item.labelFontSize || 28;
-        const labelScale = item.labelScale || 1.2;
+        const fontSize = item.labelFontSize || 18;
         const labelColor = item.labelColor || '#a6fd1c';
         const visMin = item.labelVisibleMin ?? 0;
         const visMax = item.labelVisibleMax ?? 50000;
 
-        // 检查是否已有 label（之前创建过，只需 show = true）
-        const firstEntity = entities.length > 0 ? entities[0] : null;
-        const labelsExist = firstEntity && firstEntity.label;
+        // ⭐ 关键判断：现有 label 是否由 toggleLabels 管理？
+        //   pinField 在 loadLayer 时创建的 label 不算（它们显示 pinField 字段而非 labelField 字段），
+        //   此时必须走「创建」分支，用 labelField 覆盖原有 label
+        const labelsManagedByUs = this._toggleLabelManagedLayerIds.has(item.id);
+        const labelsExist = len > 0 && entities[0] && entities[0].label;
 
-        if (labelsExist) {
-          // 快速路径：已有 label，仅恢复 show = true
+        if (labelsExist && labelsManagedByUs) {
+          // ✅ 由 toggleLabels 创建过的 label → 仅翻转 show 即可（字段一致，零对象创建）
           let count = 0;
-          entities.forEach(entity => {
-            if (entity.label) {
-              entity.label.show = true;
-              count++;
-            }
-          });
-          console.log(`[${this.componentName}] 🏷️ 文本标注已恢复: "${item.name}" (${count} 个，复用已有 label)`);
+          for (let i = 0; i < len; i++) {
+            const entity = entities[i];
+            if (entity && entity.label) { entity.label.show = true; count++; }
+          }
+          if (viewer) viewer.scene.requestRender();
+          console.log(`[${this.componentName}] 🏷️ 文本标注已恢复: "${item.name}" (${count} 个)`);
         } else {
-          // 首次创建路径：逐实体构建 label 对象
+          // ⭐ 首次创建（或 pinField 遗留 label）→ 全部重建为 labelField 字段的文本
+          if (labelsExist) {
+            console.log(`[${this.componentName}] 🔄 检测到 pinField 遗留 label，重建为 labelField="${labelField}" 的文本标注`);
+          }
+
+          const sharedEyeOffset = new Cesium.Cartesian3(0, 0, -50);
+          const sharedDistCond = new Cesium.DistanceDisplayCondition(visMin, visMax);
+          const sharedFillColor = Cesium.Color.fromCssColorString(labelColor);
+          const sharedOutlineColor = Cesium.Color.BLACK;
+          const fontStr = 'bold ' + fontSize + 'px sans-serif';
+
           let count = 0;
-          entities.forEach((entity, idx) => {
-            const props = entity.properties?.getValue?.();
+          for (let i = 0; i < len; i++) {
+            const entity = entities[i];
+            if (!entity) continue;
+
+            const props = entity.properties ? (entity.properties.getValue ? entity.properties.getValue() : entity.properties) : null;
             const text = props ? props[labelField] : null;
-            if (text == null) {
-              console.warn(`[${this.componentName}] ⚠️ entity[${idx}] 缺少字段 "${labelField}"`);
-              return;
-            }
-            // 计算标注位置：点用自身坐标；线/面取几何中心
-            let position = entity.position?.getValue?.();
+            if (text == null) continue;
+
+            let position = entity.position ? (entity.position.getValue ? entity.position.getValue() : entity.position) : null;
             if (!position) {
               if (entity.polyline) {
-                const positions = entity.polyline.positions?.getValue?.();
-                if (positions?.length >= 2) {
+                const positions = entity.polyline.positions ? (entity.polyline.positions.getValue ? entity.polyline.positions.getValue() : entity.polyline.positions) : null;
+                if (positions && positions.length >= 2) {
                   position = Cesium.Cartesian3.lerp(positions[0], positions[1], 0.5, new Cesium.Cartesian3());
                 }
               } else if (entity.polygon) {
-                const hierarchy = entity.polygon.hierarchy?.getValue?.();
-                if (hierarchy?.positions?.length) {
+                const hierarchy = entity.polygon.hierarchy ? (entity.polygon.hierarchy.getValue ? entity.polygon.hierarchy.getValue() : entity.polygon.hierarchy) : null;
+                if (hierarchy && hierarchy.positions && hierarchy.positions.length) {
                   const center = Cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
                   position = Cesium.Ellipsoid.WGS84.scaleToGeodeticSurface(center);
                 }
               }
             }
-
-            entity.label = {
-              text: String(text),
-              font: `normal ${fontSize}px AlibabaPuHuiTi`,
-              showBackground: true,
-              backgroundColor: Cesium.Color.BLACK.withAlpha(0.6),
-              fillColor: Cesium.Color.fromCssColorString(labelColor),
-              scale: labelScale,
-              horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-              verticalOrigin: Cesium.VerticalOrigin.CENTER,
-              disableDepthTestDistance: Number.POSITIVE_INFINITY,
-              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(visMin, visMax)
-            };
             if (position && !entity.position) {
               entity.position = position;
             }
+
+            entity.label = new Cesium.LabelGraphics({
+              text: String(text),
+              font: fontStr,
+              fillColor: sharedFillColor,
+              outlineColor: sharedOutlineColor,
+              outlineWidth: 3,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+              verticalOrigin: Cesium.VerticalOrigin.CENTER,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+              eyeOffset: sharedEyeOffset,
+              distanceDisplayCondition: sharedDistCond,
+              scale: 1.0
+            });
             count++;
-          });
+          }
+
+          // ⭐ 标记此图层由 toggleLabels 管理
+          this._toggleLabelManagedLayerIds.add(item.id);
+
+          if (viewer) viewer.scene.requestRender();
           console.log(`[${this.componentName}] 🏷️ 文本标注已创建: "${item.name}", 字段: "${labelField}", 实体数: ${count}`);
         }
         this._labelStates = { ...this._labelStates, [item.id]: true };
@@ -849,6 +872,7 @@ export default {
       this._heatmapLayers.clear();
       this._heatmapMeta.clear();
       this._labelStates = {};
+      this._toggleLabelManagedLayerIds.clear(); // ⭐ 清理 toggleLabels 管理标记
       this.dismissEntityPopup();
       // ⭐ 强制刷新渲染
       if (viewer) viewer.scene.requestRender();
