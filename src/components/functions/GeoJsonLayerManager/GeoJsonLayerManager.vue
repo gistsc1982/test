@@ -319,7 +319,7 @@ export default {
           strokeWidth: effectiveStrokeWidth,
           markerSymbol: markerSymbol  // undefined → PinBuilder.fromColor() 渐变圆点
         };
-        Promise.resolve(Cesium.GeoJsonDataSource.load(geoJsonData, options)).then(dataSource => {
+        Promise.resolve(Cesium.GeoJsonDataSource.load(geoJsonData, options)).then(async dataSource => {
           const entities = dataSource.entities.values;
           console.log(`[${this.componentName}] ✅ 图层 "${layer.name}" 加载成功，实体数: ${entities.length}`);
 
@@ -503,49 +503,58 @@ export default {
             console.log('[' + this.componentName + '] 🎨 径向渐变圆已应用，Canvas 缓存档位数=' + Object.keys(canvasCache).length);
           }
 
-          // ⭐ pinField：在气泡上叠加 Cesium Label 显示字段值
+          // ⭐ pinField：在气泡上叠加 Cesium Label 显示字段值（分批创建，不阻塞 UI）
           if (geoType === 'Point' && layer.pinField && entities.length > 0) {
             var pinField = layer.pinField;
             var pinFontSize = layer.pinFontSize || 18;
             var pinTextColor = layer.pinTextColor || '#FFFFFF';
+            var pinPixelOffsetY = layer.pinPixelOffsetY != null ? layer.pinPixelOffsetY : 30;
+
+            // ── 第 1 步（同步，快速）：collect texts + measure width → adjust billboard scale ──
+            //   measureText() 只做度量计算，不触发字体栅格化，中文也很快
             var measureCanvas = document.createElement('canvas');
             var measureCtx = measureCanvas.getContext('2d');
+            measureCtx.font = 'bold ' + pinFontSize + 'px sans-serif';
 
-            entities.forEach(function (ent) {
+            var pinTasks = []; // { entity, text }
+            for (var pi = 0; pi < entities.length; pi++) {
               try {
+                var ent = entities[pi];
                 var props = ent.properties ? (ent.properties.getValue ? ent.properties.getValue() : ent.properties) : null;
                 var pinText = props ? String(props[pinField] || '') : '';
-                if (!pinText) return;
+                if (!pinText) continue;
 
-                // canvas 实测文字宽度，精确计算气泡所需大小
                 if (ent.billboard && ent.billboard.image) {
                   var bImg = ent.billboard.image;
                   var bw = bImg.width || 64;
-                  measureCtx.font = 'bold ' + pinFontSize + 'px sans-serif';
                   var actualTextW = measureCtx.measureText(pinText).width;
                   var minBubbleW = actualTextW + pinFontSize;
                   if (minBubbleW > bw) {
                     ent.billboard.scale = Math.min(minBubbleW / bw, 5.0);
                   }
                 }
-
-                ent.label = new Cesium.LabelGraphics({
-                  text: pinText,
-                  font: 'bold ' + pinFontSize + 'px sans-serif',
-                  fillColor: Cesium.Color.fromCssColorString(pinTextColor),
-                  outlineColor: Cesium.Color.BLACK,
-                  outlineWidth: 3,
-                  style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                  horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-                  verticalOrigin: Cesium.VerticalOrigin.CENTER,
-                  pixelOffset: new Cesium.Cartesian2(0, (layer.pinPixelOffsetY != null ? layer.pinPixelOffsetY : 30)),
-                  disableDepthTestDistance: Number.POSITIVE_INFINITY,
-                  scale: 1.0,
-                  eyeOffset: new Cesium.Cartesian3(0, 0, -50)
-                });
+                pinTasks.push({ entity: ent, text: pinText });
               } catch (e) { /* skip */ }
-            });
-            console.log('[' + this.componentName + '] 📌 pinField="' + pinField + '": ' + entities.length + ' 个实体已添加 Label');
+            }
+
+            // ── 第 2 步（异步，分批）：rAF 分帧创建 LabelGraphics ──
+            if (pinTasks.length > 0) {
+              var sharedPinOpts = {
+                font: 'bold ' + pinFontSize + 'px sans-serif',
+                fillColor: Cesium.Color.fromCssColorString(pinTextColor),
+                outlineColor: Cesium.Color.BLACK,
+                outlineWidth: 3,
+                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                verticalOrigin: Cesium.VerticalOrigin.CENTER,
+                pixelOffset: new Cesium.Cartesian2(0, pinPixelOffsetY),
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                scale: 1.0,
+                eyeOffset: new Cesium.Cartesian3(0, 0, -50)
+              };
+              var createdCount = await this._batchCreateLabels(pinTasks, sharedPinOpts);
+              console.log('[' + this.componentName + '] 📌 pinField="' + pinField + '": ' + createdCount + '/' + entities.length + ' 个实体（' + Math.ceil(pinTasks.length / 25) + ' 批完成）');
+            }
           }
 
           // ⭐ 热力图叠加：点图层 + heatmapEnabled → 渲染 Canvas 叠加到 Cesium 地形上
@@ -726,7 +735,7 @@ export default {
      *   - 后续切换：仅设置 entity.label.show = true/false（O(n) 但零对象创建）
      *   - label 对象常驻，不销毁，避免重复构建 Cesium LabelPrimitive
      */
-    toggleLabels(item) {
+    async toggleLabels(item) {
       const Cesium = this.getCesium();
       if (!Cesium) return;
 
@@ -779,32 +788,48 @@ export default {
             console.log(`[${this.componentName}] 🔄 检测到 pinField 遗留 label，重建为 labelField="${labelField}" 的文本标注`);
           }
 
+          // ── 第 1 步（同步，快速）：收集文本 + 处理位置 ──
           const sharedEyeOffset = new Cesium.Cartesian3(0, 0, -50);
           const sharedDistCond = new Cesium.DistanceDisplayCondition(visMin, visMax);
           const sharedFillColor = Cesium.Color.fromCssColorString(labelColor);
           const sharedOutlineColor = Cesium.Color.BLACK;
           const fontStr = 'bold ' + fontSize + 'px sans-serif';
 
-          let count = 0;
-          for (let i = 0; i < len; i++) {
-            const entity = entities[i];
+          const sharedOpts = {
+            font: fontStr,
+            fillColor: sharedFillColor,
+            outlineColor: sharedOutlineColor,
+            outlineWidth: 3,
+            style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            eyeOffset: sharedEyeOffset,
+            distanceDisplayCondition: sharedDistCond,
+            scale: 1.0
+          };
+
+          var tasks = [];
+          for (var i = 0; i < len; i++) {
+            var entity = entities[i];
             if (!entity) continue;
 
-            const props = entity.properties ? (entity.properties.getValue ? entity.properties.getValue() : entity.properties) : null;
-            const text = props ? props[labelField] : null;
+            var props = entity.properties ? (entity.properties.getValue ? entity.properties.getValue() : entity.properties) : null;
+            var text = props ? props[labelField] : null;
             if (text == null) continue;
 
-            let position = entity.position ? (entity.position.getValue ? entity.position.getValue() : entity.position) : null;
+            // 线/面实体需降级计算中心点
+            var position = entity.position ? (entity.position.getValue ? entity.position.getValue() : entity.position) : null;
             if (!position) {
               if (entity.polyline) {
-                const positions = entity.polyline.positions ? (entity.polyline.positions.getValue ? entity.polyline.positions.getValue() : entity.polyline.positions) : null;
+                var positions = entity.polyline.positions ? (entity.polyline.positions.getValue ? entity.polyline.positions.getValue() : entity.polyline.positions) : null;
                 if (positions && positions.length >= 2) {
                   position = Cesium.Cartesian3.lerp(positions[0], positions[1], 0.5, new Cesium.Cartesian3());
                 }
               } else if (entity.polygon) {
-                const hierarchy = entity.polygon.hierarchy ? (entity.polygon.hierarchy.getValue ? entity.polygon.hierarchy.getValue() : entity.polygon.hierarchy) : null;
+                var hierarchy = entity.polygon.hierarchy ? (entity.polygon.hierarchy.getValue ? entity.polygon.hierarchy.getValue() : entity.polygon.hierarchy) : null;
                 if (hierarchy && hierarchy.positions && hierarchy.positions.length) {
-                  const center = Cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
+                  var center = Cesium.BoundingSphere.fromPoints(hierarchy.positions).center;
                   position = Cesium.Ellipsoid.WGS84.scaleToGeodeticSurface(center);
                 }
               }
@@ -813,28 +838,20 @@ export default {
               entity.position = position;
             }
 
-            entity.label = new Cesium.LabelGraphics({
-              text: String(text),
-              font: fontStr,
-              fillColor: sharedFillColor,
-              outlineColor: sharedOutlineColor,
-              outlineWidth: 3,
-              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-              verticalOrigin: Cesium.VerticalOrigin.CENTER,
-              disableDepthTestDistance: Number.POSITIVE_INFINITY,
-              eyeOffset: sharedEyeOffset,
-              distanceDisplayCondition: sharedDistCond,
-              scale: 1.0
-            });
-            count++;
+            tasks.push({ entity: entity, text: String(text) });
+          }
+
+          // ── 第 2 步（异步，分批）：rAF 分帧创建 LabelGraphics ──
+          var createdCount = 0;
+          if (tasks.length > 0) {
+            createdCount = await this._batchCreateLabels(tasks, sharedOpts);
           }
 
           // ⭐ 标记此图层由 toggleLabels 管理
           this._toggleLabelManagedLayerIds.add(item.id);
 
           if (viewer) viewer.scene.requestRender();
-          console.log(`[${this.componentName}] 🏷️ 文本标注已创建: "${item.name}", 字段: "${labelField}", 实体数: ${count}`);
+          console.log(`[${this.componentName}] 🏷️ 文本标注已创建: "${item.name}", 字段: "${labelField}", 实体数: ${createdCount}（${Math.ceil(tasks.length / 25)} 批完成）`);
         }
         this._labelStates = { ...this._labelStates, [item.id]: true };
       }
@@ -842,6 +859,87 @@ export default {
 
     _isLabelsShown(layerId) {
       return !!this._labelStates[layerId];
+    },
+
+    /**
+     * ⭐ 分批创建 Cesium LabelGraphics，分两阶段避免单帧栅格化风暴：
+     *
+     *   阶段 1（同步）：创建所有 label，初始 show=false。
+     *     Cesium LabelCollection.update() 对隐藏 label 跳过 fillText()+getImageData()，
+     *     因此 200+ 个 LabelGraphics 对象的创建是纯 JS 操作，极快（<10ms）。
+     *
+     *   阶段 2（异步 rAF）：每帧将 25 个 label 翻转为 show=true。
+     *     Cesium 在每帧渲染时仅栅格化这 25 条新增文本到纹理图集，
+     *     帧时间控制在 ~50ms，不会触发 11 秒的长帧。
+     *
+     * @param {Array<{entity: Entity, text: string}>} tasks
+     * @param {Object} sharedOpts - LabelGraphics 构造选项（text 除外）
+     * @param {number} [chunkSize=25] - 每帧揭示的 label 数量
+     * @returns {Promise<number>} 创建的 label 数量
+     */
+    _batchCreateLabels(tasks, sharedOpts, chunkSize) {
+      chunkSize = chunkSize || 25;
+      const Cesium = this.getCesium();
+      if (!Cesium) return Promise.resolve(0);
+      const total = tasks.length;
+
+      // ═══ 阶段 1：同步创建所有 LabelGraphics（show=false，跳过栅格化） ═══
+      let count = 0;
+      for (let i = 0; i < total; i++) {
+        const task = tasks[i];
+        if (!task || !task.entity) continue;
+        try {
+          task.entity.label = new Cesium.LabelGraphics({
+            text: task.text,
+            font: sharedOpts.font,
+            fillColor: sharedOpts.fillColor,
+            outlineColor: sharedOpts.outlineColor,
+            outlineWidth: sharedOpts.outlineWidth,
+            style: sharedOpts.style,
+            horizontalOrigin: sharedOpts.horizontalOrigin,
+            verticalOrigin: sharedOpts.verticalOrigin,
+            pixelOffset: sharedOpts.pixelOffset,
+            disableDepthTestDistance: sharedOpts.disableDepthTestDistance,
+            eyeOffset: sharedOpts.eyeOffset,
+            distanceDisplayCondition: sharedOpts.distanceDisplayCondition,
+            scale: sharedOpts.scale,
+            show: false // ⭐ 关键：初始隐藏，阻止 Cesium 立即栅格化文本
+          });
+          count++;
+        } catch (e) { /* skip */ }
+      }
+
+      if (count === 0) return Promise.resolve(0);
+
+      // ═══ 阶段 2：异步分批揭示（每帧 25 个 → 栅格化均匀分散） ═══
+      let cursor = 0;
+      const self = this;
+      const viewer = this.getCesiumViewer();
+
+      return new Promise(function (resolve) {
+        function revealChunk() {
+          const end = Math.min(cursor + chunkSize, total);
+          let revealed = 0;
+          for (let i = cursor; i < end; i++) {
+            const task = tasks[i];
+            if (!task || !task.entity || !task.entity.label) continue;
+            task.entity.label.show = true;
+            revealed++;
+          }
+          cursor = end;
+
+          // 强制 Cesium 当帧渲染，仅栅格化本批 label
+          if (viewer) viewer.scene.requestRender();
+
+          if (cursor < total) {
+            requestAnimationFrame(revealChunk);
+          } else {
+            resolve(count);
+          }
+        }
+
+        requestAnimationFrame(revealChunk);
+      });
     },
 
     destroyAllLayers() {
