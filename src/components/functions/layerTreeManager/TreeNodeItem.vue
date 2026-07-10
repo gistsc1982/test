@@ -53,6 +53,7 @@
       <span class="tree-node-actions">
         <button class="tree-action-btn" @click.stop="onEdit" title="编辑节点" type="button">✏️</button>
         <button class="tree-action-btn" @click.stop="onAddChild" title="添加子节点" type="button">📂</button>
+        <button v-if="isLayerLoaded || hasError" class="tree-action-btn tree-action-btn-reload" @click.stop="onReload" title="重新加载图层" type="button">🔄</button>
         <button class="tree-action-btn tree-action-btn-danger" @click.stop="onDelete" title="删除节点" type="button">🗑️</button>
       </span>
     </div>
@@ -93,7 +94,7 @@ export default {
     loadingLayerIds: { type: Object, default: () => ({}) },
     layerErrors: { type: Object, default: () => ({}) }
   },
-  emits: ['toggle-expand', 'select-node', 'add-child', 'edit-node', 'delete-node', 'toggle-layer'],
+  emits: ['toggle-expand', 'select-node', 'add-child', 'edit-node', 'delete-node', 'toggle-layer', 'reload-layer'],
   computed: {
     hasChildren() {
       return this.node.children && this.node.children.length > 0;
@@ -163,6 +164,9 @@ export default {
     },
     onToggleLayer() {
       this.$emit('toggle-layer', this.node);
+    },
+    onReload() {
+      this.$emit('reload-layer', this.node);
     }
   }
 };
@@ -422,5 +426,10 @@ export default {
 
 .tree-action-btn-danger:hover {
   background: rgba(255, 59, 48, 0.2);
+}
+
+.tree-action-btn-reload:hover {
+  background: rgba(255, 193, 7, 0.2);
+  color: #FFC107;
 }
 </style>

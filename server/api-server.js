@@ -292,6 +292,72 @@ app.get('/api/stats', (req, res) => {
   }
 });
 
+// ==================== 代理端点（绕过浏览器 CORS 限制）====================
+
+/**
+ * GET /api/proxy/wfs
+ *
+ * 服务端代理获取远程 WFS/GeoJSON 数据，绕过浏览器 CORS 限制。
+ * 用法：/api/proxy/wfs?url=<encoded_url>
+ *
+ * 特性：
+ * - 超时 30 秒
+ * - 自动解析 JSON 响应
+ * - Content-Type 安全校验
+ * - 透传 HTTP 错误状态
+ */
+app.get('/api/proxy/wfs', async (req, res) => {
+  const targetUrl = req.query.url;
+  if (!targetUrl) {
+    return res.status(400).json({
+      success: false,
+      error: '缺少 url 参数'
+    });
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    const fetchResp = await fetch(targetUrl, {
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/json, application/geo+json, */*'
+      }
+    });
+    clearTimeout(timeout);
+
+    if (!fetchResp.ok) {
+      const body = await fetchResp.text().catch(() => '');
+      return res.status(fetchResp.status).json({
+        success: false,
+        error: `上游返回 HTTP ${fetchResp.status}`,
+        body: body.slice(0, 500)
+      });
+    }
+
+    const contentType = fetchResp.headers.get('content-type') || '';
+    const data = await fetchResp.json();
+
+    res.json({
+      success: true,
+      contentType,
+      data
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      return res.status(504).json({
+        success: false,
+        error: '上游请求超时 (30s)'
+      });
+    }
+    res.status(502).json({
+      success: false,
+      error: `代理请求失败: ${error.message}`
+    });
+  }
+});
+
 // ==================== 错误处理 ====================
 
 app.use((req, res) => {

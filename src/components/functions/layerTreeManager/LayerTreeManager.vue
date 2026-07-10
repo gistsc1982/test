@@ -120,6 +120,7 @@
               @edit-node="openEditNodeDialog"
               @delete-node="confirmDeleteNode"
               @toggle-layer="toggleLayerLoad"
+              @reload-layer="reloadLayerNode"
             />
           </ul>
         </div>
@@ -1356,10 +1357,18 @@ export default {
     this._loadLayerPromise = new Map();
     // 代数计数器：防止超时后 IIFE 过期结果覆盖错误状态
     this._loadGeneration = new Map();
-    // 图层加载顺序记录（用于超出上限时自动卸载最旧图层）
+    // 图层加载顺序记录（用于超出上限时自动淘汰最旧图层）
     this._layerLoadOrder = [];
-    // 最大同时加载图层数（防止浏览器资源耗尽，MVT 图层尤其消耗 GPU 内存）
-    this._maxActiveLayers = 2;
+    // ⭐ 分级图层上限（按类型分别限制，避免重型图层耗尽资源）
+    this._layerTypeLimits = {
+      wcs: 3, '3dtiles': 3, mvt: 4,        // 重型：完整下载/流式几何/矢量解析
+      geojson: 8, wfs: 6,                    // 中等：实体创建开销
+      wms: 10, xyz: 15, wmts: 15,           // 轻型：瓦片缓存
+      geocoding: 5,                          // 轻型：API 调用
+    };
+    this._totalMaxLayers = 20;                // 全局硬上限（超出后真正卸载）
+    this._maxHibernated = 8;                 // 休眠池上限（超出后卸载最旧休眠层）
+    this._hibernatedOrder = [];              // 休眠顺序 FIFO（show=false 但仍占用 GPU）
     // ⭐ 本地 GeoJsonLayerManager 图层元数据缓存
     //   { rawGeoJson: string, config: {...} } — rawGeoJson 保持字符串，仅在使用时解析
     this._localGeoJsonMeta = new Map();
@@ -2948,6 +2957,26 @@ export default {
     },
 
     /**
+     * 获取指定类型的图层数量上限
+     */
+    _getTypeLimit(layerType) {
+      return this._layerTypeLimits[layerType] || 8;
+    },
+
+    /**
+     * 获取指定类型的活跃图层数（show !== false）
+     */
+    _getActiveCount(layerType) {
+      let count = 0;
+      this._cesiumLayers.forEach((entry) => {
+        if (entry.type === layerType && entry.object && entry.object.show !== false) {
+          count++;
+        }
+      });
+      return count;
+    },
+
+    /**
      * 获取节点的祖先链
      */
     getAncestorChain(nodeId) {
@@ -2998,12 +3027,158 @@ export default {
         return;
       }
 
+      // ⭐ 已加载图层：仅切换可见性（show/hide），不删除/重建
+      //    避免 WCS 等重型图层每次 toggle 都从服务器重新下载整个 coverage
       if (this._cesiumLayers.has(node.id)) {
-        this.unloadCesiumLayer(node);
+        const entry = this._cesiumLayers.get(node.id);
+        if (entry && entry.object) {
+          const newShow = !entry.object.show;
+          entry.object.show = newShow;
+          this.loadedLayerIds[node.id] = newShow;
+          // ⭐ 手动隐藏/显示时同步休眠队列 + 恢复 alpha
+          if (newShow) {
+            // 恢复休眠前保存的原始 alpha（WCS 图层通常 0.7，其他 1.0）
+            if (entry.object.alpha !== undefined && entry._preHibernateAlpha != null) {
+              entry.object.alpha = entry._preHibernateAlpha;
+              delete entry._preHibernateAlpha;
+            }
+            this._removeFromHibernatedOrder(node.id);
+            this._addToLoadOrder(node.id);
+            delete this.layerErrors[node.id];
+          } else {
+            this._removeFromLoadOrder(node.id);
+            this._removeFromHibernatedOrder(node.id);
+            this._hibernatedOrder.push(node.id);
+          }
+          // 触发渲染刷新
+          const viewer = this.getViewer();
+          if (viewer && !this._isWebGLLost) {
+            viewer.scene.requestRender();
+          }
+          console.log(
+            `[${this.componentName}] 👁️ 图层可见性切换: "${node.name}" → ${newShow ? '显示' : '隐藏'}` +
+            ` (type=${entry.type}, 休眠池=${this._hibernatedOrder.length})`
+          );
+        } else {
+          console.warn(`[${this.componentName}] ⚠️ 图层 "${node.name}" 在 _cesiumLayers 中但 object 无效，重新加载`);
+          this._cesiumLayers.delete(node.id);
+          delete this.layerErrors[node.id];
+          this.loadCesiumLayer(node);
+        }
       } else {
-        // 清除上一次的错误状态
+        // 首次加载：清除错误并加载
         delete this.layerErrors[node.id];
         this.loadCesiumLayer(node);
+      }
+    },
+
+    /**
+     * 🔄 手动重新加载图层
+     * - 移除旧图层 → 重新从服务器加载
+     * - 失败时恢复旧图层（网络容错）
+     * - 加载中忽略重复点击
+     */
+    async reloadLayerNode(node) {
+      console.log(`[${this.componentName}] 🔄 手动重新加载: "${node.name}"`);
+
+      if (this._isWebGLLost) {
+        this.layerErrors[node.id] = {
+          message: 'WebGL 上下文已丢失，请刷新页面',
+          ...classifyLayerError('WebGL 上下文丢失')
+        };
+        return;
+      }
+
+      if (this.loadingLayerIds[node.id]) {
+        console.warn(`[${this.componentName}] ⏳ 图层 "${node.name}" 正在加载中，忽略重复操作`);
+        return;
+      }
+
+      const oldEntry = this._cesiumLayers.get(node.id);
+      if (!oldEntry) {
+        // 图层不在缓存中，直接加载
+        delete this.layerErrors[node.id];
+        this.loadCesiumLayer(node);
+        return;
+      }
+
+      const wasVisible = oldEntry.object && oldEntry.object.show !== false;
+      this.loadingLayerIds[node.id] = true;
+
+      try {
+        // 步骤1: 移除旧图层（不销毁 GPU 资源）
+        const viewer = this.getViewer();
+        if (viewer && oldEntry.object) {
+          if (oldEntry.type === 'geojson' || oldEntry.type === 'geocoding') {
+            if (oldEntry.object.clustering && oldEntry.object.clustering.enabled) {
+              try { oldEntry.object.clustering.enabled = false; } catch (e) { /* ignore */ }
+            }
+            viewer.dataSources.remove(oldEntry.object, false);
+          } else if (oldEntry.type === '3dtiles') {
+            oldEntry.object.show = false;
+            viewer.scene.primitives.remove(oldEntry.object);
+          } else {
+            // imagery layers: xyz, wms, wmts, mvt, wcs
+            oldEntry.object.show = false;
+            oldEntry.object.alpha = 0.0;
+            viewer.imageryLayers.remove(oldEntry.object, false);
+          }
+          if (!this._isWebGLLost) viewer.scene.requestRender();
+        }
+
+        // 步骤2: 从缓存清除
+        this._cesiumLayers.delete(node.id);
+        this._removeFromLoadOrder(node.id);
+        this._removeFromHibernatedOrder(node.id);
+        this.loadedLayerIds[node.id] = false;
+        delete this.layerErrors[node.id];
+
+        // 步骤3: 重新加载
+        await this.loadCesiumLayer(node);
+
+        // 成功 → 释放旧 blob URL
+        if (oldEntry._imageUrl && oldEntry._imageUrl.startsWith('blob:')) {
+          try { URL.revokeObjectURL(oldEntry._imageUrl); } catch (e) { /* ignore */ }
+        }
+        console.log(`[${this.componentName}] ✅ 图层重新加载成功: "${node.name}"`);
+      } catch (err) {
+        // 失败 → 恢复旧图层
+        console.warn(`[${this.componentName}] 🔄 重新加载失败，恢复旧图层: "${node.name}"`, err.message);
+        const v = this.getViewer();
+        if (v && oldEntry && oldEntry.object) {
+          try {
+            if (oldEntry.type === 'geojson' || oldEntry.type === 'geocoding') {
+              v.dataSources.add(oldEntry.object);
+            } else if (oldEntry.type === '3dtiles') {
+              v.scene.primitives.add(oldEntry.object);
+              oldEntry.object.show = wasVisible;
+            } else {
+              v.imageryLayers.add(oldEntry.object);
+              oldEntry.object.show = wasVisible;
+              if (oldEntry.object.alpha !== undefined && wasVisible) {
+                // 恢复原始 alpha（WCS 图层通常 0.7，从 _preHibernateAlpha 或默认 1.0 恢复）
+                oldEntry.object.alpha = (oldEntry._preHibernateAlpha != null) ? oldEntry._preHibernateAlpha : 1.0;
+                delete oldEntry._preHibernateAlpha;
+              }
+            }
+            this._cesiumLayers.set(node.id, oldEntry);
+            this.loadedLayerIds[node.id] = wasVisible;
+            if (wasVisible) {
+              this._addToLoadOrder(node.id);
+            } else {
+              this._hibernatedOrder.push(node.id);
+            }
+            if (!this._isWebGLLost) v.scene.requestRender();
+          } catch (restoreErr) {
+            console.error(`[${this.componentName}] ❌ 恢复旧图层也失败了:`, restoreErr);
+          }
+        }
+        this.layerErrors[node.id] = {
+          message: `重新加载失败，已保留旧图层: ${err.message || String(err)}`,
+          ...classifyLayerError(err.message || String(err))
+        };
+      } finally {
+        this.loadingLayerIds[node.id] = false;
       }
     },
 
@@ -3059,18 +3234,58 @@ export default {
         }
       }.bind(this));
 
-      // ⚠️ 图层数量上限检查：超出上限时自动卸载最旧的图层，防止浏览器资源耗尽
-      if (this._cesiumLayers.size >= this._maxActiveLayers) {
-        const oldestNodeId = this._layerLoadOrder[0];
-        if (oldestNodeId && this._cesiumLayers.has(oldestNodeId)) {
-          const oldestNode = this.flatNodeList.find(n => n.id === oldestNodeId);
-          if (oldestNode) {
-            console.warn(`[${this.componentName}] 🗑️ 图层数已达上限 (${this._maxActiveLayers})，自动卸载最旧图层: "${oldestNode.name}"`);
-            this.unloadCesiumLayer(oldestNode);
+      // ⭐ 图层类型检测（分级驱逐逻辑需要先知道类型）
+      const layerType = this.detectLayerType(node);
+
+      // ═══════════════════════════════════════════════════════════
+      // 分级图层上限检查：先休眠后卸载，优先淘汰同类型旧图层
+      // ═══════════════════════════════════════════════════════════
+      const typeLimit = this._getTypeLimit(layerType);
+      const activeCount = this._getActiveCount(layerType);
+
+      // A) 同类型超限 → 休眠最旧的活跃图层（隐藏但保留 GPU 资源）
+      if (activeCount >= typeLimit) {
+        const oldestId = this._layerLoadOrder.find(id => {
+          const e = this._cesiumLayers.get(id);
+          return e && e.type === layerType && e.object && e.object.show !== false && id !== node.id;
+        });
+        if (oldestId) {
+          const oldNode = this.flatNodeList.find(n => n.id === oldestId);
+          if (oldNode) {
+            console.warn(`[${this.componentName}] 💤 ${layerType} 已达上限(${typeLimit})，休眠最旧图层: "${oldNode.name}"`);
+            this._hibernateLayer(oldNode);
+          }
+        }
+      }
+
+      // B) 休眠池超限 → 真正卸载最旧的休眠图层
+      while (this._hibernatedOrder.length > this._maxHibernated) {
+        const hid = this._hibernatedOrder[0];
+        const hn = this.flatNodeList.find(n => n.id === hid);
+        if (hn) {
+          console.warn(`[${this.componentName}] 🗑️ 休眠池已满(${this._maxHibernated})，卸载最旧休眠图层: "${hn.name}"`);
+          this.unloadCesiumLayer(hn);
+        } else {
+          this._hibernatedOrder.shift();
+        }
+      }
+
+      // C) 全局总量超限 → 优先卸载休眠层，无休眠则卸载最旧活跃层
+      if (this._cesiumLayers.size >= this._totalMaxLayers) {
+        if (this._hibernatedOrder.length > 0) {
+          const hid = this._hibernatedOrder[0];
+          const hn = this.flatNodeList.find(n => n.id === hid);
+          if (hn) {
+            console.warn(`[${this.componentName}] 🗑️ 全局图层数已达上限(${this._totalMaxLayers})，卸载休眠图层: "${hn.name}"`);
+            this.unloadCesiumLayer(hn);
           }
         } else {
-          // 顺序记录不一致，重建
-          this._layerLoadOrder = Array.from(this._cesiumLayers.keys());
+          const oldestId = this._layerLoadOrder.find(id => id !== node.id && this._cesiumLayers.has(id));
+          const hn = this.flatNodeList.find(n => n.id === oldestId);
+          if (hn) {
+            console.warn(`[${this.componentName}] 🗑️ 全局上限(${this._totalMaxLayers})且无休眠层，卸载最旧活跃图层: "${hn.name}"`);
+            this.unloadCesiumLayer(hn);
+          }
         }
       }
 
@@ -3078,11 +3293,15 @@ export default {
       const gen = this._loadGeneration.get(node.id) || 0;
       this._loadGeneration.set(node.id, gen);
 
-      const layerType = this.detectLayerType(node);
       console.log(`[${this.componentName}] 🌐 加载图层: ${node.name} (类型: ${layerType})`);
 
       // 整体超时：可被扩展的 deadline（WCS TIFF 解码等长操作可延长）
       var deadline = Date.now() + 15000;
+
+      // ⭐ WCS 需要更长的初始超时（顺序策略重试 + 每次 30s fetch + TIFF 解码）
+      if (layerType === 'wcs') {
+        deadline = Math.max(deadline, Date.now() + 90000);
+      }
 
       let timeoutId;
       const timeoutPromise = new Promise((_, reject) => {
@@ -3375,6 +3594,10 @@ export default {
           }
           case 'wfs':
           case 'geojson': {
+            // ⏱️ 性能诊断：记录各阶段耗时
+            const _tStart = performance.now();
+            const _timings = {};  // { step: ms }
+
             // ⚠️ WFS/GeoJSON 加载重构：WFS 服务器通常不配置 CORS 响应头，
             // Cesium.GeoJsonDataSource.load(url) 内部用 fetch 强制 CORS 模式，
             // 导致浏览器拦截返回 RequestErrorEvent{statusCode:undefined}。
@@ -3389,6 +3612,7 @@ export default {
              */
             const fetchJsonWithCorsFallback = async (directUrl) => {
               // 第一步：直接 fetch（部分 WFS 服务器支持 CORS，且浏览器环境可能已有代理）
+              const _tfDirect = performance.now();
               try {
                 console.log(`[${this.componentName}] 🔍 直接请求 GeoJSON: ${directUrl.slice(0, 120)}...`);
                 const resp = await fetch(directUrl, {
@@ -3396,21 +3620,27 @@ export default {
                 });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const data = await resp.json();
-                console.log(`[${this.componentName}] ✅ 直接请求成功`);
+                console.log(`[${this.componentName}] ✅ 直接请求成功 (${(performance.now() - _tfDirect).toFixed(0)}ms)`);
                 return data;
               } catch (directErr) {
                 const errMsg = directErr.message || String(directErr);
-                console.warn(`[${this.componentName}] ⚠️ 直接请求失败: ${errMsg}，尝试 CORS 代理...`);
+                console.warn(`[${this.componentName}] ⚠️ 直接请求失败 (${(performance.now() - _tfDirect).toFixed(0)}ms): ${errMsg}，尝试 CORS 代理...`);
               }
 
-              // 第二步：通过多个 CORS 代理依次重试（按优先级）
-              //    corsproxy.io — 全球 CDN，有大小限制（通常 ~5MB）
-              //    allorigins.win — 备选，原始 JSON 直接返回
-              //    codecoolware.com — 备选二
-              //    自建代理 — 用户可在节点配置中设置 wfsProxyUrl
+              // 第二步：通过代理依次重试（按优先级：本地后端 → 自建代理 → 公网代理）
+              //   本地后端 — 同机/同网段，无 CORS 限制，速度最快
+              //   自建代理 — 用户在节点配置中设置 wfsProxyUrl
+              //   corsproxy.io / allorigins.win / codecoolware — 公网 CORS 代理（最后手段）
               const corsProxies = [];
 
-              // 如果节点配置了自定义代理 URL，最高优先级
+              // ⭐ 本地后端代理（最高优先级，比公网代理快 10-100 倍）
+              const localProxyBase = `http://${window.location.hostname}:${new URL(window.location.href).port || '8081'}`;
+              corsProxies.push({
+                name: '本地后端',
+                url: `${localProxyBase}/api/proxy/wfs?url=${encodeURIComponent(directUrl)}`
+              });
+
+              // 自建代理（用户配置的 wfsProxyUrl）
               if (node.wfsProxyUrl) {
                 corsProxies.push({
                   name: '自建代理',
@@ -3418,7 +3648,7 @@ export default {
                 });
               }
 
-              // 公共 CORS 代理列表
+              // 公网 CORS 代理（最后手段，速度慢、不稳定）
               corsProxies.push(
                 { name: 'corsproxy.io', url: `https://corsproxy.io/?${encodeURIComponent(directUrl)}` },
                 { name: 'allorigins.win', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}` },
@@ -3426,18 +3656,22 @@ export default {
               );
 
               for (const proxy of corsProxies) {
+                const _tfProxy = performance.now();
                 try {
                   console.log(`[${this.componentName}] 🔄 通过 ${proxy.name} 代理请求: ${proxy.url.slice(0, 120)}...`);
                   const resp = await fetch(proxy.url, {
                     signal: createTimeoutSignal(PROXY_FETCH_TIMEOUT)
                   });
                   if (!resp.ok) throw new Error(`${proxy.name} 返回 HTTP ${resp.status}`);
-                  const data = await resp.json();
-                  console.log(`[${this.componentName}] ✅ ${proxy.name} 代理请求成功`);
+                  const raw = await resp.json();
+                  // 本地后端代理返回 {success, data} 包装，公网代理直接返回 GeoJSON
+                  const isWrapped = raw && raw.success === true && raw.data;
+                  const data = isWrapped ? raw.data : raw;
+                  console.log(`[${this.componentName}] ✅ ${proxy.name} 代理请求成功 (${(performance.now() - _tfProxy).toFixed(0)}ms, ${isWrapped ? '已解包' : '直传'})`);
                   return data;
                 } catch (proxyErr) {
                   const errMsg = proxyErr.message || String(proxyErr);
-                  console.warn(`[${this.componentName}] ⚠️ ${proxy.name} 代理失败:`, errMsg);
+                  console.warn(`[${this.componentName}] ⚠️ ${proxy.name} 代理失败 (${(performance.now() - _tfProxy).toFixed(0)}ms):`, errMsg);
                 }
               }
 
@@ -3481,8 +3715,12 @@ export default {
               console.log(`[${this.componentName}] 📦 按需解析本地 GeoJSON: "${node.name}"`);
             } else {
               // 获取 GeoJSON 数据（手动 fetch + CORS 代理回退，绕过 Cesium 内部 fetch 的 CORS 限制）
+              const _tFetch = performance.now();
               geojsonData = await fetchJsonWithCorsFallback(node.url);
+              _timings['获取数据(网络)'] = (performance.now() - _tFetch).toFixed(0) + 'ms';
             }
+
+            _timings['总计(含fetch)'] = (performance.now() - _tStart).toFixed(0) + 'ms';
 
             // 基本格式校验
             if (!geojsonData || (geojsonData.type !== 'FeatureCollection' && !geojsonData.type)) {
@@ -3514,6 +3752,7 @@ export default {
             const isSingleAscii = markerIcon.length === 1;
             const markerSymbol = isSingleAscii ? markerIcon : undefined;
 
+            const _tCesiumLoad = performance.now();
             const dataSource = await Cesium.GeoJsonDataSource.load(geojsonData, {
               stroke: stroke,
               strokeWidth: s.strokeWidth ?? 3,
@@ -3522,6 +3761,7 @@ export default {
               markerSize: s.markerSize ?? 48,
               markerSymbol: markerSymbol
             });
+            _timings['Cesium实体创建'] = (performance.now() - _tCesiumLoad).toFixed(0) + 'ms';
 
             // 后处理：分面/线设置样式和 clampToGround
             const ents = dataSource.entities.values;
@@ -3542,6 +3782,7 @@ export default {
               }
             }
             console.log(`[${this.componentName}] 🎨 后处理样式完成: ${ents.length} 个实体`);
+            _timings['后处理样式'] = (performance.now() - _tCesiumLoad - parseFloat(_timings['Cesium实体创建'])).toFixed(0) + 'ms';
 
             // ⭐ emoji/SVG 图标后处理（与 GeoJsonLayerManager 逻辑一致）
             //   单 ASCII 已通过 markerSymbol 传递给 Cesium，emoji 需要 canvas 绘制到 billboard
@@ -3579,6 +3820,7 @@ export default {
 
             // ⭐ pinField：在气泡上叠加 Cesium Label 显示字段值
             const layerCfg = dynamicLayerConfig || {};
+            const _tPinField = performance.now();
             if (layerCfg.pinField && ents.length > 0) {
               const pinField = layerCfg.pinField;
               const pinFontSize = layerCfg.pinFontSize || 18;
@@ -3626,8 +3868,10 @@ export default {
               viewer.scene.requestRender();
               console.log(`[${this.componentName}] 📌 pinField="${pinField}": ${ents.length} 个实体已添加 Label`);
             }
+            _timings['pinField标签'] = (performance.now() - _tPinField).toFixed(0) + 'ms';
 
             // ⭐ 点聚类支持（复用 GeoJsonLayerManager 逻辑）
+            const _tCluster = performance.now();
             if (node.clusterEnabled && entityCount > 0) {
               var cluster = dataSource.clustering;
               cluster.pixelRange = node.clusterPixelRange || 80;
@@ -3663,10 +3907,21 @@ export default {
               ents.forEach(function (e) { e.clusterShow = true; });
               console.log(`[${this.componentName}] 🔵 点聚类已启用: pixelRange=${cluster.pixelRange}, minSize=${cluster.minimumClusterSize}`);
             }
+            _timings['点聚类'] = (performance.now() - _tCluster).toFixed(0) + 'ms';
 
             this._cesiumLayers.set(node.id, { type: 'geojson', object: dataSource });
             // ⭐ 注册实体拾取（选中高亮 + 属性弹窗）
             this._registerEntityPicking(node, dataSource);
+
+            // ⏱️ 性能诊断总览
+            _timings['总计(全部)'] = (performance.now() - _tStart).toFixed(0) + 'ms';
+            const timingSummary = Object.entries(_timings)
+              .map(([k, v]) => `${k}=${v}`)
+              .join(', ');
+            console.log(
+              `[${this.componentName}] ⏱️ [性能] "${node.name}" (${layerType}, ${entityCount}要素) → ${timingSummary}`
+            );
+
             console.log(`[${this.componentName}] ✅ ${layerType.toUpperCase()} 加载成功: ${entityCount} 个要素`);
             break;
           }
@@ -3957,7 +4212,13 @@ export default {
               console.log(`[${this.componentName}] 🔄 GetCapabilities 不可用，回退: "${covName}"`);
             }
 
-            // 如果用户未指定 coverage，优先选 2D 数据层（跳过预渲染样式 Color/Scaled + 3D 时序 Temp/Land）
+            // ⭐ 指定的 coverage 未在服务中找到 → 自动选择可用 coverage
+            if (covName && availableCoverages.length > 0 && !availableCoverages.includes(covName)) {
+              console.warn(`[${this.componentName}] ⚠️ 指定 Coverage "${covName}" 在服务中未找到（可用: ${availableCoverages.join(', ')}），自动选择...`);
+              covName = ''; // 清空以触发下方的自动选择逻辑
+            }
+
+            // 如果用户未指定 coverage（或已清空），优先选 2D 数据层（跳过预渲染样式 Color/Scaled + 3D 时序 Temp/Land）
             if (!covName && availableCoverages.length > 0) {
               for (var ci = 0; ci < availableCoverages.length; ci++) {
                 var cn = availableCoverages[ci];
@@ -4043,12 +4304,19 @@ export default {
             var covBlob = null;
             var finalFormat = covFormat;
 
+            // ⭐ 使用 DescribeCoverage 的真实边界框，避免硬编码 (-180,180)/(-90,90) 超出 coverage 范围
+            var subsetLon = covBbox ? (covBbox.west + ',' + covBbox.east) : '-180,180';
+            var subsetLat = covBbox ? (covBbox.south + ',' + covBbox.north) : '-90,90';
+            if (covBbox) {
+              console.log(`[${this.componentName}] 🎯 使用 DescribeCoverage 边界: ${axisNames[0]}(${subsetLon}) ${axisNames[1]}(${subsetLat})`);
+            }
+
             // 策略列表（仅 DescribeCoverage 明确发现的额外轴才加切片）
             var strategies = [
               { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=' + encodeURIComponent(covFormat) + extraSlices, desc: '无SUBSET ' + covFormat + (extraSlices ? ' +切片' : '') },
               { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=image%2Ftiff' + extraSlices, desc: '无SUBSET image/tiff' + (extraSlices ? ' +切片' : ''), ifFormatFail: true },
-              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=' + encodeURIComponent(covFormat) + '&SUBSET=' + encodeURIComponent(axisNames[0]) + '(-180,180)&SUBSET=' + encodeURIComponent(axisNames[1]) + '(-90,90)' + extraSlices, desc: 'SUBSET ' + axisNames[0] + ',' + axisNames[1] + ' ' + covFormat + (extraSlices ? ' +切片' : '') },
-              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=image%2Ftiff' + '&SUBSET=' + encodeURIComponent(axisNames[0]) + '(-180,180)&SUBSET=' + encodeURIComponent(axisNames[1]) + '(-90,90)' + extraSlices, desc: 'SUBSET ' + axisNames[0] + ',' + axisNames[1] + ' image/tiff' + (extraSlices ? ' +切片' : ''), ifFormatFail: true },
+              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=' + encodeURIComponent(covFormat) + '&SUBSET=' + encodeURIComponent(axisNames[0]) + '(' + subsetLon + ')&SUBSET=' + encodeURIComponent(axisNames[1]) + '(' + subsetLat + ')' + extraSlices, desc: 'SUBSET ' + axisNames[0] + ',' + axisNames[1] + ' ' + covFormat + (extraSlices ? ' +切片' : '') },
+              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=image%2Ftiff' + '&SUBSET=' + encodeURIComponent(axisNames[0]) + '(' + subsetLon + ')&SUBSET=' + encodeURIComponent(axisNames[1]) + '(' + subsetLat + ')' + extraSlices, desc: 'SUBSET ' + axisNames[0] + ',' + axisNames[1] + ' image/tiff' + (extraSlices ? ' +切片' : ''), ifFormatFail: true },
             ];
 
             for (var si = 0; si < strategies.length && !covBlob; si++) {
@@ -4138,28 +4406,59 @@ export default {
             var providerOpts = { url: imageUrl };
             if (covBbox && covBbox.west < covBbox.east && covBbox.south < covBbox.north) {
               providerOpts.rectangle = Cesium.Rectangle.fromDegrees(covBbox.west, covBbox.south, covBbox.east, covBbox.north);
-              console.log(`[${this.componentName}] 🗺️ WCS 边界框: [${covBbox.west}, ${covBbox.south}, ${covBbox.east}, ${covBbox.north}]`);
+              console.log(`[${this.componentName}] 🗺️ WCS 边界框(度): [${covBbox.west}, ${covBbox.south}, ${covBbox.east}, ${covBbox.north}]`);
+              console.log(`[${this.componentName}] 🗺️ providerOpts.rectangle(弧度):`, {
+                west: providerOpts.rectangle.west,
+                south: providerOpts.rectangle.south,
+                east: providerOpts.rectangle.east,
+                north: providerOpts.rectangle.north
+              });
             }
             var imageryProvider = new Cesium.SingleTileImageryProvider(providerOpts);
+            console.log(`[${this.componentName}] 🗺️ imageryProvider.rectangle:`, {
+              west: imageryProvider.rectangle.west,
+              south: imageryProvider.rectangle.south,
+              east: imageryProvider.rectangle.east,
+              north: imageryProvider.rectangle.north
+            });
             var imageryLayer = viewer.imageryLayers.addImageryProvider(imageryProvider);
             imageryLayer.alpha = node.wcsAlpha != null ? node.wcsAlpha : 0.7; // 可配置透明度
-            this._cesiumLayers.set(node.id, { type: 'wcs', object: imageryLayer, provider: imageryProvider, _imageUrl: imageUrl });
-
-            // 定位：优先用 bbox 中心，其次节点配置
-            var flyLon, flyLat, flyHeight;
-            if (covBbox && covBbox.west < covBbox.east) {
-              flyLon = (covBbox.west + covBbox.east) / 2;
-              flyLat = (covBbox.south + covBbox.north) / 2;
-              flyHeight = Math.max(30000, (covBbox.north - covBbox.south) * 500000);
-            } else {
-              flyLon = node.centerLon != null ? node.centerLon : 0;
-              flyLat = node.centerLat != null ? node.centerLat : 30;
-              flyHeight = node.centerHeight != null ? node.centerHeight : 5000000;
+            // 存储 bbox 用于 flyToLayerNode 精确定位
+            var entryMeta = { type: 'wcs', object: imageryLayer, provider: imageryProvider, _imageUrl: imageUrl };
+            if (covBbox && covBbox.west < covBbox.east && covBbox.south < covBbox.north) {
+              entryMeta._wcsBbox = covBbox;
             }
-            viewer.camera.flyTo({
-              destination: Cesium.Cartesian3.fromDegrees(flyLon, flyLat, flyHeight),
-              duration: 1.0
+            this._cesiumLayers.set(node.id, entryMeta);
+
+            // ⚠️ 等待 SingleTileImageryProvider 就绪（大图 blob URL 需异步解码）
+            if (!imageryProvider.ready) {
+              console.log(`[${this.componentName}] ⏳ 等待 imageryProvider 就绪...`);
+              var _tReady = performance.now();
+              await new Promise(function(resolve) {
+                var maxWait = 5000, interval = 100, elapsed = 0;
+                var timer = setInterval(function() {
+                  elapsed += interval;
+                  if (imageryProvider.ready || elapsed >= maxWait) {
+                    clearInterval(timer);
+                    resolve();
+                  }
+                }, interval);
+              });
+              console.log(`[${this.componentName}] ✅ imageryProvider.ready = ${imageryProvider.ready} (${(performance.now() - _tReady).toFixed(0)}ms)`);
+            }
+
+            // 🔍 诊断日志：验证图层状态
+            console.log(`[${this.componentName}] 🔍 WCS 图层状态:`, {
+              show: imageryLayer.show,
+              alpha: imageryLayer.alpha,
+              rectangle: imageryLayer.rectangle,
+              imageryLayerCount: viewer.imageryLayers.length,
+              isDestroyed: imageryLayer.isDestroyed ? imageryLayer.isDestroyed() : 'N/A',
+              providerReady: imageryProvider.ready,
+              imageUrlType: imageUrl ? imageUrl.slice(0, 30) + '...' : 'null'
             });
+
+            // 定位由 flyToLayerNode 统一处理，避免双重 flyTo 冲突
             console.log(`[${this.componentName}] ✅ WCS 图层加载成功: "${node.name}" → ${covName}`);
             break;
           }
@@ -4202,6 +4501,7 @@ export default {
             if (panel) { panel.scrollTop = 0; }
           }.bind(this));
         }.bind(this));
+
         // 清除错误状态（MVT 类型除外：readyPromise 超时错误需保留）
         // ⚠️ MVT readyPromise 超时后仍会添加图层（非阻塞），此时错误提示应保留
         if (layerType !== 'mvt' || !providerReadyError) {
@@ -4266,12 +4566,13 @@ export default {
       if (!entry) return;
 
       this._removeFromLoadOrder(nodeId);
+      this._removeFromHibernatedOrder(nodeId);
 
       try {
         const viewer = this.getViewer();
         if (!viewer) return;
 
-        if (entry.type === 'xyz' || entry.type === 'wms' || entry.type === 'wmts' || entry.type === 'mvt') {
+        if (entry.type === 'xyz' || entry.type === 'wms' || entry.type === 'wmts' || entry.type === 'mvt' || entry.type === 'wcs') {
           // 双重保险 + 不销毁
           entry.object.show = false;
           entry.object.alpha = 0.0;
@@ -4367,6 +4668,61 @@ export default {
     },
 
     /**
+     * 💤 休眠图层：隐藏但保留在 Cesium 中（GPU 资源不释放）
+     * 优先于活跃图层被卸载；用户重新勾选时瞬间唤醒（无网络请求）
+     */
+    _hibernateLayer(node) {
+      const entry = this._cesiumLayers.get(node.id);
+      if (!entry || !entry.object || entry.object.show === false) return;
+
+      // 保存原始 alpha 值，唤醒时恢复（WCS 图层 alpha 通常为 0.7）
+      if (entry.object.alpha !== undefined) {
+        entry._preHibernateAlpha = entry.object.alpha;
+        entry.object.alpha = 0.0;
+      }
+      entry.object.show = false;
+      this.loadedLayerIds[node.id] = false;
+      this._removeFromLoadOrder(node.id);
+      this._removeFromHibernatedOrder(node.id);
+      this._hibernatedOrder.push(node.id);
+
+      const viewer = this.getViewer();
+      if (viewer && !this._isWebGLLost) viewer.scene.requestRender();
+      console.log(`[${this.componentName}] 💤 图层已休眠: "${node.name}" (type=${entry.type}, 休眠池=${this._hibernatedOrder.length})`);
+    },
+
+    /**
+     * 🔔 唤醒休眠图层（恢复可见性，不重新加载）
+     */
+    _awakenLayer(node) {
+      const entry = this._cesiumLayers.get(node.id);
+      if (!entry || !entry.object) return;
+
+      entry.object.show = true;
+      // 恢复休眠前保存的原始 alpha（WCS 图层通常 0.7，其他 1.0）
+      if (entry.object.alpha !== undefined) {
+        entry.object.alpha = (entry._preHibernateAlpha != null) ? entry._preHibernateAlpha : 1.0;
+        delete entry._preHibernateAlpha;
+      }
+      this.loadedLayerIds[node.id] = true;
+      this._removeFromHibernatedOrder(node.id);
+      this._addToLoadOrder(node.id);
+      delete this.layerErrors[node.id];
+
+      const viewer = this.getViewer();
+      if (viewer && !this._isWebGLLost) viewer.scene.requestRender();
+      console.log(`[${this.componentName}] 🔔 图层已唤醒: "${node.name}" (type=${entry.type})`);
+    },
+
+    /**
+     * 从休眠队列中移出
+     */
+    _removeFromHibernatedOrder(nodeId) {
+      const idx = this._hibernatedOrder.indexOf(nodeId);
+      if (idx !== -1) this._hibernatedOrder.splice(idx, 1);
+    },
+
+    /**
      * 从 Cesium 移除图层
      */
     unloadCesiumLayer(node) {
@@ -4442,6 +4798,7 @@ export default {
         }
         this._cesiumLayers.delete(node.id);
         this._removeFromLoadOrder(node.id);
+        this._removeFromHibernatedOrder(node.id);
         this.loadedLayerIds[node.id] = false;
       } catch (error) {
         console.error(`[${this.componentName}] ❌ 移除图层失败:`, error);
@@ -4458,6 +4815,21 @@ export default {
       if (!viewer || !Cesium) return;
 
       try {
+        // ⭐ WCS 图层：优先用 DescribeCoverage 获取的真实边界框中心定位
+        const wcsEntry = this._cesiumLayers.get(node.id);
+        if (wcsEntry && wcsEntry._wcsBbox) {
+          const bb = wcsEntry._wcsBbox;
+          const flyLon = (bb.west + bb.east) / 2;
+          const flyLat = (bb.south + bb.north) / 2;
+          const flyHeight = Math.max(2000, (bb.north - bb.south) * 500000);
+          viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(flyLon, flyLat, flyHeight),
+            duration: 2
+          });
+          console.log(`[${this.componentName}] 🎯 飞行至 WCS 边界框中心: ${node.name} (${flyLon.toFixed(4)}, ${flyLat.toFixed(4)}, ${flyHeight.toFixed(0)}m)`);
+          return;
+        }
+
         // 1. 优先使用节点自定义中心坐标
         if (node.centerLon != null && node.centerLat != null) {
           const height = node.centerHeight || 50000;
@@ -4659,6 +5031,7 @@ export default {
       });
       this._cesiumLayers.clear();
       this._layerLoadOrder = [];
+      this._hibernatedOrder = [];
     },
 
     beforeSaveConfig() {
