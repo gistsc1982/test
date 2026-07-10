@@ -1292,7 +1292,12 @@ export default {
         { "id": "folder-wcs",     "name": "WCS 栅格服务",      "parentId": "root-ogc","nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "OGC WCS 栅格覆盖服务（GetCoverage）", "icon": "📁" },
         { "id": "wcs-rasdaman-dem","name":"rasdaman 巴伐利亚 DSM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Bavaria_50_DSM。德国巴伐利亚州50m分辨率数字地表模型（海拔色带渲染）。","icon":"🏔️","centerLon":11.5,"centerLat":48.5,"centerHeight":80000,"wcsCoverageName":"Bavaria_50_DSM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
         { "id": "wcs-rasdaman-s2","name":"rasdaman 德国 DTM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":2,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Germany_DTM。德国全境数字地形模型（色带渲染）。","icon":"🇩🇪","centerLon":10,"centerLat":51,"centerHeight":500000,"wcsCoverageName":"Germany_DTM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
-{ "id": "wcs-rasdaman-avgtemp","name":"rasdaman 全球地表温度(WCS 3D-Timeline)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":3,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=AvgLandTemp，185个时间切片(2000-2015)，支持Timeline时间轴动画。","icon":"🌡️","centerLon":0,"centerLat":20,"centerHeight":15000000,"wcsCoverageName":"AvgLandTemp","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsAlpha":0.4,"wcsTimeAxis":"ansi","wcsTimeSlice":"2000-02-01T00:00:00Z","wcsColorRamp":true,"wcsRenderMode":"3d","wcsElevationScale":50.0}
+	        { "id": "wcs-rasdaman-avgtemp","name":"rasdaman 全球地表温度(WCS 3D-Timeline)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":3,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=AvgLandTemp，185个时间切片(2000-2015)，支持Timeline时间轴动画。","icon":"🌡️","centerLon":0,"centerLat":20,"centerHeight":15000000,"wcsCoverageName":"AvgLandTemp","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsAlpha":0.4,"wcsTimeAxis":"ansi","wcsTimeSlice":"2000-02-01T00:00:00Z","wcsColorRamp":true,"wcsRenderMode":"3d","wcsElevationScale":50.0},
+	        { "id": "folder-local-dem","name": "本地 DEM 高程数据","parentId": null,"nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "本地 GeoTIFF 格式数字高程模型，无需网络请求，直接从本地文件加载 3D 渲染", "icon": "📁" },
+	        { "id": "local-dem-srtm30","name": "SRTM 30M DEM（下载后放入文件）","parentId": "folder-local-dem","nodeType": "layer","url": "/data/dem/srtm_30m.tif","sortOrder":1,"visible":1,"description": "SRTM 30m 分辨率全球 DEM。从地理空间数据云 (gscloud.cn) 下载 → 解压 → 将 .tif 重命名为 srtm_30m.tif 放入 public/data/dem/","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
+	        { "id": "local-dem-aster30","name":"ASTER GDEM 30M（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/aster_gdem_30m.tif","sortOrder":2,"visible":1,"description":"ASTER GDEM v3 30m 全球 DEM，覆盖 83°N-83°S。下载：www.gscloud.cn → DEM 数字高程数据 → ASTER GDEM 30M，或 earthexplorer.usgs.gov","icon":"⛰️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
+	        { "id": "local-dem-aw3d30","name":"ALOS AW3D30 DEM（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/alos_aw3d30.tif","sortOrder":3,"visible":1,"description":"JAXA ALOS AW3D30 全球 30m DEM，精度~5m。下载：www.eorc.jaxa.jp/ALOS → AW3D30 → 注册后下载","icon":"🗻","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
+	        { "id": "local-dem-cop30","name":"Copernicus GLO-30 DEM（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":4,"visible":1,"description":"ESA Copernicus GLO-30 全球 30m DEM，精度~4m。下载：dataspace.copernicus.eu 或 portal.opentopography.org","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true}
       ],
 
       // Cesium 图层加载状态 — 记录已加载的图层 ID → Cesium 对象
@@ -1532,7 +1537,12 @@ export default {
         { "id": "folder-wcs", "name": "WCS 栅格服务", "parentId": "root-ogc", "nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "OGC WCS 栅格覆盖服务（GetCoverage）", "icon": "📁" },
         { "id": "wcs-rasdaman-dem","name":"rasdaman 巴伐利亚 DSM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Bavaria_50_DSM。德国巴伐利亚州50m分辨率数字地表模型（海拔色带渲染）。","icon":"🏔️","centerLon":11.5,"centerLat":48.5,"centerHeight":80000,"wcsCoverageName":"Bavaria_50_DSM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
         { "id": "wcs-rasdaman-s2","name":"rasdaman 德国 DTM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":2,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Germany_DTM。德国全境数字地形模型（色带渲染）。","icon":"🇩🇪","centerLon":10,"centerLat":51,"centerHeight":500000,"wcsCoverageName":"Germany_DTM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
-{ "id": "wcs-rasdaman-avgtemp","name":"rasdaman 全球地表温度(WCS 3D-Timeline)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":3,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=AvgLandTemp，185个时间切片(2000-2015)，支持Timeline时间轴动画。","icon":"🌡️","centerLon":0,"centerLat":20,"centerHeight":15000000,"wcsCoverageName":"AvgLandTemp","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsAlpha":0.4,"wcsTimeAxis":"ansi","wcsTimeSlice":"2000-02-01T00:00:00Z","wcsColorRamp":true,"wcsRenderMode":"3d","wcsElevationScale":50.0}
+	        { "id": "wcs-rasdaman-avgtemp","name":"rasdaman 全球地表温度(WCS 3D-Timeline)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":3,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=AvgLandTemp，185个时间切片(2000-2015)，支持Timeline时间轴动画。","icon":"🌡️","centerLon":0,"centerLat":20,"centerHeight":15000000,"wcsCoverageName":"AvgLandTemp","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsAlpha":0.4,"wcsTimeAxis":"ansi","wcsTimeSlice":"2000-02-01T00:00:00Z","wcsColorRamp":true,"wcsRenderMode":"3d","wcsElevationScale":50.0},
+	        { "id": "folder-local-dem","name": "本地 DEM 高程数据","parentId": null,"nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "本地 GeoTIFF 格式数字高程模型，无需网络请求，直接从本地文件加载 3D 渲染", "icon": "📁" },
+	        { "id": "local-dem-srtm30","name": "SRTM 30M DEM（下载后放入文件）","parentId": "folder-local-dem","nodeType": "layer","url": "/data/dem/srtm_30m.tif","sortOrder":1,"visible":1,"description": "SRTM 30m 分辨率全球 DEM。从地理空间数据云 (gscloud.cn) 下载 → 解压 → 将 .tif 重命名为 srtm_30m.tif 放入 public/data/dem/","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
+	        { "id": "local-dem-aster30","name":"ASTER GDEM 30M（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/aster_gdem_30m.tif","sortOrder":2,"visible":1,"description":"ASTER GDEM v3 30m 全球 DEM，覆盖 83°N-83°S。下载：www.gscloud.cn → DEM 数字高程数据 → ASTER GDEM 30M，或 earthexplorer.usgs.gov","icon":"⛰️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
+	        { "id": "local-dem-aw3d30","name":"ALOS AW3D30 DEM（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/alos_aw3d30.tif","sortOrder":3,"visible":1,"description":"JAXA ALOS AW3D30 全球 30m DEM，精度~5m。下载：www.eorc.jaxa.jp/ALOS → AW3D30 → 注册后下载","icon":"🗻","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
+	        { "id": "local-dem-cop30","name":"Copernicus GLO-30 DEM（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":4,"visible":1,"description":"ESA Copernicus GLO-30 全球 30m DEM，精度~4m。下载：dataspace.copernicus.eu 或 portal.opentopography.org","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true}
       ];
 
       var added = [];
@@ -1843,7 +1853,12 @@ export default {
         wcsColorRamp: node.wcsColorRamp !== false, // 默认 true（启用色带）
         wcsRenderMode: node.wcsRenderMode || '2d',   // 默认 2D 叠加
         wcsElevationScale: node.wcsElevationScale != null ? node.wcsElevationScale : 1.0,
-        _showWcs: !!(node.wcsCoverageName || node.wcsFormat || this._findAncestorFolder(node.id, ['folder-wcs', 'WCS']))
+        _showWcs: !!(node.wcsCoverageName || node.wcsFormat || this._findAncestorFolder(node.id, ['folder-wcs', 'WCS'])),
+        // ⭐ 本地 DEM 专属
+        demRenderMode: node.demRenderMode || '3d',
+        demElevationScale: node.demElevationScale != null ? node.demElevationScale : 1.0,
+        demColorRamp: node.demColorRamp !== false,
+        _showDem: !!(node.url && (node.url.endsWith('.tif') || node.url.endsWith('.tiff')) || this._findAncestorFolder(node.id, ['folder-local-dem', 'local-dem', 'DEM']))
       };
       this.showEditDialog = true;
     },
@@ -1905,7 +1920,11 @@ export default {
         wcsTimeSlice: this.editForm.wcsTimeSlice || undefined,
         wcsColorRamp: this.editForm.wcsColorRamp !== undefined ? this.editForm.wcsColorRamp : undefined,
         wcsRenderMode: this.editForm.wcsRenderMode || undefined,
-        wcsElevationScale: this.editForm.wcsElevationScale != null ? this.editForm.wcsElevationScale : undefined
+        wcsElevationScale: this.editForm.wcsElevationScale != null ? this.editForm.wcsElevationScale : undefined,
+        // ⭐ 本地 DEM
+        demRenderMode: this.editForm.demRenderMode || undefined,
+        demElevationScale: this.editForm.demElevationScale != null ? this.editForm.demElevationScale : undefined,
+        demColorRamp: this.editForm.demColorRamp !== undefined ? this.editForm.demColorRamp : undefined
       };
       // 强制触发响应式更新
       this.flatNodeList = [...this.flatNodeList];
@@ -2970,6 +2989,8 @@ export default {
       // ⭐ 地理编码：天地图API 或 父目录标识
       if (url.includes('api.tianditu.gov.cn/search') || url.includes('api.tianditu.gov.cn/geocoding') || ancestorNames.includes('geocode') || ancestorNames.includes('地理编码')) return 'geocoding';
       // ⭐ WCS：URL含 wcs 或 父目录标识
+      // ⭐ 本地 DEM GeoTIFF 文件：.tif/.tiff 后缀 或 父目录为 local-dem
+      if (url.endsWith('.tif') || url.endsWith('.tiff') || ancestorNames.includes('local-dem') || ancestorNames.includes('dem')) return 'local-dem';
       if (url.includes('wcs') || ancestorNames.includes('wcs')) return 'wcs';
       // 防止将非 OGC 服务 URL（HTML页面、图片等）误判为 WMS
       // 只有当 URL 包含明显的 OGC 服务特征时才继承祖先类型
@@ -4215,6 +4236,127 @@ export default {
             console.log(`[${this.componentName}] ✅ 地理编码图层加载成功: "${node.name}" → ${features.length} 个点位`);
             break;
           }
+          case 'local-dem': {
+            // ⭐ 本地 DEM GeoTIFF 文件加载：无需网络请求，直接 fetch 本地文件
+            var localDemUrl = node.url;
+            console.log(`[${this.componentName}] 🏔️ 加载本地 DEM: ${localDemUrl}`);
+
+            deadline = Math.max(deadline, Date.now() + 60000);
+            await this._ensureGeoTiff();
+
+            // 步骤1：fetch 本地 GeoTIFF 文件
+            var demResp = await fetch(localDemUrl, { signal: createTimeoutSignal(30000) });
+            if (!demResp.ok) throw new Error(`本地 DEM 文件加载失败 (HTTP ${demResp.status}): ${localDemUrl}`);
+            var demBlob = await demResp.blob();
+            console.log(`[${this.componentName}] 📦 本地 DEM 文件: ${(demBlob.size/1024/1024).toFixed(1)}MB`);
+
+            if (typeof window.GeoTIFF === 'undefined') {
+              throw new Error('geotiff.js 未加载，无法解析本地 DEM 文件');
+            }
+
+            // 步骤2：geotiff.js 解码
+            var tiff = await window.GeoTIFF.fromArrayBuffer(await demBlob.arrayBuffer());
+            var tifImg = await tiff.getImage();
+            var tifRaster = await tifImg.readRasters();
+            var band = tifRaster[0];
+            var tw = tifImg.getWidth(), th = tifImg.getHeight();
+
+            var tMin = Infinity, tMax = -Infinity, tv = 0;
+            for (var ri = 0; ri < band.length; ri++) {
+              var v = band[ri];
+              if (isFinite(v) && v > -9999) { if (v < tMin) tMin = v; if (v > tMax) tMax = v; tv++; }
+            }
+            console.log('[LayerTreeManager] 📊 本地 DEM: ' + tMin.toFixed(1) + '~' + tMax.toFixed(1) + 'm 有效=' + tv + ' 尺寸=' + tw + '×' + th);
+
+            // 步骤3：色带渲染
+            var tCvs = document.createElement('canvas'); tCvs.width = tw; tCvs.height = th;
+            var tCtx = tCvs.getContext('2d');
+            var tImg = tCtx.createImageData(tw, th);
+            var tSt = (tMax > tMin) ? 1 / (tMax - tMin) : 1;
+            for (var ri = 0; ri < band.length; ri++) {
+              var val = band[ri], pi = ri * 4;
+              if (!isFinite(val) || val <= -9999) { tImg.data[pi+3] = 0; continue; }
+              var nt = Math.max(0, Math.min(1, (val - tMin) * tSt));
+              var tr, tg, tb;
+              if (nt < 0.25)      { var s = nt / 0.25;          tr = Math.round(s * 255); tg = 255; tb = Math.round((1 - s) * 128); }
+              else if (nt < 0.5)  { var s = (nt - 0.25) / 0.25; tr = 255; tg = Math.round(255 - s * 100); tb = 0; }
+              else if (nt < 0.75) { var s = (nt - 0.5) / 0.25;  tr = 255; tg = Math.round(155 - s * 155); tb = Math.round(s * 100); }
+              else                { var s = (nt - 0.75) / 0.25; tr = 255; tg = Math.round(s * 255); tb = Math.round(100 + s * 155); }
+              tImg.data[pi]=tr; tImg.data[pi+1]=tg; tImg.data[pi+2]=tb; tImg.data[pi+3]=255;
+            }
+            tCtx.putImageData(tImg, 0, 0);
+
+            // 步骤4：3D 网格渲染（复用 WCS 3D 逻辑）
+            var is3d = node.demRenderMode !== '2d';
+            if (is3d) {
+              var scale3d = node.demElevationScale != null ? node.demElevationScale : 1.0;
+              var stepX3d = Math.max(1, Math.floor(tw / 180));
+              var stepY3d = Math.max(1, Math.floor(th / 90));
+              var cols3d = Math.floor((tw - 1) / stepX3d) + 1;
+              var rows3d = Math.floor((th - 1) / stepY3d) + 1;
+              var heightRange = tMax - tMin; if (heightRange <= 0) heightRange = 1;
+
+              var vertices3d = [], texCoords3d = [], indices3d = [], vertexColors = [];
+              for (var row = 0; row < rows3d; row++) {
+                for (var col = 0; col < cols3d; col++) {
+                  var si = Math.min(row * stepY3d, th - 1);
+                  var sj = Math.min(col * stepX3d, tw - 1);
+                  var pixIdx = si * tw + sj;
+                  var v = band[pixIdx];
+                  if (!isFinite(v) || v <= -9999) v = tMin;
+                  var nt3d = (v - tMin) / heightRange;
+                  var ht3d = nt3d * scale3d * 50000;
+                  // 经纬度范围从本地文件推断（假设全球或中国范围）
+                  var demWest = node.centerLon != null ? node.centerLon - 10 : -180;
+                  var demEast = node.centerLon != null ? node.centerLon + 10 : 180;
+                  var demSouth = node.centerLat != null ? node.centerLat - 5 : -90;
+                  var demNorth = node.centerLat != null ? node.centerLat + 5 : 90;
+                  var lon3d = demWest + col * (demEast - demWest) / (cols3d - 1);
+                  var lat3d = demNorth - row * (demNorth - demSouth) / (rows3d - 1);
+                  var cart3d = Cesium.Cartesian3.fromDegrees(lon3d, lat3d, ht3d);
+                  vertices3d.push(cart3d.x, cart3d.y, cart3d.z);
+                  texCoords3d.push(col / (cols3d - 1), 1 - row / (rows3d - 1));
+                  var pi = pixIdx * 4;
+                  vertexColors.push(tImg.data[pi], tImg.data[pi+1], tImg.data[pi+2], 255);
+                }
+              }
+              for (var row = 0; row < rows3d - 1; row++) {
+                for (var col = 0; col < cols3d - 1; col++) {
+                  var a = row * cols3d + col, b = a + 1, c = a + cols3d, d = c + 1;
+                  indices3d.push(a, b, d); indices3d.push(a, d, c);
+                }
+              }
+              var geometry3d = new Cesium.Geometry({
+                attributes: new Cesium.GeometryAttributes({
+                  position: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.DOUBLE, componentsPerAttribute: 3, values: vertices3d }),
+                  st: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.FLOAT, componentsPerAttribute: 2, values: texCoords3d }),
+                  color: new Cesium.GeometryAttribute({ componentDatatype: Cesium.ComponentDatatype.UNSIGNED_BYTE, componentsPerAttribute: 4, values: new Uint8Array(vertexColors), normalize: true })
+                }),
+                indices: indices3d,
+                primitiveType: Cesium.PrimitiveType.TRIANGLES,
+                boundingSphere: Cesium.BoundingSphere.fromVertices(vertices3d)
+              });
+              var mesh3d = new Cesium.Primitive({
+                geometryInstances: new Cesium.GeometryInstance({ geometry: geometry3d }),
+                appearance: new Cesium.PerInstanceColorAppearance({ flat: false, translucent: true }),
+                asynchronous: false
+              });
+              viewer.scene.primitives.add(mesh3d);
+              this._cesiumLayers.set(node.id, { type: 'local-dem', object: mesh3d, _is3d: true, _imageUrl: tCvs.toDataURL('image/png') });
+              console.log('[LayerTreeManager] 🏔️ 本地 DEM 3D 网格: ' + cols3d + '×' + rows3d +
+                ' 顶点=' + (vertices3d.length/3).toFixed(0) + ' 三角形=' + (indices3d.length/3).toFixed(0) +
+                ' 高程×' + scale3d.toFixed(1));
+            } else {
+              // 2D 模式：SingleTileImageryProvider
+              var imageUrl = tCvs.toDataURL('image/png');
+              var provider2d = new Cesium.SingleTileImageryProvider({ url: imageUrl });
+              var layer2d = viewer.imageryLayers.addImageryProvider(provider2d);
+              layer2d.alpha = 0.7;
+              this._cesiumLayers.set(node.id, { type: 'local-dem', object: layer2d, provider: provider2d, _imageUrl: imageUrl });
+            }
+            console.log(`[${this.componentName}] ✅ 本地 DEM 加载成功: "${node.name}"`);
+            break;
+          }
           case 'wcs': {
             // ⭐ WCS：GetCapabilities 发现 Coverage → GetCoverage 获取栅格 → 叠加为影像图层
             var covName = node.wcsCoverageName || '';
@@ -4754,7 +4896,7 @@ export default {
         const viewer = this.getViewer();
         if (!viewer) return;
 
-        if (entry.type === 'xyz' || entry.type === 'wms' || entry.type === 'wmts' || entry.type === 'mvt' || entry.type === 'wcs') {
+        if (entry.type === 'xyz' || entry.type === 'wms' || entry.type === 'wmts' || entry.type === 'mvt' || entry.type === 'wcs' || entry.type === 'local-dem') {
           // 双重保险 + 不销毁
           entry.object.show = false;
           entry.object.alpha = 0.0;
@@ -4950,7 +5092,8 @@ export default {
             viewer.scene.requestRender();
             break;
           }
-          case 'wcs': {
+          case 'wcs':
+          case 'local-dem': {
             if (entry._is3d) {
               // 3D 网格：remove from scene.primitives
               entry.object.show = false;
