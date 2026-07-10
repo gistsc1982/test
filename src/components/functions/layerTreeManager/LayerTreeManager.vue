@@ -4268,6 +4268,35 @@ export default {
             }
             console.log('[LayerTreeManager] 📊 本地 DEM: ' + tMin.toFixed(1) + '~' + tMax.toFixed(1) + 'm 有效=' + tv + ' 尺寸=' + tw + '×' + th);
 
+            // 步骤2.5：从 GeoTIFF 元数据提取实际地理范围
+            var demWest, demEast, demSouth, demNorth;
+            try {
+              var tifOrigin = tifImg.getOrigin();
+              var tifResolution = tifImg.getResolution();
+              if (tifOrigin && tifResolution && tifOrigin.length >= 2 && tifResolution.length >= 2 &&
+                  isFinite(tifOrigin[0]) && isFinite(tifOrigin[1]) &&
+                  isFinite(tifResolution[0]) && isFinite(tifResolution[1])) {
+                demWest = tifOrigin[0];
+                demNorth = tifOrigin[1];
+                demEast = tifOrigin[0] + tw * Math.abs(tifResolution[0]);
+                demSouth = tifOrigin[1] - th * Math.abs(tifResolution[1]);
+                console.log('[LayerTreeManager] 🌍 从 GeoTIFF 读取实际地理范围: ' +
+                  demWest.toFixed(4) + '°~' + demEast.toFixed(4) + '°E, ' +
+                  demSouth.toFixed(4) + '°~' + demNorth.toFixed(4) + '°N');
+              } else {
+                throw new Error('GeoTIFF 地理元数据无效');
+              }
+            } catch (e) {
+              // 回退：使用 centerLon/centerLat 中心推断
+              demWest = node.centerLon != null ? node.centerLon - 10 : -180;
+              demEast = node.centerLon != null ? node.centerLon + 10 : 180;
+              demSouth = node.centerLat != null ? node.centerLat - 5 : -90;
+              demNorth = node.centerLat != null ? node.centerLat + 5 : 90;
+              console.log('[LayerTreeManager] ⚠️ GeoTIFF 地理元数据不可用，使用 center-based 推断范围: ' +
+                demWest.toFixed(2) + '°~' + demEast.toFixed(2) + '°E, ' +
+                demSouth.toFixed(2) + '°~' + demNorth.toFixed(2) + '°N (错误: ' + e.message + ')');
+            }
+
             // 步骤3：色带渲染
             var tCvs = document.createElement('canvas'); tCvs.width = tw; tCvs.height = th;
             var tCtx = tCvs.getContext('2d');
@@ -4278,10 +4307,11 @@ export default {
               if (!isFinite(val) || val <= -9999) { tImg.data[pi+3] = 0; continue; }
               var nt = Math.max(0, Math.min(1, (val - tMin) * tSt));
               var tr, tg, tb;
-              if (nt < 0.25)      { var s = nt / 0.25;          tr = Math.round(s * 255); tg = 255; tb = Math.round((1 - s) * 128); }
-              else if (nt < 0.5)  { var s = (nt - 0.25) / 0.25; tr = 255; tg = Math.round(255 - s * 100); tb = 0; }
-              else if (nt < 0.75) { var s = (nt - 0.5) / 0.25;  tr = 255; tg = Math.round(155 - s * 155); tb = Math.round(s * 100); }
-              else                { var s = (nt - 0.75) / 0.25; tr = 255; tg = Math.round(s * 255); tb = Math.round(100 + s * 155); }
+              // 自然地形色带：绿(低) → 棕/土黄(中) → 灰(高) → 白(雪山顶)
+              if (nt < 0.25)      { var s = nt / 0.25;          tr = Math.round(34 + s * 100);  tg = Math.round(139 - s * 50);  tb = Math.round(34 - s * 30); }      // 深绿→浅绿
+              else if (nt < 0.6)  { var s = (nt - 0.25) / 0.35; tr = Math.round(134 + s * 86);  tg = Math.round(89 + s * 25);   tb = Math.round(4 + s * 50); }        // 浅绿→棕色/土黄
+              else if (nt < 0.85) { var s = (nt - 0.6) / 0.25;  tr = Math.round(220 + s * 20);  tg = Math.round(114 - s * 24);  tb = Math.round(54 + s * 96); }        // 棕色→灰色
+              else                { var s = (nt - 0.85) / 0.15; tr = Math.round(240 + s * 15);  tg = Math.round(90 + s * 165);  tb = Math.round(150 + s * 105); }      // 灰色→白色
               tImg.data[pi]=tr; tImg.data[pi+1]=tg; tImg.data[pi+2]=tb; tImg.data[pi+3]=255;
             }
             tCtx.putImageData(tImg, 0, 0);
@@ -4290,11 +4320,12 @@ export default {
             var is3d = node.demRenderMode !== '2d';
             if (is3d) {
               var scale3d = node.demElevationScale != null ? node.demElevationScale : 1.0;
-              var stepX3d = Math.max(1, Math.floor(tw / 180));
-              var stepY3d = Math.max(1, Math.floor(th / 90));
+              // 根据瓦片尺寸动态计算网格分辨率（目标每边 50~200 顶点）
+              var targetVerticesPerSide = Math.min(200, Math.max(50, Math.floor((tw + th) / 36)));
+              var stepX3d = Math.max(1, Math.floor(tw / targetVerticesPerSide));
+              var stepY3d = Math.max(1, Math.floor(th / targetVerticesPerSide));
               var cols3d = Math.floor((tw - 1) / stepX3d) + 1;
               var rows3d = Math.floor((th - 1) / stepY3d) + 1;
-              var heightRange = tMax - tMin; if (heightRange <= 0) heightRange = 1;
 
               var vertices3d = [], texCoords3d = [], indices3d = [], vertexColors = [];
               for (var row = 0; row < rows3d; row++) {
@@ -4304,13 +4335,8 @@ export default {
                   var pixIdx = si * tw + sj;
                   var v = band[pixIdx];
                   if (!isFinite(v) || v <= -9999) v = tMin;
-                  var nt3d = (v - tMin) / heightRange;
-                  var ht3d = nt3d * scale3d * 50000;
-                  // 经纬度范围从本地文件推断（假设全球或中国范围）
-                  var demWest = node.centerLon != null ? node.centerLon - 10 : -180;
-                  var demEast = node.centerLon != null ? node.centerLon + 10 : 180;
-                  var demSouth = node.centerLat != null ? node.centerLat - 5 : -90;
-                  var demNorth = node.centerLat != null ? node.centerLat + 5 : 90;
+                  // 使用实际高程值（米），scale3d 作为垂直夸张系数
+                  var ht3d = v * scale3d;
                   var lon3d = demWest + col * (demEast - demWest) / (cols3d - 1);
                   var lat3d = demNorth - row * (demNorth - demSouth) / (rows3d - 1);
                   var cart3d = Cesium.Cartesian3.fromDegrees(lon3d, lat3d, ht3d);
@@ -4342,7 +4368,7 @@ export default {
                 asynchronous: false
               });
               viewer.scene.primitives.add(mesh3d);
-              this._cesiumLayers.set(node.id, { type: 'local-dem', object: mesh3d, _is3d: true, _imageUrl: tCvs.toDataURL('image/png') });
+              this._cesiumLayers.set(node.id, { type: 'local-dem', object: mesh3d, _is3d: true, _imageUrl: tCvs.toDataURL('image/png'), _bounds: { west: demWest, east: demEast, south: demSouth, north: demNorth } });
               console.log('[LayerTreeManager] 🏔️ 本地 DEM 3D 网格: ' + cols3d + '×' + rows3d +
                 ' 顶点=' + (vertices3d.length/3).toFixed(0) + ' 三角形=' + (indices3d.length/3).toFixed(0) +
                 ' 高程×' + scale3d.toFixed(1));
@@ -5162,7 +5188,22 @@ export default {
           return;
         }
 
-        // 1. 优先使用节点自定义中心坐标
+        // 1. 本地 DEM / WCS 3D — 从存储的地理边界计算飞行目标
+        const entry = this._cesiumLayers.get(node.id);
+        if (entry && entry._bounds) {
+          const b = entry._bounds;
+          const flyLon = (b.west + b.east) / 2;
+          const flyLat = (b.south + b.north) / 2;
+          const flyHeight = Math.max(5000, (b.north - b.south) * 500000);
+          viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(flyLon, flyLat, flyHeight),
+            duration: 2
+          });
+          console.log(`[${this.componentName}] 🎯 飞行至数据实际范围: ${node.name} (${flyLon.toFixed(4)}, ${flyLat.toFixed(4)}, ${flyHeight.toFixed(0)}m)`);
+          return;
+        }
+
+        // 2. 回退：使用节点自定义中心坐标
         if (node.centerLon != null && node.centerLat != null) {
           const height = node.centerHeight || 50000;
           viewer.camera.flyTo({
@@ -5177,18 +5218,18 @@ export default {
           return;
         }
 
-        // 2. GeoJSON / 3DTiles / WFS — 从已有 Cesium 对象获取范围
-        const entry = this._cesiumLayers.get(node.id);
-        if (!entry) return;
+        // 3. GeoJSON / 3DTiles / WFS — 从已有 Cesium 对象获取范围
+        const entry2 = entry || this._cesiumLayers.get(node.id);
+        if (!entry2) return;
 
-        if (entry.type === 'geojson' && entry.object) {
-          viewer.flyTo(entry.object).catch(() => {});
-        } else if (entry.type === '3dtiles' && entry.object) {
-          viewer.flyTo(entry.object).catch(() => {});
-        } else if ((entry.type === 'wms' || entry.type === 'wmts' || entry.type === 'xyz') && entry.provider) {
+        if (entry2.type === 'geojson' && entry2.object) {
+          viewer.flyTo(entry2.object).catch(() => {});
+        } else if (entry2.type === '3dtiles' && entry2.object) {
+          viewer.flyTo(entry2.object).catch(() => {});
+        } else if ((entry2.type === 'wms' || entry2.type === 'wmts' || entry2.type === 'xyz') && entry2.provider) {
           // 影像图层尝试从 provider 获取范围
           // WebMapServiceImageryProvider 有 `rectangle` 属性
-          const rect = entry.provider.rectangle;
+          const rect = entry2.provider.rectangle;
           if (rect) {
             viewer.camera.flyTo({
               destination: rect,
