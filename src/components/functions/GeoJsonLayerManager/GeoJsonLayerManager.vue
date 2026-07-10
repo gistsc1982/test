@@ -881,6 +881,51 @@ export default {
       chunkSize = chunkSize || 25;
       const Cesium = this.getCesium();
       if (!Cesium) return Promise.resolve(0);
+
+      const viewer = this.getCesiumViewer();
+
+      // ═══ 阶段 0：按屏幕可见性排序（视野内优先加载） ═══
+      if (viewer && viewer.camera && viewer.scene && viewer.scene.globe) {
+        try {
+          var viewRect = viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid);
+          if (viewRect) {
+            var vpWest  = Cesium.Math.toDegrees(viewRect.west);
+            var vpSouth = Cesium.Math.toDegrees(viewRect.south);
+            var vpEast  = Cesium.Math.toDegrees(viewRect.east);
+            var vpNorth = Cesium.Math.toDegrees(viewRect.north);
+            var crossed = vpWest > vpEast; // 跨越日期变更线
+
+            // 预计算每个 entity 的经纬度，用于可见性判断
+            for (var t = 0; t < tasks.length; t++) {
+              var ent = tasks[t].entity;
+              if (!ent || !ent.position) { tasks[t]._onScreen = false; continue; }
+              try {
+                var pos = ent.position.getValue ? ent.position.getValue() : ent.position;
+                if (!pos) { tasks[t]._onScreen = false; continue; }
+                var cg = Cesium.Cartographic.fromCartesian(pos);
+                var lon = Cesium.Math.toDegrees(cg.longitude);
+                var lat = Cesium.Math.toDegrees(cg.latitude);
+                var lonOk = crossed ? (lon >= vpWest || lon <= vpEast) : (lon >= vpWest && lon <= vpEast);
+                tasks[t]._onScreen = lonOk && lat >= vpSouth && lat <= vpNorth;
+              } catch (e) { tasks[t]._onScreen = false; }
+            }
+
+            // 视野内排在前面
+            tasks.sort(function (a, b) {
+              return (b._onScreen ? 1 : 0) - (a._onScreen ? 1 : 0);
+            });
+
+            var visibleCount = 0;
+            for (var vi = 0; vi < tasks.length; vi++) {
+              if (tasks[vi]._onScreen) visibleCount++; else break;
+            }
+            if (visibleCount > 0 && visibleCount < tasks.length) {
+              console.log('[' + this.componentName + '] 👁️ 视野内 ' + visibleCount + '/' + tasks.length + ' 个实体优先加载');
+            }
+          }
+        } catch (e) { /* 可见性排序失败不影响主流程 */ }
+      }
+
       const total = tasks.length;
 
       // ═══ 阶段 1：同步创建所有 LabelGraphics（show=false，跳过栅格化） ═══
@@ -913,22 +958,17 @@ export default {
 
       // ═══ 阶段 2：异步分批揭示（每帧 25 个 → 栅格化均匀分散） ═══
       let cursor = 0;
-      const self = this;
-      const viewer = this.getCesiumViewer();
 
       return new Promise(function (resolve) {
         function revealChunk() {
           const end = Math.min(cursor + chunkSize, total);
-          let revealed = 0;
           for (let i = cursor; i < end; i++) {
             const task = tasks[i];
             if (!task || !task.entity || !task.entity.label) continue;
             task.entity.label.show = true;
-            revealed++;
           }
           cursor = end;
 
-          // 强制 Cesium 当帧渲染，仅栅格化本批 label
           if (viewer) viewer.scene.requestRender();
 
           if (cursor < total) {
