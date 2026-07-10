@@ -13,12 +13,48 @@
       });
     }
     </script>
+    <!-- ⭐ 全局修复：checkbox 点击后面板 header/toolbar 被滚出屏幕 -->
+    <script>
+    (function() {
+      function resetPanelScrolls() {
+        document.querySelectorAll('.panel-body').forEach(function(pb) {
+          if (pb.scrollTop > 10) {
+            pb.scrollTop = 0;
+            pb.scrollTo(0, 0);
+            var panel = pb.closest('.function-panel');
+            if (panel) { panel.scrollTop = 0; }
+            var tw = pb.querySelector('.tree-wrapper');
+            if (tw && tw.scrollTop > 0) { tw.scrollTop = 0; tw.scrollTo(0, 0); }
+            var cl = pb.querySelector('.config-list');
+            if (cl && cl.scrollTop > 0) { cl.scrollTop = 0; cl.scrollTo(0, 0); }
+          }
+        });
+      }
+      // DOM 变化时重置（图层加载完成/checkbox 切换触发 Vue 渲染）
+      var observer = new MutationObserver(function() { resetPanelScrolls(); });
+      var tid = setInterval(function() {
+        var bodies = document.querySelectorAll('.panel-body');
+        if (bodies.length > 0) {
+          clearInterval(tid);
+          bodies.forEach(function(pb) {
+            observer.observe(pb, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+          });
+        }
+      }, 500);
+      // 兜底：scroll 事件也触发重置
+      document.addEventListener('scroll', function() { resetPanelScrolls(); }, true);
+    })();
+    </script>
     <!-- ⭐ 引入 Cesium 核心库（来自 update-gis 打包的静态资源） -->
     <script src="/gis/Cesium/Cesium.js"></script>
     <!-- ⭐ 引入 Cesium Widgets 样式 -->
     <link href="/gis/Cesium/Widgets/widgets.css" rel="stylesheet">
     <!-- ⭐ 引入 vue3-sfc-loader（用于动态加载 .mjs 组件） -->
     <script src="/gis/libs/vue3-sfc-loader.js"></script>
+    <!-- ⭐ 全局禁用 scroll anchoring：防止 checkbox/图层状态变化时面板标题栏被推出屏幕 -->
+    <style>
+      .panel-body, .panel-body * { overflow-anchor: none !important; }
+    </style>
     <!-- ⭐ Import Map 配置（用于 load-three-globals.js 解析模块路径） -->
     <script type="importmap">
     {

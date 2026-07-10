@@ -1419,8 +1419,16 @@ export default {
           if (!treeEl) return;
           var panel = treeEl.closest('.function-panel');
           if (!panel) return;
+          // ⭐ 禁用浏览器 scroll anchoring：防止 checkbox 状态变化触发 DOM 更新时
+          //    浏览器自动滚动面板，导致 header/toolbar 滚出可视区
+          panel.style.overflowAnchor = 'none';
+          var tw = panel.querySelector('.tree-wrapper');
+          if (tw) { tw.style.overflowAnchor = 'none'; }
           var configList = panel.querySelector('.config-list');
-          if (configList) configList.style.display = self.sectionVisible.list ? '' : 'none';
+          if (configList) {
+            configList.style.display = self.sectionVisible.list ? '' : 'none';
+            configList.style.overflowAnchor = 'none';
+          }
         });
       });
     });
@@ -1664,9 +1672,14 @@ export default {
           if (toolbar) toolbar.style.display = sv.showToolbar !== false ? '' : 'none';
           // 列表
           var configList = panel.querySelector('.config-list');
-          if (configList) configList.style.display = sv.list ? '' : 'none';
+          if (configList) {
+            configList.style.display = sv.list ? '' : 'none';
+            configList.style.overflowAnchor = 'none';
+            configList.scrollTop = 0;
+          }
           // ⚠️ 显隐切换可能导致浏览器调整 .function-panel 的 scrollTop，须重置
           panel.scrollTop = 0;
+          panel.style.overflowAnchor = 'none';
         }.bind(this));
       }
     },
@@ -3230,7 +3243,12 @@ export default {
         var el = this.$refs.treeContainer;
         if (el) {
           var panel = el.closest('.function-panel');
-          if (panel) panel.scrollTop = 0;
+          if (panel) {
+            panel.scrollTop = 0;
+            panel.style.overflowAnchor = 'none';
+            var tw = panel.querySelector('.tree-wrapper');
+            if (tw) { tw.scrollTop = 0; tw.style.overflowAnchor = 'none'; }
+          }
         }
       }.bind(this));
 
@@ -4490,15 +4508,17 @@ export default {
             if (!panel) return;
             var toolbar = panel.querySelector('.toolbar');
             var pb = panel.querySelector('.panel-body');
+            var tw = panel.querySelector('.tree-wrapper');
             // 强制显示工具栏
             if (toolbar) toolbar.style.display = 'flex';
-            // 重置滚动
+            // 重置所有滚动容器：panel-body、tree-wrapper、function-panel
             if (pb) { pb.scrollTop = 0; pb.scrollTo(0, 0); }
-            // 切换再恢复以触发重绘
+            if (tw) { tw.scrollTop = 0; tw.scrollTo(0, 0); }
+            // 切换再恢复以触发重绘，防止浏览器保留旧的滚动位置
             if (toolbar) { toolbar.style.display = 'none'; toolbar.offsetHeight; toolbar.style.display = 'flex'; }
             // ⚠️ 关键修复：toolbar 显隐切换会导致浏览器调整 .function-panel 的 scrollTop，
             // 将 header/toolbar 滚出可视区域。必须重置 panel 自身的滚动位置。
-            if (panel) { panel.scrollTop = 0; }
+            if (panel) { panel.scrollTop = 0; panel.style.overflowAnchor = 'none'; }
           }.bind(this));
         }.bind(this));
 
@@ -5076,6 +5096,14 @@ export default {
   min-height: 120px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* ⭐ 禁用浏览器 scroll anchoring：checkbox 状态变化触发 DOM 更新时，
+    浏览器不会自动调整滚动位置，防止 header/toolbar 被滚出可视区 */
+  overflow-anchor: none;
+}
+
+/* ⭐ 树节点内禁止成为 scroll anchor 候选 */
+.tree-wrapper * {
+  overflow-anchor: none;
 }
 
 .tree-wrapper::-webkit-scrollbar {
@@ -5656,5 +5684,12 @@ ul.tree-children {
   font-size: 10px;
   color: #666;
   margin-left: auto;
+}
+/* ⭐ 列表区域（JsonConfigPanelBase 的默认渲染）：禁用 scroll anchoring */
+::v-deep .config-list {
+  overflow-anchor: none;
+}
+::v-deep .config-list * {
+  overflow-anchor: none;
 }
 </style>
