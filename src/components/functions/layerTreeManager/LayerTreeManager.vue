@@ -304,6 +304,21 @@
                     </div>
                   </div>
                 </div>
+                <div class="tree-form-group" v-if="editForm._showWcs">
+                  <div style="display:flex;gap:6px;">
+                    <div style="flex:1;">
+                      <label class="tree-form-label">渲染模式 <span style="font-weight:normal;color:#888;font-size:10px;">(2d叠加/3d网格)</span></label>
+                      <select v-model="editForm.wcsRenderMode" class="tree-form-input" style="padding:5px 8px;">
+                        <option value="2d">2D — 单瓦片叠加在球面上</option>
+                        <option value="3d">3D — GeoTIFF 高程生成网格</option>
+                      </select>
+                    </div>
+                    <div style="flex:1;" v-if="editForm.wcsRenderMode === '3d'">
+                      <label class="tree-form-label">高程夸张 <span style="font-weight:normal;color:#888;font-size:10px;">(倍数)</span></label>
+                      <input v-model.number="editForm.wcsElevationScale" class="tree-form-input" type="number" min="0.1" max="100" step="0.1" placeholder="1.0" />
+                    </div>
+                  </div>
+                </div>
                 <div class="tree-form-group" v-if="editForm.nodeType === 'layer'">
                   <label class="tree-form-label">定位坐标 <span style="font-weight:normal;color:#888;font-size:11px;">(选填，用于地图自动定位)</span></label>
                   <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -1275,8 +1290,9 @@ export default {
         { "id": "root-geocode",  "name": "地理编码服务",      "parentId": null,     "nodeType": "folder", "sortOrder": 4, "visible": 1, "description": "正向/反向地理编码，名称↔坐标互查", "icon": "📁" },
         { "id": "geocode-tianditu","name":"天地图 地址→坐标(地理编码)","parentId":"root-geocode","nodeType":"layer","url":"https://api.tianditu.gov.cn/search","sortOrder":1,"visible":1,"description":"天地图POI搜索/地理编码API。需替换URL中的tk参数为你的天地图Key。查询结果自动构建为GeoJSON点图层。","icon":"🔍","centerLon":116.4,"centerLat":39.9,"centerHeight":50000,"geocodingAddress":"北京市天安门","geocodingKey":"你的天地图Key"},
         { "id": "folder-wcs",     "name": "WCS 栅格服务",      "parentId": "root-ogc","nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "OGC WCS 栅格覆盖服务（GetCoverage）", "icon": "📁" },
-        { "id": "wcs-rasdaman-dem","name":"rasdaman 巴伐利亚 DSM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Bavaria_50_DSM。德国巴伐利亚州50m分辨率数字地表模型（海拔色带渲染）。","icon":"🏔️","centerLon":11.5,"centerLat":48.5,"centerHeight":80000,"wcsCoverageName":"Bavaria_50_DSM","wcsFormat":"image/tiff","wcsVersion":"2.0.1"},
-        { "id": "wcs-rasdaman-s2","name":"rasdaman 德国 DTM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":2,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Germany_DTM。德国全境数字地形模型（色带渲染）。","icon":"🇩🇪","centerLon":10,"centerLat":51,"centerHeight":500000,"wcsCoverageName":"Germany_DTM","wcsFormat":"image/tiff","wcsVersion":"2.0.1"}
+        { "id": "wcs-rasdaman-dem","name":"rasdaman 巴伐利亚 DSM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Bavaria_50_DSM。德国巴伐利亚州50m分辨率数字地表模型（海拔色带渲染）。","icon":"🏔️","centerLon":11.5,"centerLat":48.5,"centerHeight":80000,"wcsCoverageName":"Bavaria_50_DSM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
+        { "id": "wcs-rasdaman-s2","name":"rasdaman 德国 DTM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":2,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Germany_DTM。德国全境数字地形模型（色带渲染）。","icon":"🇩🇪","centerLon":10,"centerLat":51,"centerHeight":500000,"wcsCoverageName":"Germany_DTM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
+{ "id": "wcs-rasdaman-avgtemp","name":"rasdaman 全球地表温度(WCS 3D-Timeline)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":3,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=AvgLandTemp，185个时间切片(2000-2015)，支持Timeline时间轴动画。","icon":"🌡️","centerLon":0,"centerLat":20,"centerHeight":15000000,"wcsCoverageName":"AvgLandTemp","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsAlpha":0.4,"wcsTimeAxis":"ansi","wcsTimeSlice":"2000-02-01T00:00:00Z","wcsColorRamp":true,"wcsRenderMode":"3d","wcsElevationScale":50.0}
       ],
 
       // Cesium 图层加载状态 — 记录已加载的图层 ID → Cesium 对象
@@ -1514,8 +1530,9 @@ export default {
         { "id": "root-geocode", "name": "地理编码服务", "parentId": null, "nodeType": "folder", "sortOrder": 4, "visible": 1, "description": "正向/反向地理编码，名称↔坐标互查", "icon": "📁" },
         { "id": "geocode-tianditu","name":"天地图 地址→坐标(地理编码)","parentId":"root-geocode","nodeType":"layer","url":"https://api.tianditu.gov.cn/search","sortOrder":1,"visible":1,"description":"天地图POI搜索/地理编码API。需替换URL中的tk参数为你的天地图Key。查询结果自动构建为GeoJSON点图层。","icon":"🔍","centerLon":116.4,"centerLat":39.9,"centerHeight":50000,"geocodingAddress":"北京市天安门","geocodingKey":"你的天地图Key"},
         { "id": "folder-wcs", "name": "WCS 栅格服务", "parentId": "root-ogc", "nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "OGC WCS 栅格覆盖服务（GetCoverage）", "icon": "📁" },
-        { "id": "wcs-rasdaman-dem","name":"rasdaman 巴伐利亚 DSM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Bavaria_50_DSM。德国巴伐利亚州50m分辨率数字地表模型（海拔色带渲染）。","icon":"🏔️","centerLon":11.5,"centerLat":48.5,"centerHeight":80000,"wcsCoverageName":"Bavaria_50_DSM","wcsFormat":"image/tiff","wcsVersion":"2.0.1"},
-        { "id": "wcs-rasdaman-s2","name":"rasdaman 德国 DTM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":2,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Germany_DTM。德国全境数字地形模型（色带渲染）。","icon":"🇩🇪","centerLon":10,"centerLat":51,"centerHeight":500000,"wcsCoverageName":"Germany_DTM","wcsFormat":"image/tiff","wcsVersion":"2.0.1"}
+        { "id": "wcs-rasdaman-dem","name":"rasdaman 巴伐利亚 DSM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Bavaria_50_DSM。德国巴伐利亚州50m分辨率数字地表模型（海拔色带渲染）。","icon":"🏔️","centerLon":11.5,"centerLat":48.5,"centerHeight":80000,"wcsCoverageName":"Bavaria_50_DSM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
+        { "id": "wcs-rasdaman-s2","name":"rasdaman 德国 DTM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":2,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Germany_DTM。德国全境数字地形模型（色带渲染）。","icon":"🇩🇪","centerLon":10,"centerLat":51,"centerHeight":500000,"wcsCoverageName":"Germany_DTM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
+{ "id": "wcs-rasdaman-avgtemp","name":"rasdaman 全球地表温度(WCS 3D-Timeline)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":3,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=AvgLandTemp，185个时间切片(2000-2015)，支持Timeline时间轴动画。","icon":"🌡️","centerLon":0,"centerLat":20,"centerHeight":15000000,"wcsCoverageName":"AvgLandTemp","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsAlpha":0.4,"wcsTimeAxis":"ansi","wcsTimeSlice":"2000-02-01T00:00:00Z","wcsColorRamp":true,"wcsRenderMode":"3d","wcsElevationScale":50.0}
       ];
 
       var added = [];
@@ -1824,6 +1841,8 @@ export default {
         wcsTimeAxis: node.wcsTimeAxis || '',
         wcsTimeSlice: node.wcsTimeSlice || '',
         wcsColorRamp: node.wcsColorRamp !== false, // 默认 true（启用色带）
+        wcsRenderMode: node.wcsRenderMode || '2d',   // 默认 2D 叠加
+        wcsElevationScale: node.wcsElevationScale != null ? node.wcsElevationScale : 1.0,
         _showWcs: !!(node.wcsCoverageName || node.wcsFormat || this._findAncestorFolder(node.id, ['folder-wcs', 'WCS']))
       };
       this.showEditDialog = true;
@@ -1884,7 +1903,9 @@ export default {
         wcsAlpha: this.editForm.wcsAlpha != null ? this.editForm.wcsAlpha : undefined,
         wcsTimeAxis: this.editForm.wcsTimeAxis || undefined,
         wcsTimeSlice: this.editForm.wcsTimeSlice || undefined,
-        wcsColorRamp: this.editForm.wcsColorRamp !== undefined ? this.editForm.wcsColorRamp : undefined
+        wcsColorRamp: this.editForm.wcsColorRamp !== undefined ? this.editForm.wcsColorRamp : undefined,
+        wcsRenderMode: this.editForm.wcsRenderMode || undefined,
+        wcsElevationScale: this.editForm.wcsElevationScale != null ? this.editForm.wcsElevationScale : undefined
       };
       // 强制触发响应式更新
       this.flatNodeList = [...this.flatNodeList];
@@ -4278,8 +4299,23 @@ export default {
                   if (abbr) found.push(abbr);
                 }
                 if (found.length >= 2) {
-                  axisNames = found.slice(0, 2);
-                  extraAxes = found.slice(2);
+                  // ⭐ 分离空间轴和时间轴：时间/日期轴不用于 SUBSET 空间范围
+                  var timeAxisPattern = /^(ansi|time|t|date|datetime|timestamp|unix|elevation)$/i;
+                  var spatialAxes = [], timeAxes = [];
+                  for (var fi = 0; fi < found.length; fi++) {
+                    if (timeAxisPattern.test(found[fi])) {
+                      timeAxes.push(found[fi]);
+                    } else {
+                      spatialAxes.push(found[fi]);
+                    }
+                  }
+                  // 空间轴取前 2 个，其余归入额外轴
+                  axisNames = spatialAxes.slice(0, 2);
+                  extraAxes = timeAxes.concat(spatialAxes.slice(2));
+                  if (axisNames.length < 2) {
+                    axisNames = found.slice(0, 2); // 回退：无法识别空间轴时保持原逻辑
+                    extraAxes = found.slice(2);
+                  }
                 }
                 // 提取空间边界框（WGS84 经纬度）
                 var bboxRegex = /<gml:lowerCorner[^>]*>([^<]+)<\/gml:lowerCorner>\s*<gml:upperCorner[^>]*>([^<]+)<\/gml:upperCorner>/;
@@ -4287,8 +4323,19 @@ export default {
                 if (bm) {
                   var lo = bm[1].trim().split(/\s+/);
                   var hi = bm[2].trim().split(/\s+/);
-                  // ⚠️ EPSG:4326 在 WCS 中轴序为 Lat,Lon（不是 Lon,Lat）
-                  covBbox = { west: parseFloat(lo[1]), south: parseFloat(lo[0]), east: parseFloat(hi[1]), north: parseFloat(hi[0]) };
+                  // ⭐ 多轴 coverage（含时间维度）：bbox 值偏移 extraAxes.length
+                  //    例如 axisLabels="ansi Lat Lon" → lo=[time, lat, lon] → 偏移 1
+                  var spOff = extraAxes.length;
+                  var lo0 = parseFloat(lo[spOff]), lo1 = parseFloat(lo[spOff + 1]);
+                  var hi0 = parseFloat(hi[spOff]), hi1 = parseFloat(hi[spOff + 1]);
+                  // 验证值的合理性（纬度 -90~90，经度 -180~180）
+                  if (isFinite(lo0) && isFinite(lo1) && isFinite(hi0) && isFinite(hi1) &&
+                      Math.abs(lo0) <= 180 && Math.abs(hi0) <= 180 &&
+                      Math.abs(lo1) <= 180 && Math.abs(hi1) <= 180) {
+                    covBbox = { west: lo1, south: lo0, east: hi1, north: hi0 };
+                  } else {
+                    console.warn(`[${this.componentName}] ⚠️ bbox 解析值异常 (spOff=${spOff}): lo=[${lo0},${lo1}] hi=[${hi0},${hi1}]，回退全局范围`);
+                  }
                 }
                 console.log(`[${this.componentName}] 📐 DescribeCoverage 轴: 空间=${axisNames.join(',')} 额外=${extraAxes.join(',') || '无'} bbox=`, covBbox);
               }
@@ -4325,16 +4372,19 @@ export default {
             // ⭐ 使用 DescribeCoverage 的真实边界框，避免硬编码 (-180,180)/(-90,90) 超出 coverage 范围
             var subsetLon = covBbox ? (covBbox.west + ',' + covBbox.east) : '-180,180';
             var subsetLat = covBbox ? (covBbox.south + ',' + covBbox.north) : '-90,90';
+            // ⭐ 匹配空间轴名到子集范围（轴序可能为 Lat,Lon 或 Lon,Lat）
+            var axLon = axisNames.find(function(a) { return /^(lon|long|longitude|x|easting)$/i.test(a); }) || axisNames[0];
+            var axLat = axisNames.find(function(a) { return /^(lat|latitude|y|northing)$/i.test(a); }) || axisNames[1];
             if (covBbox) {
-              console.log(`[${this.componentName}] 🎯 使用 DescribeCoverage 边界: ${axisNames[0]}(${subsetLon}) ${axisNames[1]}(${subsetLat})`);
+              console.log(`[${this.componentName}] 🎯 使用 DescribeCoverage 边界: ${axLon}(${subsetLon}) ${axLat}(${subsetLat})`);
             }
 
             // 策略列表（仅 DescribeCoverage 明确发现的额外轴才加切片）
             var strategies = [
               { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=' + encodeURIComponent(covFormat) + extraSlices, desc: '无SUBSET ' + covFormat + (extraSlices ? ' +切片' : '') },
               { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=image%2Ftiff' + extraSlices, desc: '无SUBSET image/tiff' + (extraSlices ? ' +切片' : ''), ifFormatFail: true },
-              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=' + encodeURIComponent(covFormat) + '&SUBSET=' + encodeURIComponent(axisNames[0]) + '(' + subsetLon + ')&SUBSET=' + encodeURIComponent(axisNames[1]) + '(' + subsetLat + ')' + extraSlices, desc: 'SUBSET ' + axisNames[0] + ',' + axisNames[1] + ' ' + covFormat + (extraSlices ? ' +切片' : '') },
-              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=image%2Ftiff' + '&SUBSET=' + encodeURIComponent(axisNames[0]) + '(' + subsetLon + ')&SUBSET=' + encodeURIComponent(axisNames[1]) + '(' + subsetLat + ')' + extraSlices, desc: 'SUBSET ' + axisNames[0] + ',' + axisNames[1] + ' image/tiff' + (extraSlices ? ' +切片' : ''), ifFormatFail: true },
+              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=' + encodeURIComponent(covFormat) + '&SUBSET=' + encodeURIComponent(axLon) + '(' + subsetLon + ')&SUBSET=' + encodeURIComponent(axLat) + '(' + subsetLat + ')' + extraSlices, desc: 'SUBSET ' + axLon + ',' + axLat + ' ' + covFormat + (extraSlices ? ' +切片' : '') },
+              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=image%2Ftiff' + '&SUBSET=' + encodeURIComponent(axLon) + '(' + subsetLon + ')&SUBSET=' + encodeURIComponent(axLat) + '(' + subsetLat + ')' + extraSlices, desc: 'SUBSET ' + axLon + ',' + axLat + ' image/tiff' + (extraSlices ? ' +切片' : ''), ifFormatFail: true },
             ];
 
             for (var si = 0; si < strategies.length && !covBlob; si++) {
@@ -4407,6 +4457,118 @@ export default {
                 tCtx.putImageData(tImg, 0, 0);
                 imageUrl = tCvs.toDataURL('image/png');
                 console.log('[LayerTreeManager] 🖼️ GeoTIFF+色带 → ' + tw + '×' + th);
+
+                // ═══════════════════════════════════════════════════════
+                // 🏔️ 3D 渲染模式：高程数据 → 3D 网格
+                // ═══════════════════════════════════════════════════════
+                if (node.wcsRenderMode === '3d') {
+                  var scale3d = node.wcsElevationScale != null ? node.wcsElevationScale : 1.0;
+
+                  // 降采样步长（目标 ~180×90 网格 = 16K 顶点，平衡性能和细节）
+                  var stepX3d = Math.max(1, Math.floor(tw / 180));
+                  var stepY3d = Math.max(1, Math.floor(th / 90));
+                  var cols3d = Math.floor((tw - 1) / stepX3d) + 1;
+                  var rows3d = Math.floor((th - 1) / stepY3d) + 1;
+
+                  var heightRange = tMax - tMin;
+                  if (heightRange <= 0) heightRange = 1;
+                  var baseHeight = 0; // 基准海拔（海平面以上）
+
+                  // 构建顶点和纹理坐标
+                  var vertices3d = [];
+                  var texCoords3d = [];
+                  var indices3d = [];
+                  var vertexColors = [];
+
+                  for (var row = 0; row < rows3d; row++) {
+                    for (var col = 0; col < cols3d; col++) {
+                      var si = Math.min(row * stepY3d, th - 1);
+                      var sj = Math.min(col * stepX3d, tw - 1);
+                      var pixIdx = si * tw + sj;
+                      var v = band[pixIdx];
+                      if (!isFinite(v) || v <= -9999) v = tMin;
+
+                      var nt3d = (v - tMin) / heightRange;
+                      var ht3d = nt3d * scale3d * 200000; // 最大高程 ~200km @ scale=1
+
+                      var lon3d = -180 + col * 360 / (cols3d - 1);
+                      var lat3d = 90 - row * 180 / (rows3d - 1);
+
+                      var cart3d = Cesium.Cartesian3.fromDegrees(lon3d, lat3d, baseHeight + ht3d);
+                      vertices3d.push(cart3d.x, cart3d.y, cart3d.z);
+
+                      // 纹理坐标（用于颜色贴图）
+                      texCoords3d.push(col / (cols3d - 1), 1 - row / (rows3d - 1));
+
+                      // 顶点颜色（从色带中取对应像素）
+                      var pi = pixIdx * 4;
+                      vertexColors.push(tImg.data[pi], tImg.data[pi+1], tImg.data[pi+2], 255);
+                    }
+                  }
+
+                  // 构建三角形索引
+                  for (var row = 0; row < rows3d - 1; row++) {
+                    for (var col = 0; col < cols3d - 1; col++) {
+                      var a = row * cols3d + col;
+                      var b = a + 1;
+                      var c = a + cols3d;
+                      var d = c + 1;
+                      indices3d.push(a, b, d);
+                      indices3d.push(a, d, c);
+                    }
+                  }
+
+                  var geometry3d = new Cesium.Geometry({
+                    attributes: new Cesium.GeometryAttributes({
+                      position: new Cesium.GeometryAttribute({
+                        componentDatatype: Cesium.ComponentDatatype.DOUBLE,
+                        componentsPerAttribute: 3,
+                        values: vertices3d
+                      }),
+                      st: new Cesium.GeometryAttribute({
+                        componentDatatype: Cesium.ComponentDatatype.FLOAT,
+                        componentsPerAttribute: 2,
+                        values: texCoords3d
+                      }),
+                      color: new Cesium.GeometryAttribute({
+                        componentDatatype: Cesium.ComponentDatatype.UNSIGNED_BYTE,
+                        componentsPerAttribute: 4,
+                        values: new Uint8Array(vertexColors),
+                        normalize: true
+                      })
+                    }),
+                    indices: indices3d,
+                    primitiveType: Cesium.PrimitiveType.TRIANGLES,
+                    boundingSphere: Cesium.BoundingSphere.fromVertices(vertices3d)
+                  });
+
+                  var mesh3d = new Cesium.Primitive({
+                    geometryInstances: new Cesium.GeometryInstance({
+                      geometry: geometry3d
+                    }),
+                    appearance: new Cesium.PerInstanceColorAppearance({
+                      flat: false,
+                      translucent: true
+                    }),
+                    asynchronous: false
+                  });
+
+                  viewer.scene.primitives.add(mesh3d);
+                  mesh3d.show = true;
+
+                  this._cesiumLayers.set(node.id, {
+                    type: 'wcs',
+                    object: mesh3d,
+                    _is3d: true,
+                    _wcsBbox: covBbox,
+                    _imageUrl: imageUrl
+                  });
+
+                  console.log('[LayerTreeManager] 🏔️ 3D 网格已创建: ' + cols3d + '×' + rows3d +
+                    ' 顶点=' + (vertices3d.length/3).toFixed(0) + ' 三角形=' + (indices3d.length/3).toFixed(0) +
+                    ' 高程×' + scale3d.toFixed(1));
+                  break; // 跳过 2D provider 创建
+                }
               } else {
                 imageUrl = URL.createObjectURL(covBlob);
               }
@@ -4604,7 +4766,7 @@ export default {
           }
           viewer.dataSources.remove(entry.object, false);
           viewer.scene.requestRender();
-        } else if (entry.type === '3dtiles') {
+        } else if (entry.type === '3dtiles' || entry._is3d) {
           entry.object.show = false;
           viewer.scene.primitives.remove(entry.object);
         }
@@ -4789,9 +4951,16 @@ export default {
             break;
           }
           case 'wcs': {
-            entry.object.show = false;
-            entry.object.alpha = 0.0;
-            viewer.imageryLayers.remove(entry.object, false);
+            if (entry._is3d) {
+              // 3D 网格：remove from scene.primitives
+              entry.object.show = false;
+              viewer.scene.primitives.remove(entry.object);
+            } else {
+              // 2D 叠加：remove from imageryLayers
+              entry.object.show = false;
+              entry.object.alpha = 0.0;
+              viewer.imageryLayers.remove(entry.object, false);
+            }
             if (entry._imageUrl && entry._imageUrl.startsWith('blob:')) {
               try { URL.revokeObjectURL(entry._imageUrl); } catch (e) { /* ignore */ }
             }
@@ -5043,7 +5212,7 @@ export default {
             if (entry._imageUrl && entry._imageUrl.startsWith('blob:')) {
               try { URL.revokeObjectURL(entry._imageUrl); } catch (e) { /* ignore */ }
             }
-          } else if (entry.type === '3dtiles') {
+          } else if (entry.type === '3dtiles' || entry._is3d) {
             entry.object.show = false;
             viewer.scene.primitives.remove(entry.object);
           }
