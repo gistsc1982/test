@@ -425,7 +425,7 @@ export class SQLiteConfigStrategy extends ConfigLoadStrategy {
    */
   async loadFromIndexedDB(storeName) {
     return new Promise((resolve, reject) => {
-      const request = window.indexedDB.open('configDB', 1);
+      const request = window.indexedDB.open('configDB');
 
       request.onerror = () => reject(request.error);
       request.onsuccess = (event) => {
@@ -458,7 +458,7 @@ export class SQLiteConfigStrategy extends ConfigLoadStrategy {
    */
   async saveToIndexedDB(storeName, data) {
     return new Promise((resolve, reject) => {
-      const request = window.indexedDB.open('configDB', 1);
+      const request = window.indexedDB.open('configDB');
 
       request.onerror = () => reject(request.error);
       request.onsuccess = (event) => {
@@ -478,9 +478,11 @@ export class SQLiteConfigStrategy extends ConfigLoadStrategy {
 
           let completed = 0;
           data.forEach((item) => {
-            const cleanItem = { ...item };
-            delete cleanItem.loaded;
-            delete cleanItem.loading;
+            const cleanItem = JSON.parse(JSON.stringify(item, function (k, v) {
+              if (k === 'loaded' || k === 'loading' || k === 'children') return undefined;
+              if (v === undefined || typeof v === 'function' || typeof v === 'symbol') return undefined;
+              return v;
+            }));
             const putRequest = store.put(cleanItem);
 
             putRequest.onsuccess = () => {

@@ -123,7 +123,7 @@ export class SQLiteConfigStrategy {
 
   _loadFromIndexedDB(storeName) {
     return new Promise((resolve) => {
-      const req = indexedDB.open('configDB', 1);
+      const req = indexedDB.open('configDB');
       req.onerror = () => resolve([]);
       req.onsuccess = (ev) => {
         const db = ev.target.result;
@@ -148,7 +148,7 @@ export class SQLiteConfigStrategy {
     await this._initDB();
     const storeName = configMetadata?.dataSource?.tableName || this._tableName;
     return new Promise((resolve) => {
-      const req = indexedDB.open('configDB', 1);
+      const req = indexedDB.open('configDB');
       req.onsuccess = (ev) => {
         const db = ev.target.result;
         const tx = db.transaction([storeName], 'readwrite');
@@ -157,7 +157,11 @@ export class SQLiteConfigStrategy {
           if (!data.length) { resolve(true); db.close(); return; }
           let done = 0;
           data.forEach(item => {
-            const clean = { ...item }; delete clean.loaded; delete clean.loading;
+            const clean = JSON.parse(JSON.stringify(item, function (k, v) {
+              if (k === 'loaded' || k === 'loading' || k === 'children') return undefined;
+              if (v === undefined || typeof v === 'function' || typeof v === 'symbol') return undefined;
+              return v;
+            }));
             const putReq = store.put(clean);
             putReq.onsuccess = () => { if (++done === data.length) { resolve(true); db.close(); } };
             putReq.onerror = () => { resolve(false); db.close(); };

@@ -257,6 +257,52 @@
                   <label class="tree-form-label">MVT源图层 <span style="font-weight:normal;color:#888;font-size:11px;">(逗号分隔，留空自动检测)</span></label>
                   <input v-model="editForm.mvtSourceLayers" class="tree-form-input" placeholder="如: water,transportation,building" />
                 </div>
+                <!-- ⭐ 地理编码专属字段 -->
+                <div class="tree-form-group" v-if="editForm._showGeocoding">
+                  <label class="tree-form-label">🔍 地理编码 — 查询地址 <span class="required">*</span></label>
+                  <input v-model="editForm.geocodingAddress" class="tree-form-input" placeholder="如: 北京市天安门" />
+                </div>
+                <div class="tree-form-group" v-if="editForm._showGeocoding">
+                  <label class="tree-form-label">🔍 地理编码 — API Key (tk) <span class="required">*</span></label>
+                  <input v-model="editForm.geocodingKey" class="tree-form-input" placeholder="天地图 Key" />
+                </div>
+                <!-- ⭐ WCS 专属字段 -->
+                <div class="tree-form-group" v-if="editForm._showWcs">
+                  <label class="tree-form-label">🏔️ WCS — Coverage 名称 <span class="required">*</span></label>
+                  <input v-model="editForm.wcsCoverageName" class="tree-form-input" placeholder="如: WorldDEMNeoDSM" />
+                </div>
+                <div class="tree-form-group" v-if="editForm._showWcs">
+                  <div style="display:flex;gap:6px;">
+                    <div style="flex:1;">
+                      <label class="tree-form-label">WCS 格式</label>
+                      <input v-model="editForm.wcsFormat" class="tree-form-input" placeholder="image/tiff" />
+                    </div>
+                    <div style="flex:1;">
+                      <label class="tree-form-label">WCS 版本</label>
+                      <input v-model="editForm.wcsVersion" class="tree-form-input" placeholder="2.0.1" />
+                    </div>
+                    <div style="flex:0 0 70px;">
+                      <label class="tree-form-label">透明度</label>
+                      <input v-model.number="editForm.wcsAlpha" class="tree-form-input" type="number" min="0" max="1" step="0.1" placeholder="0.7" />
+                    </div>
+                    <div style="flex:0 0 auto;display:flex;align-items:flex-end;padding-bottom:2px;">
+                      <label class="tree-form-checkbox" style="margin:0;white-space:nowrap;">
+                        <input type="checkbox" v-model="editForm.wcsColorRamp" />
+                        <span style="font-size:11px;">色带</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:6px;margin-top:6px;">
+                    <div style="flex:1;">
+                      <label class="tree-form-label">时间轴名 <span style="font-weight:normal;color:#888;font-size:10px;">(3D覆盖需切片)</span></label>
+                      <input v-model="editForm.wcsTimeAxis" class="tree-form-input" placeholder="如: ansi" />
+                    </div>
+                    <div style="flex:2;">
+                      <label class="tree-form-label">时间切片值 <span style="font-weight:normal;color:#888;font-size:10px;">(默认时刻)</span></label>
+                      <input v-model="editForm.wcsTimeSlice" class="tree-form-input" placeholder="如: 2000-02-01T00:00:00Z" />
+                    </div>
+                  </div>
+                </div>
                 <div class="tree-form-group" v-if="editForm.nodeType === 'layer'">
                   <label class="tree-form-label">定位坐标 <span style="font-weight:normal;color:#888;font-size:11px;">(选填，用于地图自动定位)</span></label>
                   <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -283,6 +329,42 @@
                     <span>可见</span>
                   </label>
                 </div>
+                <!-- ⭐ geoJsonStyle 编辑区（仅图层节点） -->
+                <div class="tree-form-group" v-if="editForm.nodeType === 'layer'">
+                  <div class="tree-style-header" @click="editStyleExpanded = !editStyleExpanded">
+                    <label class="tree-form-label" style="cursor:pointer;margin:0;">
+                      🎨 样式编辑 (geoJsonStyle)
+                      <span v-if="editForm.geoJsonStyle" class="style-indicator-set">已设</span>
+                      <span v-else class="style-indicator-empty">未设</span>
+                    </label>
+                    <span class="tree-style-toggle">{{ editStyleExpanded ? '▼' : '▶' }}</span>
+                  </div>
+                  <div v-if="editStyleExpanded" class="tree-style-body">
+                    <textarea
+                      v-model="editForm.geoJsonStyle"
+                      class="tree-style-textarea"
+                      rows="8"
+                      placeholder='{
+  "fill": "#FF6600",
+  "fillOpacity": 0.5,
+  "stroke": "#FF0000",
+  "strokeWidth": 2,
+  "markerColor": "#FF4400",
+  "markerSize": 48,
+  "markerIcon": "📍"
+}'
+                      spellcheck="false"
+                    ></textarea>
+                    <div class="tree-style-actions">
+                      <button @click="formatGeoJsonStyle" class="tree-btn tree-btn-outline" type="button" style="font-size:11px;padding:3px 8px;">📐 格式化</button>
+                      <button @click="convertGeoJsonManagerStyle" class="tree-btn tree-btn-outline" type="button" style="font-size:11px;padding:3px 8px;color:#ffa726;border-color:#ffa726;">🔄 转换</button>
+                      <button @click="fetchServiceStyle" class="tree-btn tree-btn-outline" type="button" style="font-size:11px;padding:3px 8px;color:#2196F3;border-color:#2196F3;" :disabled="styleFetching">{{ styleFetching ? '⏳ 获取中...' : '📡 服务样式' }}</button>
+                      <button @click="clearGeoJsonStyle" class="tree-btn tree-btn-outline" type="button" style="font-size:11px;padding:3px 8px;">🗑️ 清除</button>
+                      <span class="tree-style-hint">面: fill/stroke/strokeWidth/fillOpacity &nbsp; 线: stroke/strokeWidth &nbsp; 点: markerColor/markerSize/markerIcon</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="tree-form-group">
                   <label class="tree-form-label">父节点ID</label>
                   <select v-model="editForm.parentId" class="tree-form-select">
@@ -1188,7 +1270,12 @@ export default {
         { "id": "mvt-geofabrik","name":"Geofabrik Shortbread 矢量瓦片","parentId":"root-mvt","nodeType":"layer","url":"https://tiles.shortbread.geofabrik.de/tiles/shortbread_v1/{z}/{x}/{y}.mvt","sortOrder":4,"visible":1,"description":"德国Geofabrik免费MVT","icon":"🧩","centerLon":8.68,"centerLat":50.11,"centerHeight":500000},
         { "id": "mvt-maptiler-cn","name":"MapTiler 矢量瓦片(全球CDN)","parentId":"root-mvt","nodeType":"layer","url":"https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=get-free-key","sortOrder":5,"visible":1,"description":"MapTiler全球CDN矢量瓦片，OpenMapTiles schema，需免费注册Key替换URL，国内可访问","icon":"🎯","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
         { "id": "mvt-planet",    "name":"OpenFreeMap 全球矢量瓦片","parentId":"root-mvt","nodeType":"layer","url":"https://tiles.openfreemap.org/planet/{z}/{x}/{y}.pbf","sortOrder":6,"visible":1,"description":"OpenFreeMap免费全球MVT，无需API Key","icon":"🌏","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
-        { "id": "xyz-versatiles-raster","name":"VersaTiles 浅色栅格底图(XYZ)","parentId":"root-xyz","nodeType":"layer","url":"https://tiles.versatiles.org/tiles/versatiles-light/{z}/{x}/{y}.png","sortOrder":9,"visible":1,"description":"VersaTiles免费浅色栅格瓦片，XYZ格式，全球覆盖，直接可用","icon":"🎨","centerLon":116.4,"centerLat":39.9,"centerHeight":50000}
+        { "id": "xyz-versatiles-raster","name":"VersaTiles 浅色栅格底图(XYZ)","parentId":"root-xyz","nodeType":"layer","url":"https://tiles.versatiles.org/tiles/versatiles-light/{z}/{x}/{y}.png","sortOrder":9,"visible":1,"description":"VersaTiles免费浅色栅格瓦片，XYZ格式，全球覆盖，直接可用","icon":"🎨","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
+        { "id": "root-geocode",  "name": "地理编码服务",      "parentId": null,     "nodeType": "folder", "sortOrder": 4, "visible": 1, "description": "正向/反向地理编码，名称↔坐标互查", "icon": "📁" },
+        { "id": "geocode-tianditu","name":"天地图 地址→坐标(地理编码)","parentId":"root-geocode","nodeType":"layer","url":"https://api.tianditu.gov.cn/search","sortOrder":1,"visible":1,"description":"天地图POI搜索/地理编码API。需替换URL中的tk参数为你的天地图Key。查询结果自动构建为GeoJSON点图层。","icon":"🔍","centerLon":116.4,"centerLat":39.9,"centerHeight":50000,"geocodingAddress":"北京市天安门","geocodingKey":"你的天地图Key"},
+        { "id": "folder-wcs",     "name": "WCS 栅格服务",      "parentId": "root-ogc","nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "OGC WCS 栅格覆盖服务（GetCoverage）", "icon": "📁" },
+        { "id": "wcs-rasdaman-dem","name":"rasdaman 巴伐利亚 DSM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Bavaria_50_DSM。德国巴伐利亚州50m分辨率数字地表模型（海拔色带渲染）。","icon":"🏔️","centerLon":11.5,"centerLat":48.5,"centerHeight":80000,"wcsCoverageName":"Bavaria_50_DSM","wcsFormat":"image/tiff","wcsVersion":"2.0.1"},
+        { "id": "wcs-rasdaman-s2","name":"rasdaman 德国 DTM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":2,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Germany_DTM。德国全境数字地形模型（色带渲染）。","icon":"🇩🇪","centerLon":10,"centerLat":51,"centerHeight":500000,"wcsCoverageName":"Germany_DTM","wcsFormat":"image/tiff","wcsVersion":"2.0.1"}
       ],
 
       // Cesium 图层加载状态 — 记录已加载的图层 ID → Cesium 对象
@@ -1214,6 +1301,8 @@ export default {
 
       // 编辑节点对话框
       showEditDialog: false,
+      editStyleExpanded: false, // ⭐ geoJsonStyle 编辑区折叠状态
+      styleFetching: false,      // ⭐ 服务样式获取中标记
       editingNode: null,
       editForm: this.createDefaultForm(),
 
@@ -1361,6 +1450,9 @@ export default {
             sortOrder: item.sortOrder || 0
           }));
 
+          // ⭐ 合并新增的内置节点（用户删除了也能重新出现）
+          this._mergeBuiltinNodes();
+
           // 同步到 basePanel.configList（工具栏导入导出等需要）
           if (this.$refs.basePanel) {
             this.$refs.basePanel.configList = [...this.flatNodeList];
@@ -1387,6 +1479,46 @@ export default {
         // 不执行 this.flatNodeList = [] — 保留现有数据
         // 配置加载失败时也尝试加载本地图层（不影响已有数据）
         this._loadLocalGeoJsonLayers();
+      }
+    },
+
+    /**
+     * ⭐ 合并内置节点：确保新版代码中新增的默认节点自动注入到已有数据库
+     */
+    _mergeBuiltinNodes() {
+      // 必须是已存在的节点才不注入（以 id 为唯一键）
+      var existingIds = {};
+      for (var i = 0; i < this.flatNodeList.length; i++) {
+        existingIds[this.flatNodeList[i].id] = true;
+      }
+
+      // 内置根文件夹 + 子节点的默认定义（与 data() 中 flatNodeList 保持同步）
+      var builtinNodes = [
+        { "id": "root-geocode", "name": "地理编码服务", "parentId": null, "nodeType": "folder", "sortOrder": 4, "visible": 1, "description": "正向/反向地理编码，名称↔坐标互查", "icon": "📁" },
+        { "id": "geocode-tianditu","name":"天地图 地址→坐标(地理编码)","parentId":"root-geocode","nodeType":"layer","url":"https://api.tianditu.gov.cn/search","sortOrder":1,"visible":1,"description":"天地图POI搜索/地理编码API。需替换URL中的tk参数为你的天地图Key。查询结果自动构建为GeoJSON点图层。","icon":"🔍","centerLon":116.4,"centerLat":39.9,"centerHeight":50000,"geocodingAddress":"北京市天安门","geocodingKey":"你的天地图Key"},
+        { "id": "folder-wcs", "name": "WCS 栅格服务", "parentId": "root-ogc", "nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "OGC WCS 栅格覆盖服务（GetCoverage）", "icon": "📁" },
+        { "id": "wcs-rasdaman-dem","name":"rasdaman 巴伐利亚 DSM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Bavaria_50_DSM。德国巴伐利亚州50m分辨率数字地表模型（海拔色带渲染）。","icon":"🏔️","centerLon":11.5,"centerLat":48.5,"centerHeight":80000,"wcsCoverageName":"Bavaria_50_DSM","wcsFormat":"image/tiff","wcsVersion":"2.0.1"},
+        { "id": "wcs-rasdaman-s2","name":"rasdaman 德国 DTM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":2,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Germany_DTM。德国全境数字地形模型（色带渲染）。","icon":"🇩🇪","centerLon":10,"centerLat":51,"centerHeight":500000,"wcsCoverageName":"Germany_DTM","wcsFormat":"image/tiff","wcsVersion":"2.0.1"}
+      ];
+
+      var added = [];
+      for (var b = 0; b < builtinNodes.length; b++) {
+        var node = builtinNodes[b];
+        if (!existingIds[node.id]) {
+          this.flatNodeList.push(node);
+          existingIds[node.id] = true;
+          added.push(node.id);
+        }
+      }
+
+      if (added.length > 0) {
+        // 触发响应式更新
+        this.flatNodeList = [...this.flatNodeList];
+        console.log('[LayerTreeManager] 📥 已注入 ' + added.length + ' 个新增内置节点:', added.join(', '));
+        // 持久化到数据库
+        this.saveConfig().then(function () {
+          console.log('[LayerTreeManager] 💾 新增内置节点已持久化');
+        }).catch(function () {});
       }
     },
 
@@ -1638,6 +1770,7 @@ export default {
     // --- 编辑节点 ---
     openEditNodeDialog(node) {
       this.editingNode = node;
+      this.editStyleExpanded = !!(node.geoJsonStyle || node.wfsStyle); // 有样式则默认展开
       this.editForm = {
         id: node.id,
         name: node.name || '',
@@ -1653,7 +1786,23 @@ export default {
         wmsVersion: node.wmsVersion || '',
         centerLon: node.centerLon != null ? Number(node.centerLon) : null,
         centerLat: node.centerLat != null ? Number(node.centerLat) : null,
-        centerHeight: node.centerHeight != null ? Number(node.centerHeight) : null
+        centerHeight: node.centerHeight != null ? Number(node.centerHeight) : null,
+        // ⭐ geoJsonStyle：对象 → JSON 字符串供 textarea 编辑
+        geoJsonStyle: node.geoJsonStyle ? JSON.stringify(node.geoJsonStyle, null, 2) : (node.wfsStyle ? JSON.stringify(node.wfsStyle, null, 2) : ''),
+        wfsProxyUrl: node.wfsProxyUrl || '',
+        // ⭐ 地理编码专属
+        geocodingAddress: node.geocodingAddress || '',
+        geocodingKey: node.geocodingKey || '',
+        _showGeocoding: !!(node.geocodingAddress || node.geocodingKey || this._findAncestorFolder(node.id, ['root-geocode', '地理编码'])),
+        // ⭐ WCS 专属
+        wcsCoverageName: node.wcsCoverageName || '',
+        wcsFormat: node.wcsFormat || 'image/tiff',
+        wcsVersion: node.wcsVersion || '2.0.1',
+        wcsAlpha: node.wcsAlpha != null ? node.wcsAlpha : 0.7,
+        wcsTimeAxis: node.wcsTimeAxis || '',
+        wcsTimeSlice: node.wcsTimeSlice || '',
+        wcsColorRamp: node.wcsColorRamp !== false, // 默认 true（启用色带）
+        _showWcs: !!(node.wcsCoverageName || node.wcsFormat || this._findAncestorFolder(node.id, ['folder-wcs', 'WCS']))
       };
       this.showEditDialog = true;
     },
@@ -1672,6 +1821,17 @@ export default {
       const index = this.flatNodeList.findIndex(n => n.id === this.editForm.id);
       if (index === -1) return;
 
+      // ⭐ 解析 geoJsonStyle JSON 字符串 → 对象
+      let parsedStyle = undefined;
+      if (this.editForm.geoJsonStyle && this.editForm.geoJsonStyle.trim()) {
+        try {
+          parsedStyle = JSON.parse(this.editForm.geoJsonStyle);
+        } catch (e) {
+          alert('geoJsonStyle JSON 格式无效，请检查：' + e.message);
+          return;
+        }
+      }
+
       // 合并更新（保留原始节点中额外字段）
       this.flatNodeList[index] = {
         ...this.flatNodeList[index],
@@ -1688,7 +1848,21 @@ export default {
         wmsVersion: this.editForm.wmsVersion || '',
         centerLon: this.editForm.centerLon != null ? Number(this.editForm.centerLon) : undefined,
         centerLat: this.editForm.centerLat != null ? Number(this.editForm.centerLat) : undefined,
-        centerHeight: this.editForm.centerHeight != null ? Number(this.editForm.centerHeight) : undefined
+        centerHeight: this.editForm.centerHeight != null ? Number(this.editForm.centerHeight) : undefined,
+        geoJsonStyle: parsedStyle,           // ⭐ 保存解析后的样式对象
+        wfsStyle: parsedStyle || undefined,  // ⭐ 同步到 wfsStyle（兼容旧 WFS 节点）
+        wfsProxyUrl: this.editForm.wfsProxyUrl || undefined,
+        // ⭐ 地理编码专属
+        geocodingAddress: this.editForm.geocodingAddress || undefined,
+        geocodingKey: this.editForm.geocodingKey || undefined,
+        // ⭐ WCS 专属
+        wcsCoverageName: this.editForm.wcsCoverageName || undefined,
+        wcsFormat: this.editForm.wcsFormat || undefined,
+        wcsVersion: this.editForm.wcsVersion || undefined,
+        wcsAlpha: this.editForm.wcsAlpha != null ? this.editForm.wcsAlpha : undefined,
+        wcsTimeAxis: this.editForm.wcsTimeAxis || undefined,
+        wcsTimeSlice: this.editForm.wcsTimeSlice || undefined,
+        wcsColorRamp: this.editForm.wcsColorRamp !== undefined ? this.editForm.wcsColorRamp : undefined
       };
       // 强制触发响应式更新
       this.flatNodeList = [...this.flatNodeList];
@@ -1701,6 +1875,272 @@ export default {
       });
 
       this.closeEditDialog();
+    },
+
+    // ═══════════ geoJsonStyle 编辑器辅助方法 ═══════════
+
+    /**
+     * 检查节点是否属于指定文件夹（递归向上查找 parentId）
+     */
+    _findAncestorFolder(nodeId, folderIdsOrNames) {
+      var current = this.flatNodeList.find(function (n) { return n.id === nodeId; });
+      var maxDepth = 10;
+      while (current && maxDepth-- > 0) {
+        if (!current.parentId) return false;
+        var parent = this.flatNodeList.find(function (n) { return n.id === current.parentId; });
+        if (!parent) return false;
+        for (var k = 0; k < folderIdsOrNames.length; k++) {
+          if (parent.id === folderIdsOrNames[k] || (parent.name || '').indexOf(folderIdsOrNames[k]) >= 0) return true;
+        }
+        current = parent;
+      }
+      return false;
+    },
+
+    /**
+     * 格式化 textarea 中的 geoJsonStyle JSON
+     */
+    formatGeoJsonStyle() {
+      if (!this.editForm.geoJsonStyle || !this.editForm.geoJsonStyle.trim()) return;
+      try {
+        const obj = JSON.parse(this.editForm.geoJsonStyle);
+        this.editForm.geoJsonStyle = JSON.stringify(obj, null, 2);
+      } catch (e) {
+        alert('JSON 格式无效，无法格式化：' + e.message);
+      }
+    },
+
+    /**
+     * 清除 geoJsonStyle
+     */
+    clearGeoJsonStyle() {
+      this.editForm.geoJsonStyle = '';
+    },
+
+    /**
+     * 📡 从 OGC 服务的 GetStyles 接口获取 SLD 样式并转为 geoJsonStyle
+     *
+     * 尝试顺序：
+     *   1. WFS GetStyles (WFS 1.1.0)
+     *   2. WMS GetStyles (WMS 1.3.0)
+     *
+     * SLD 解析支持：
+     *   PolygonSymbolizer → fill / fillOpacity / stroke / strokeWidth
+     *   LineSymbolizer   → stroke / strokeWidth / strokeOpacity
+     *   PointSymbolizer  → markerColor / markerSize
+     *   TextSymbolizer   → labelField (提示)
+     */
+    async fetchServiceStyle() {
+      var nodeUrl = this.editForm.url;
+      if (!nodeUrl) {
+        alert('请先填写资源URL');
+        return;
+      }
+
+      this.styleFetching = true;
+      var self = this;
+
+      try {
+        // 提取服务基地址（去掉已有查询参数）
+        var baseUrl = nodeUrl.split('?')[0];
+
+        // ═══ 尝试 1：WFS GetStyles (1.1.0) ═══
+        var wfsStylesUrl = baseUrl + '?SERVICE=WFS&REQUEST=GetStyles&VERSION=1.1.0&TYPENAMES=' + encodeURIComponent(this.editForm.wmsLayerName || '');
+        var sldText = null;
+
+        try {
+          console.log('[SLD检测] 🔍 尝试 WFS GetStyles:', wfsStylesUrl.slice(0, 120));
+          var resp = await fetch(wfsStylesUrl, { signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined });
+          if (resp.ok) {
+            sldText = await resp.text();
+            if (sldText && sldText.indexOf('StyledLayerDescriptor') >= 0) {
+              console.log('[SLD检测] ✅ WFS GetStyles 返回 SLD');
+            }
+          }
+        } catch (e) {
+          console.log('[SLD检测] ⚠️ WFS GetStyles 失败:', e.message);
+        }
+
+        // ═══ 尝试 2：WMS GetStyles (1.3.0) ═══
+        if (!sldText || sldText.indexOf('StyledLayerDescriptor') < 0) {
+          try {
+            var wmsStylesUrl = baseUrl.replace(/\/wfs/i, '/wms') + '?SERVICE=WMS&REQUEST=GetStyles&VERSION=1.3.0&LAYERS=' + encodeURIComponent(this.editForm.wmsLayerName || '');
+            console.log('[SLD检测] 🔍 尝试 WMS GetStyles:', wmsStylesUrl.slice(0, 120));
+            var resp2 = await fetch(wmsStylesUrl, { signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined });
+            if (resp2.ok) {
+              sldText = await resp2.text();
+              if (sldText && sldText.indexOf('StyledLayerDescriptor') >= 0) {
+                console.log('[SLD检测] ✅ WMS GetStyles 返回 SLD');
+              }
+            }
+          } catch (e) {
+            console.log('[SLD检测] ⚠️ WMS GetStyles 失败:', e.message);
+          }
+        }
+
+        // ═══ 解析 SLD → geoJsonStyle ═══
+        if (!sldText || sldText.indexOf('StyledLayerDescriptor') < 0) {
+          alert('该服务不支持 GetStyles 或未返回 SLD 样式描述。\n\n天地图 WFS 2.0 通常不提供 GetStyles 接口。\n建议：手动配置 geoJsonStyle 或从 GeoJsonLayerManager 转换样式。');
+          this.styleFetching = false;
+          return;
+        }
+
+        var styleJson = parseSldToGeoJsonStyle(sldText);
+        if (styleJson) {
+          this.editForm.geoJsonStyle = JSON.stringify(styleJson, null, 2);
+          this.editStyleExpanded = true;
+          console.log('[SLD检测] 🎨 SLD → geoJsonStyle 转换完成:', JSON.stringify(styleJson));
+        } else {
+          alert('SLD 解析成功但未提取到样式规则。');
+        }
+      } catch (err) {
+        console.error('[SLD检测] ❌ 获取样式失败:', err);
+        alert('获取服务样式失败：' + (err.message || '网络错误'));
+      } finally {
+        this.styleFetching = false;
+      }
+
+      // ═══════ 内嵌 SLD 解析函数 ═══════
+
+      function parseSldToGeoJsonStyle(xmlText) {
+        if (typeof DOMParser === 'undefined') return null;
+
+        var doc;
+        try {
+          doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+          if (doc.querySelector('parsererror')) return null;
+        } catch (e) { return null; }
+
+        // 找到第一个 Rule
+        var rule = doc.querySelector('Rule');
+        if (!rule) return null;
+
+        var style = {};
+
+        // ── PolygonSymbolizer ──
+        var polySym = rule.querySelector('PolygonSymbolizer');
+        if (polySym) {
+          var fillEl = polySym.querySelector('CssParameter[name="fill"]');
+          if (fillEl) style.fill = fillEl.textContent.trim();
+          var fillOpEl = polySym.querySelector('CssParameter[name="fill-opacity"]');
+          if (fillOpEl) style.fillOpacity = parseFloat(fillOpEl.textContent.trim());
+          var strokeEl = polySym.querySelector('CssParameter[name="stroke"]');
+          if (strokeEl) {
+            style.stroke = strokeEl.textContent.trim();
+            style.outlineColor = strokeEl.textContent.trim();
+          }
+          var strokeWEl = polySym.querySelector('CssParameter[name="stroke-width"]');
+          if (strokeWEl) {
+            style.strokeWidth = parseFloat(strokeWEl.textContent.trim());
+            style.outlineWidth = parseFloat(strokeWEl.textContent.trim());
+          }
+        }
+
+        // ── LineSymbolizer ──
+        var lineSym = rule.querySelector('LineSymbolizer');
+        if (lineSym) {
+          var lStrokeEl = lineSym.querySelector('CssParameter[name="stroke"]');
+          if (lStrokeEl && !style.stroke) style.stroke = lStrokeEl.textContent.trim();
+          var lStrokeWEl = lineSym.querySelector('CssParameter[name="stroke-width"]');
+          if (lStrokeWEl && !style.strokeWidth) style.strokeWidth = parseFloat(lStrokeWEl.textContent.trim());
+        }
+
+        // ── PointSymbolizer → Marker ──
+        var ptSym = rule.querySelector('PointSymbolizer');
+        if (ptSym) {
+          var mark = ptSym.querySelector('Mark');
+          if (mark) {
+            var mFill = mark.querySelector('CssParameter[name="fill"], CssParameter[name="fill"]');
+            if (mFill) style.markerColor = mFill.textContent.trim();
+            var mStroke = mark.querySelector('CssParameter[name="stroke"]');
+            if (mStroke) style.markerColor = style.markerColor || mStroke.textContent.trim();
+          }
+          var sizeEl = ptSym.querySelector('Size');
+          if (sizeEl) style.markerSize = parseFloat(sizeEl.textContent.trim());
+        }
+
+        // ── TextSymbolizer → label 提示 ──
+        var txtSym = rule.querySelector('TextSymbolizer');
+        if (txtSym) {
+          var labelEl = txtSym.querySelector('Label > PropertyName, Label > ogc\\:PropertyName');
+          if (!labelEl) labelEl = txtSym.querySelector('Label');
+          if (labelEl) {
+            // 提取字段名作为提示
+            var labelText = labelEl.textContent.trim();
+            if (labelText) {
+              style._sldLabelField = labelText;
+            }
+          }
+        }
+
+        return Object.keys(style).length > 0 ? style : null;
+      }
+    },
+
+    /**
+     * 🔄 转换 GeoJsonLayerManager 样式 → geoJsonStyle 格式
+     *
+     * 核心规则：
+     *   fillColor  → fill  (rgba() 自动拆分为 #rrggbb + fillOpacity)
+     *   strokeColor → stroke
+     *   其余所有字段 → 透传（包括未来 GeoJsonLayerManager 新增的任何样式字段）
+     *
+     * 跳过内部字段：id, name, description, geoType, geoJson, loaded, loading
+     *
+     * 用法：从 GeoJsonLayerManager 编辑表单复制样式 JSON → 粘贴到 textarea → 点"🔄 转换"
+     */
+    convertGeoJsonManagerStyle() {
+      if (!this.editForm.geoJsonStyle || !this.editForm.geoJsonStyle.trim()) return;
+      try {
+        const src = JSON.parse(this.editForm.geoJsonStyle);
+        const dst = {};
+
+        // 内部字段白名单（这些是图层配置元数据，不是样式，跳过）
+        var metaKeys = { id:1, name:1, description:1, geoType:1, geoJson:1, loaded:1, loading:1 };
+
+        // 需要重命名的字段（GeoJsonLayerManager → geoJsonStyle）
+        var renameMap = {
+          fillColor: 'fill',
+          strokeColor: 'stroke'
+        };
+
+        for (var key in src) {
+          if (!src.hasOwnProperty(key)) continue;
+          if (metaKeys[key]) continue; // 跳过元数据字段
+          var val = src[key];
+          if (val === null || val === undefined) continue;
+
+          // fillColor：拆分 rgba() 为 #rrggbb + fillOpacity
+          if (key === 'fillColor') {
+            var rgba = typeof val === 'string' ? val.match(
+              /rgba?\(\s*(\d+\.?\d*)\s*,?\s*(\d+\.?\d*)\s*,?\s*(\d+\.?\d*)\s*(?:[,/]\s*([\d.]+)\s*)?\)/
+            ) : null;
+            if (rgba) {
+              var r = Math.round(parseFloat(rgba[1]));
+              var g = Math.round(parseFloat(rgba[2]));
+              var b = Math.round(parseFloat(rgba[3]));
+              dst.fill = '#' + [r, g, b].map(function (v) { return v.toString(16).padStart(2, '0'); }).join('');
+              if (rgba[4] !== undefined) dst.fillOpacity = parseFloat(rgba[4]);
+            } else {
+              dst.fill = val;
+            }
+            continue;
+          }
+
+          // 已知重命名
+          if (renameMap[key]) {
+            dst[renameMap[key]] = val;
+            continue;
+          }
+
+          // ⭐ 其余所有字段透传（未来新增的样式字段自动生效）
+          dst[key] = val;
+        }
+
+        this.editForm.geoJsonStyle = JSON.stringify(dst, null, 2);
+      } catch (e) {
+        alert('JSON 格式无效：' + e.message);
+      }
     },
 
     // --- 删除节点（级联） ---
@@ -2484,6 +2924,10 @@ export default {
       if (url.includes('tileset.json') || ancestorNames.includes('3d tiles')) return '3dtiles';
       if (url.includes('{z}/{x}/{y}') || url.includes('{z}/{y}/{x}')) return 'xyz';
       if (url.includes('geojson') || url.endsWith('.json')) return 'geojson';
+      // ⭐ 地理编码：天地图API 或 父目录标识
+      if (url.includes('api.tianditu.gov.cn/search') || url.includes('api.tianditu.gov.cn/geocoding') || ancestorNames.includes('geocode') || ancestorNames.includes('地理编码')) return 'geocoding';
+      // ⭐ WCS：URL含 wcs 或 父目录标识
+      if (url.includes('wcs') || ancestorNames.includes('wcs')) return 'wcs';
       // 防止将非 OGC 服务 URL（HTML页面、图片等）误判为 WMS
       // 只有当 URL 包含明显的 OGC 服务特征时才继承祖先类型
       const looksLikeOgc = (
@@ -2637,16 +3081,18 @@ export default {
       const layerType = this.detectLayerType(node);
       console.log(`[${this.componentName}] 🌐 加载图层: ${node.name} (类型: ${layerType})`);
 
-      // 整体超时 Promise（15 秒）
-      const LAYER_LOAD_TIMEOUT = 15000;
-      let timeoutId;
+      // 整体超时：可被扩展的 deadline（WCS TIFF 解码等长操作可延长）
+      var deadline = Date.now() + 15000;
 
+      let timeoutId;
       const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => {
-          // 递增代数，使 IIFE 的后续成功操作失效
-          this._loadGeneration.set(node.id, gen + 1);
-          reject(new Error(`图层加载超时 (${LAYER_LOAD_TIMEOUT / 1000}秒)`));
-        }, LAYER_LOAD_TIMEOUT);
+        timeoutId = setInterval(() => {
+          if (Date.now() > deadline) {
+            clearInterval(timeoutId);
+            this._loadGeneration.set(node.id, gen + 1);
+            reject(new Error('图层加载超时'));
+          }
+        }, 2000);
       });
 
       const actualLoad = (async () => {
@@ -3410,6 +3856,313 @@ export default {
             console.log(`[${this.componentName}] ✅ MVT 矢量瓦片 "${node.name}" 已添加到 Cesium`);
             break;
           }
+          case 'geocoding': {
+            // ⭐ 地理编码：调用天地图/高德等 API → 解析坐标 → 构建 GeoJSON 点图层
+            var geoAddr = node.geocodingAddress || '';
+            var geoKey = node.geocodingKey || '';
+            if (!geoAddr) throw new Error('地理编码地址不能为空，请在编辑对话框中填写"查询地址"');
+            if (!geoKey || geoKey === '你的天地图Key') throw new Error('请先在编辑对话框中填写有效的天地图 Key (tk)');
+
+            // 构建天地图 POI 搜索 URL
+            var postStr = JSON.stringify({ keyword: geoAddr, queryType: 1, count: 50 });
+            var geoUrl = node.url + '?postStr=' + encodeURIComponent(postStr) + '&type=query&tk=' + encodeURIComponent(geoKey);
+            console.log(`[${this.componentName}] 🔍 地理编码请求: keyword="${geoAddr}"`);
+
+            var geoResp = await fetch(geoUrl, { signal: createTimeoutSignal(10000) });
+            if (!geoResp.ok) throw new Error('天地图 API 返回 HTTP ' + geoResp.status);
+            var geoData = await geoResp.json();
+            if (!geoData || geoData.status !== '0') throw new Error('天地图 API 错误: ' + (geoData && geoData.msg || '未知错误'));
+
+            // 解析 POI 结果 → GeoJSON FeatureCollection
+            var pois = (geoData.pois || []).concat(geoData.areaResult || []);
+            if (pois.length === 0) throw new Error('未找到匹配的地理位置: "' + geoAddr + '"');
+            var features = [];
+            for (var pi = 0; pi < pois.length; pi++) {
+              var poi = pois[pi];
+              if (!poi.lonlat) continue;
+              var ll = poi.lonlat.split(/\s+/);
+              var lon = parseFloat(ll[0]), lat = parseFloat(ll[1]);
+              if (isNaN(lon) || isNaN(lat)) continue;
+              features.push({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [lon, lat] },
+                properties: {
+                  name: poi.name || geoAddr,
+                  address: poi.address || '',
+                  phone: poi.phone || '',
+                  type: poi.typeName || poi.type || ''
+                }
+              });
+            }
+            if (features.length === 0) throw new Error('天地图返回结果无有效坐标');
+
+            var geoCollection = { type: 'FeatureCollection', features: features };
+            console.log(`[${this.componentName}] 📍 地理编码: ${features.length} 个POI → GeoJSON 点图层`);
+
+            // 加载为 GeoJSON 点图层
+            var dataSource = await Cesium.GeoJsonDataSource.load(geoCollection, {
+              markerColor: Cesium.Color.fromCssColorString('#FF4444'),
+              markerSize: 36,
+              markerSymbol: '📍'
+            });
+            viewer.dataSources.add(dataSource);
+            dataSource.name = node.name;
+            this._cesiumLayers.set(node.id, { type: 'geocoding', object: dataSource, _geojson: geoCollection });
+
+            // 定位到搜索结果中心
+            var allLons = features.map(function(f) { return f.geometry.coordinates[0]; });
+            var allLats = features.map(function(f) { return f.geometry.coordinates[1]; });
+            var cLon = (Math.min.apply(null, allLons) + Math.max.apply(null, allLons)) / 2;
+            var cLat = (Math.min.apply(null, allLats) + Math.max.apply(null, allLats)) / 2;
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(cLon, cLat, Math.max(50000, Math.abs(allLons[0] - allLons[allLons.length-1]) * 200000)),
+              duration: 1.0
+            });
+            console.log(`[${this.componentName}] ✅ 地理编码图层加载成功: "${node.name}" → ${features.length} 个点位`);
+            break;
+          }
+          case 'wcs': {
+            // ⭐ WCS：GetCapabilities 发现 Coverage → GetCoverage 获取栅格 → 叠加为影像图层
+            var covName = node.wcsCoverageName || '';
+            var covFormat = node.wcsFormat || 'image/png'; // 默认 PNG（无需 geotiff.js）
+            var covVersion = node.wcsVersion || '2.0.1';
+            var baseUrl = node.url;
+
+            // ── 步骤 1：GetCapabilities 发现可用 Coverage ──
+            var capsSep = baseUrl.indexOf('?') >= 0 ? '&' : '?';
+            var capsUrl = baseUrl + capsSep + 'SERVICE=WCS&REQUEST=GetCapabilities&VERSION=' + encodeURIComponent(covVersion);
+            console.log(`[${this.componentName}] 🔍 WCS GetCapabilities...`);
+
+            var availableCoverages = [];
+            try {
+              var capsResp = await fetch(capsUrl, { signal: createTimeoutSignal(15000) });
+              if (capsResp.ok) {
+                var capsText = await capsResp.text();
+                // 从 XML 中提取 CoverageId
+                var cidRegex = /<wcs:CoverageId[^>]*>([^<]+)<\/wcs:CoverageId>|<CoverageId[^>]*>([^<]+)<\/CoverageId>/gi;
+                var m;
+                while ((m = cidRegex.exec(capsText)) !== null) {
+                  var cid = m[1] || m[2];
+                  if (cid && cid.trim()) availableCoverages.push(cid.trim());
+                }
+                console.log(`[${this.componentName}] 📋 可用 Coverage (${availableCoverages.length}):`, availableCoverages.slice(0, 10));
+              }
+            } catch (e) {
+              console.warn(`[${this.componentName}] ⚠️ GetCapabilities 失败:`, e.message);
+            }
+
+            // GetCapabilities 不可用时，若未指定 coverage 则用预置名
+            if (!covName && availableCoverages.length === 0) {
+              covName = 'BlueMarbleCov'; // 2D 全球卫星影像，无需时间切片
+              console.log(`[${this.componentName}] 🔄 GetCapabilities 不可用，回退: "${covName}"`);
+            }
+
+            // 如果用户未指定 coverage，优先选 2D 数据层（跳过预渲染样式 Color/Scaled + 3D 时序 Temp/Land）
+            if (!covName && availableCoverages.length > 0) {
+              for (var ci = 0; ci < availableCoverages.length; ci++) {
+                var cn = availableCoverages[ci];
+                if (!/color|scaled|temp|land/i.test(cn)) { covName = cn; break; }
+              }
+              // 回退：选第一个不含 Color/Scaled 的（即使可能是 3D）
+              if (!covName) {
+                for (var cj = 0; cj < availableCoverages.length; cj++) {
+                  var cn2 = availableCoverages[cj];
+                  if (!/color|scaled/i.test(cn2)) { covName = cn2; break; }
+                }
+              }
+              if (!covName) covName = availableCoverages[0];
+              console.log(`[${this.componentName}] 🎯 自动选择 Coverage: "${covName}"`);
+            }
+            if (!covName) {
+              var hint = availableCoverages.length > 0
+                ? '可用 Coverage: ' + availableCoverages.slice(0, 5).join(', ')
+                : '无法获取 Coverage 列表，请手动填写 Coverage 名称';
+              throw new Error('WCS Coverage 名称不能为空。' + hint);
+            }
+
+            // ── 步骤 2：DescribeCoverage 获取维度名称 ──
+            var descSep = baseUrl.indexOf('?') >= 0 ? '&' : '?';
+            var descUrl = baseUrl + descSep + 'SERVICE=WCS&REQUEST=DescribeCoverage&VERSION=' + encodeURIComponent(covVersion);
+            descUrl += '&COVERAGEID=' + encodeURIComponent(covName);
+            var axisNames = ['Long', 'Lat']; // 默认空间轴
+            var extraAxes = []; // 额外轴（时间等），需切片
+            var covBbox = null; // { west, south, east, north }
+            try {
+              var descResp = await fetch(descUrl, { signal: createTimeoutSignal(10000) });
+              if (descResp.ok) {
+                var descText = await descResp.text();
+                var axisRegex = /<gml:axisAbbrev[^>]*>([^<]+)<\/gml:axisAbbrev>|<AxisAbbrev[^>]*>([^<]+)<\/AxisAbbrev>/gi;
+                var found = [];
+                var am;
+                while ((am = axisRegex.exec(descText)) !== null) {
+                  var abbr = (am[1] || am[2] || '').trim();
+                  if (abbr) found.push(abbr);
+                }
+                if (found.length >= 2) {
+                  axisNames = found.slice(0, 2);
+                  extraAxes = found.slice(2);
+                }
+                // 提取空间边界框（WGS84 经纬度）
+                var bboxRegex = /<gml:lowerCorner[^>]*>([^<]+)<\/gml:lowerCorner>\s*<gml:upperCorner[^>]*>([^<]+)<\/gml:upperCorner>/;
+                var bm = descText.match(bboxRegex);
+                if (bm) {
+                  var lo = bm[1].trim().split(/\s+/);
+                  var hi = bm[2].trim().split(/\s+/);
+                  // ⚠️ EPSG:4326 在 WCS 中轴序为 Lat,Lon（不是 Lon,Lat）
+                  covBbox = { west: parseFloat(lo[1]), south: parseFloat(lo[0]), east: parseFloat(hi[1]), north: parseFloat(hi[0]) };
+                }
+                console.log(`[${this.componentName}] 📐 DescribeCoverage 轴: 空间=${axisNames.join(',')} 额外=${extraAxes.join(',') || '无'} bbox=`, covBbox);
+              }
+            } catch (e) { /* 使用默认轴名 */ }
+
+            // 为额外轴构建切片参数
+            var extraSlices = '';
+            // 优先使用节点配置的时间切片（wcsTimeAxis + wcsTimeSlice）
+            if (node.wcsTimeAxis && node.wcsTimeSlice) {
+              extraSlices = '&SUBSET=' + encodeURIComponent(node.wcsTimeAxis) + '("' + encodeURIComponent(node.wcsTimeSlice) + '")';
+              console.log(`[${this.componentName}] 🔪 配置时间切片: ${node.wcsTimeAxis}="${node.wcsTimeSlice}"`);
+            } else if (extraAxes.length > 0) {
+              // DescribeCoverage 自动发现的额外轴
+              try {
+                var lowerRegex = /<gml:lowerCorner[^>]*>([^<]+)<\/gml:lowerCorner>/;
+                var lm = descText.match(lowerRegex);
+                if (lm) {
+                  var lowerVals = lm[1].trim().split(/\s+/);
+                  for (var ei = 0; ei < extraAxes.length; ei++) {
+                    var valIdx = 2 + ei;
+                    var sliceVal = (lowerVals[valIdx] !== undefined) ? lowerVals[valIdx] : '0';
+                    extraSlices += '&SUBSET=' + encodeURIComponent(extraAxes[ei]) + '("' + sliceVal + '")';
+                    console.log(`[${this.componentName}] 🔪 自动切片 ${extraAxes[ei]}="${sliceVal}"`);
+                  }
+                }
+              } catch (e) { /* skip */ }
+            }
+
+            // ── 步骤 3：GetCoverage（多策略重试：无 SUBSET → 有 SUBSET，png → tiff）─
+            var covSep = baseUrl.indexOf('?') >= 0 ? '&' : '?';
+            var covBlob = null;
+            var finalFormat = covFormat;
+
+            // 策略列表（仅 DescribeCoverage 明确发现的额外轴才加切片）
+            var strategies = [
+              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=' + encodeURIComponent(covFormat) + extraSlices, desc: '无SUBSET ' + covFormat + (extraSlices ? ' +切片' : '') },
+              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=image%2Ftiff' + extraSlices, desc: '无SUBSET image/tiff' + (extraSlices ? ' +切片' : ''), ifFormatFail: true },
+              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=' + encodeURIComponent(covFormat) + '&SUBSET=' + encodeURIComponent(axisNames[0]) + '(-180,180)&SUBSET=' + encodeURIComponent(axisNames[1]) + '(-90,90)' + extraSlices, desc: 'SUBSET ' + axisNames[0] + ',' + axisNames[1] + ' ' + covFormat + (extraSlices ? ' +切片' : '') },
+              { suffix: '&COVERAGEID=' + encodeURIComponent(covName) + '&FORMAT=image%2Ftiff' + '&SUBSET=' + encodeURIComponent(axisNames[0]) + '(-180,180)&SUBSET=' + encodeURIComponent(axisNames[1]) + '(-90,90)' + extraSlices, desc: 'SUBSET ' + axisNames[0] + ',' + axisNames[1] + ' image/tiff' + (extraSlices ? ' +切片' : ''), ifFormatFail: true },
+            ];
+
+            for (var si = 0; si < strategies.length && !covBlob; si++) {
+              var strat = strategies[si];
+              // 仅当上一策略因格式失败时才尝试 tiff 回退
+              if (strat.ifFormatFail && covFormat.indexOf('png') < 0) continue;
+
+              var wcsUrl = baseUrl + covSep + 'SERVICE=WCS&REQUEST=GetCoverage&VERSION=' + encodeURIComponent(covVersion) + strat.suffix;
+              console.log(`[${this.componentName}] 🏔️ WCS 尝试 ${si+1}/${strategies.length}: ${strat.desc}`);
+              try {
+                var covResp = await fetch(wcsUrl, { signal: createTimeoutSignal(30000) });
+                if (covResp.ok) {
+                  covBlob = await covResp.blob();
+                  // 若此策略用了 tiff，更新最终格式
+                  if (strat.suffix.indexOf('image%2Ftiff') >= 0) finalFormat = 'image/tiff';
+                  console.log(`[${this.componentName}] ✅ GetCoverage 成功 (${(covBlob.size/1024).toFixed(0)}KB, ${finalFormat})`);
+                  break;
+                }
+                var errBody = '';
+                try { errBody = await covResp.text(); } catch (e2) {}
+                // 提取 OWS Exception 文本
+                var errMatch = errBody.match(/<ows:ExceptionText[^>]*>([\s\S]*?)<\/ows:ExceptionText>/);
+                var errMsg = errMatch ? errMatch[1].trim() : errBody.slice(0, 500);
+                console.warn(`[${this.componentName}] ⚠️ ${strat.desc} → HTTP ${covResp.status}:`, errMsg);
+              } catch (e) {
+                console.warn(`[${this.componentName}] ⚠️ ${strat.desc} 失败:`, e.message);
+              }
+            }
+
+            if (!covBlob) {
+              throw new Error('WCS GetCoverage 失败：所有轴名组合均未成功。Coverage="' + covName +
+                '" 可用列表: ' + availableCoverages.slice(0, 5).join(', '));
+            }
+
+            // ── 步骤 4：栅格 → Cesium 影像层 ──
+            var imageUrl;
+            if (finalFormat.indexOf('tiff') >= 0) {
+              // GeoTIFF：延长超时（解码 120 万像素需 ~15 秒）
+              deadline = Math.max(deadline, Date.now() + 30000);
+              await this._ensureGeoTiff();
+              if (typeof window.GeoTIFF !== 'undefined') {
+                var tiff = await window.GeoTIFF.fromArrayBuffer(await covBlob.arrayBuffer());
+                var tifImg = await tiff.getImage();
+                var tifRaster = await tifImg.readRasters();
+                var band = tifRaster[0];
+                var tw = tifImg.getWidth(), th = tifImg.getHeight();
+
+                var tMin = Infinity, tMax = -Infinity, tv = 0;
+                for (var ri = 0; ri < band.length; ri++) {
+                  var v = band[ri];
+                  if (isFinite(v) && v > -9999) { if (v < tMin) tMin = v; if (v > tMax) tMax = v; tv++; }
+                }
+                console.log('[LayerTreeManager] 📊 TIFF: ' + tMin.toFixed(1) + '~' + tMax.toFixed(1) + ' 有效:' + tv);
+
+                var tCvs = document.createElement('canvas'); tCvs.width = tw; tCvs.height = th;
+                var tCtx = tCvs.getContext('2d');
+                var tImg = tCtx.createImageData(tw, th);
+                var tSt = (tMax > tMin) ? 1 / (tMax - tMin) : 1;
+                for (var ri = 0; ri < band.length; ri++) {
+                  var val = band[ri], pi = ri * 4;
+                  if (!isFinite(val) || val <= -9999) { tImg.data[pi+3] = 0; continue; }
+                  var nt = Math.max(0, Math.min(1, (val - tMin) * tSt));
+                  var tr, tg, tb;
+                  if (nt < 0.25)      { var s = nt / 0.25;          tr = Math.round(s * 255); tg = 255; tb = Math.round((1 - s) * 128); }
+                  else if (nt < 0.5)  { var s = (nt - 0.25) / 0.25; tr = 255; tg = Math.round(255 - s * 100); tb = 0; }
+                  else if (nt < 0.75) { var s = (nt - 0.5) / 0.25;  tr = 255; tg = Math.round(155 - s * 155); tb = Math.round(s * 100); }
+                  else                { var s = (nt - 0.75) / 0.25; tr = 255; tg = Math.round(s * 255); tb = Math.round(100 + s * 155); }
+                  tImg.data[pi]=tr; tImg.data[pi+1]=tg; tImg.data[pi+2]=tb; tImg.data[pi+3]=255;
+                }
+                tCtx.putImageData(tImg, 0, 0);
+                imageUrl = tCvs.toDataURL('image/png');
+                console.log('[LayerTreeManager] 🖼️ GeoTIFF+色带 → ' + tw + '×' + th);
+              } else {
+                imageUrl = URL.createObjectURL(covBlob);
+              }
+            } else if (finalFormat.indexOf('png') >= 0 || finalFormat.indexOf('jpeg') >= 0 || finalFormat.indexOf('jpg') >= 0) {
+              if (node.wcsColorRamp !== false) {
+                imageUrl = await this._applyColorRamp(covBlob, covName);
+              } else {
+                imageUrl = URL.createObjectURL(covBlob);
+              }
+            } else {
+              imageUrl = URL.createObjectURL(covBlob);
+            }
+
+            // ⭐ 使用 DescribeCoverage 获取的真实边界框定位栅格
+            var providerOpts = { url: imageUrl };
+            if (covBbox && covBbox.west < covBbox.east && covBbox.south < covBbox.north) {
+              providerOpts.rectangle = Cesium.Rectangle.fromDegrees(covBbox.west, covBbox.south, covBbox.east, covBbox.north);
+              console.log(`[${this.componentName}] 🗺️ WCS 边界框: [${covBbox.west}, ${covBbox.south}, ${covBbox.east}, ${covBbox.north}]`);
+            }
+            var imageryProvider = new Cesium.SingleTileImageryProvider(providerOpts);
+            var imageryLayer = viewer.imageryLayers.addImageryProvider(imageryProvider);
+            imageryLayer.alpha = node.wcsAlpha != null ? node.wcsAlpha : 0.7; // 可配置透明度
+            this._cesiumLayers.set(node.id, { type: 'wcs', object: imageryLayer, provider: imageryProvider, _imageUrl: imageUrl });
+
+            // 定位：优先用 bbox 中心，其次节点配置
+            var flyLon, flyLat, flyHeight;
+            if (covBbox && covBbox.west < covBbox.east) {
+              flyLon = (covBbox.west + covBbox.east) / 2;
+              flyLat = (covBbox.south + covBbox.north) / 2;
+              flyHeight = Math.max(30000, (covBbox.north - covBbox.south) * 500000);
+            } else {
+              flyLon = node.centerLon != null ? node.centerLon : 0;
+              flyLat = node.centerLat != null ? node.centerLat : 30;
+              flyHeight = node.centerHeight != null ? node.centerHeight : 5000000;
+            }
+            viewer.camera.flyTo({
+              destination: Cesium.Cartesian3.fromDegrees(flyLon, flyLat, flyHeight),
+              duration: 1.0
+            });
+            console.log(`[${this.componentName}] ✅ WCS 图层加载成功: "${node.name}" → ${covName}`);
+            break;
+          }
           default: {
             // 默认当 XYZ 处理
             const provider = new Cesium.UrlTemplateImageryProvider({
@@ -3499,7 +4252,7 @@ export default {
         // 确保 loadedLayerIds 状态正确
         this.loadedLayerIds[node.id] = false;
       } finally {
-        clearTimeout(timeoutId);
+        clearInterval(timeoutId);
         this.loadingLayerIds[node.id] = false;
         this._loadLayerPromise.delete(node.id);
       }
@@ -3650,12 +4403,26 @@ export default {
             }
             break;
           }
-          case 'geojson': {
+          case 'geojson':
+          case 'geocoding': {
             if (entry.object.clustering && entry.object.clustering.enabled) {
               try { entry.object.clustering.enabled = false; } catch (e) { /* ignore */ }
             }
             viewer.dataSources.remove(entry.object, true);
             viewer.scene.requestRender();
+            break;
+          }
+          case 'wcs': {
+            entry.object.show = false;
+            entry.object.alpha = 0.0;
+            viewer.imageryLayers.remove(entry.object, false);
+            if (entry._imageUrl && entry._imageUrl.startsWith('blob:')) {
+              try { URL.revokeObjectURL(entry._imageUrl); } catch (e) { /* ignore */ }
+            }
+            if (!this._isWebGLLost) {
+              viewer.scene.requestRender();
+              try { viewer.scene.render(viewer.clock.currentTime); } catch (e) { /* ignore */ }
+            }
             break;
           }
           case '3dtiles': {
@@ -3759,6 +4526,95 @@ export default {
     },
 
     /**
+     * 动态加载 geotiff.js CDN（仅在首次 TIFF 请求时加载）
+     */
+    _ensureGeoTiff() {
+      if (typeof window.GeoTIFF !== 'undefined') return Promise.resolve();
+      if (this._geoTiffLoading) return this._geoTiffLoading;
+      var self = this;
+      this._geoTiffLoading = new Promise(function (resolve) {
+        var script = document.createElement('script');
+        script.src = '../../../src/components/utils/geotiff.bundle.min.js';
+        script.onload = function () { console.log('[LayerTreeManager] 📦 geotiff.js 加载完成'); resolve(); };
+        script.onerror = function () { console.warn('[LayerTreeManager] ⚠️ geotiff.js CDN 加载失败'); resolve(); };
+        document.head.appendChild(script);
+      });
+      return this._geoTiffLoading;
+    },
+
+    /**
+     * 🎨 对 WCS 栅格 PNG 应用色带映射，使灰度 DEM 数据肉眼可见
+     * @param {Blob} blob - WCS 返回的 PNG blob
+     * @param {string} covName - Coverage 名称（用于日志）
+     * @returns {Promise<string>} Canvas data URL
+     */
+    _applyColorRamp(blob, covName) {
+      var self = this;
+      return new Promise(function (resolve, reject) {
+        var img = new Image();
+        var blobUrl = URL.createObjectURL(blob);
+        img.onload = function () {
+          var w = img.width, h = img.height;
+          if (w === 0 || h === 0) { resolve(blobUrl); return; }
+
+          var canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          var ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0);
+          var imgData = ctx.getImageData(0, 0, w, h);
+          var data = imgData.data;
+
+          // ── 第 1 遍：找到实际灰度范围，排除纯黑/纯白（nodata） ──
+          var minGray = 255, maxGray = 0, validCount = 0;
+          for (var pi = 0; pi < data.length; pi += 4) {
+            var gr = (data[pi] + data[pi+1] + data[pi+2]) / 3;
+            if (gr > 0.5 && gr < 254.5) { // 排除纯黑(0)和纯白(255)的nodata
+              if (gr < minGray) minGray = gr;
+              if (gr > maxGray) maxGray = gr;
+              validCount++;
+            }
+          }
+          console.log('[LayerTreeManager] 📊 灰度: ' + minGray.toFixed(2) + '~' + maxGray.toFixed(2) + ' 有效:' + validCount + '/' + (data.length/4));
+          if (validCount < 50 || maxGray - minGray < 0.5) {
+            // 色带无意义 → 返回原图（可能是已渲染的可视化图像）
+            console.log('[LayerTreeManager] 🖼️ 栅格无需色带，直接显示原图');
+            resolve(blobUrl);
+            return;
+          }
+          var stretch = 255 / (maxGray - minGray);
+
+          // ── 第 2 遍：拉伸 → 色带映射 ──
+          for (var i = 0; i < data.length; i += 4) {
+            var gray = (data[i] + data[i+1] + data[i+2]) / 3;
+            if (gray <= 0.5 || gray >= 254.5) { data[i+3] = 0; continue; }
+
+            // 对比度拉伸
+            var t = Math.max(0, Math.min(1, (gray - minGray) * stretch));
+            var r, g, b;
+
+            if (t < 0.25)      { var s = t / 0.25;          r = Math.round(s * 255); g = 255; b = Math.round((1 - s) * 128); }
+            else if (t < 0.5)  { var s = (t - 0.25) / 0.25; r = 255; g = Math.round(255 - s * 100); b = 0; }
+            else if (t < 0.75) { var s = (t - 0.5) / 0.25;  r = 255; g = Math.round(155 - s * 155); b = Math.round(s * 100); }
+            else               { var s = (t - 0.75) / 0.25; r = 255; g = Math.round(s * 255); b = Math.round(100 + s * 155); }
+
+            data[i] = r; data[i+1] = g; data[i+2] = b; data[i+3] = 255;
+          }
+
+          ctx.putImageData(imgData, 0, 0);
+          var dataUrl = canvas.toDataURL('image/png');
+          console.log('[LayerTreeManager] 🎨 色带已应用: w=' + w + ' h=' + h + ' → ' + covName);
+          resolve(dataUrl);
+        };
+        img.onerror = function () {
+          URL.revokeObjectURL(blobUrl);
+          resolve(blobUrl); // 失败则直接使用原始图片
+        };
+        img.src = blobUrl;
+      });
+    },
+
+    /**
      * 销毁所有 Cesium 图层（组件卸载时调用）
      * ⚠️ WebGL 上下文丢失时，跳过 rAF 和 .destroy()（需要有效上下文），仅移除引用让 GC 回收
      */
@@ -3779,12 +4635,22 @@ export default {
             viewer.imageryLayers.remove(entry.object, false);
             // 组件卸载时安全销毁所有 GPU 资源
             this._safeDestroyImageryLayer(entry.object, entry.provider);
-          } else if (entry.type === 'geojson') {
+          } else if (entry.type === 'geojson' || entry.type === 'geocoding') {
+            // GeoJSON 图层 + 地理编码图层：DataSource 类型
             if (entry.object.clustering && entry.object.clustering.enabled) {
               try { entry.object.clustering.enabled = false; } catch (e) { /* ignore */ }
             }
             viewer.dataSources.remove(entry.object, false);
             viewer.scene.requestRender();
+          } else if (entry.type === 'wcs') {
+            // WCS 栅格图层：ImageryLayer 类型
+            entry.object.show = false;
+            viewer.imageryLayers.remove(entry.object, false);
+            this._safeDestroyImageryLayer(entry.object, entry.provider);
+            // 释放 Blob URL
+            if (entry._imageUrl && entry._imageUrl.startsWith('blob:')) {
+              try { URL.revokeObjectURL(entry._imageUrl); } catch (e) { /* ignore */ }
+            }
           } else if (entry.type === '3dtiles') {
             entry.object.show = false;
             viewer.scene.primitives.remove(entry.object);
@@ -4341,5 +5207,81 @@ ul.tree-children {
 .tree-dialog-fade-enter-from .tree-dialog-panel,
 .tree-dialog-fade-leave-to .tree-dialog-panel {
   transform: scale(0.95);
+}
+
+/* ========== geoJsonStyle 编辑器 ========== */
+.tree-style-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tree-style-header:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.tree-style-toggle {
+  font-size: 10px;
+  color: #888;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+.style-indicator-set {
+  font-size: 10px;
+  background: #4CAF50;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 8px;
+}
+.style-indicator-empty {
+  font-size: 10px;
+  color: #666;
+  margin-left: 8px;
+}
+.tree-style-body {
+  margin-top: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.tree-style-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  background: #1a1a2e;
+  color: #c0c0c0;
+  border: none;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 120px;
+  outline: none;
+}
+.tree-style-textarea:focus {
+  background: #1e1e36;
+  color: #e0e0e0;
+}
+.tree-style-textarea::placeholder {
+  color: #555;
+}
+.tree-style-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-wrap: wrap;
+}
+.tree-style-hint {
+  font-size: 10px;
+  color: #666;
+  margin-left: auto;
 }
 </style>

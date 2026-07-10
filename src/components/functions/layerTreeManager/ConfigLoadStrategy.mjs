@@ -301,7 +301,7 @@ export class SQLiteConfigStrategy extends ConfigLoadStrategy {
 
   async loadFromIndexedDB(storeName) {
     return new Promise((resolve, reject) => {
-      const request = window.indexedDB.open('configDB', 1);
+      const request = window.indexedDB.open('configDB'); // 不指定版本号，使用数据库当前版本
 
       request.onerror = () => reject(request.error);
       request.onsuccess = (event) => {
@@ -328,7 +328,7 @@ export class SQLiteConfigStrategy extends ConfigLoadStrategy {
 
   async saveToIndexedDB(storeName, data) {
     return new Promise((resolve, reject) => {
-      const request = window.indexedDB.open('configDB', 1);
+      const request = window.indexedDB.open('configDB'); // 不指定版本号，使用数据库当前版本
 
       request.onerror = () => reject(request.error);
       request.onsuccess = (event) => {
@@ -346,11 +346,21 @@ export class SQLiteConfigStrategy extends ConfigLoadStrategy {
 
           let completed = 0;
           data.forEach((item) => {
-            const cleanItem = { ...item };
-            delete cleanItem.loaded;
-            delete cleanItem.loading;
-            delete cleanItem.children;
-            const putRequest = store.put(cleanItem);
+            // ⭐ 通过 JSON 序列化/反序列化彻底清洗，仅保留结构化克隆兼容的值
+            var cloned;
+            try {
+              cloned = JSON.parse(JSON.stringify(item, function (key, val) {
+                if (val === undefined || typeof val === 'function' || typeof val === 'symbol') return undefined;
+                if (key === 'loaded' || key === 'loading' || key === 'children') return undefined;
+                return val;
+              }));
+            } catch (jsonErr) {
+              console.warn('[LayerTreeSQLiteConfigStrategy] ⚠️ JSON 清洗失败，跳过:', item.id, jsonErr.message);
+              completed++;
+              if (completed === data.length) { resolve(true); db.close(); }
+              return;
+            }
+            var putRequest = store.put(cloned);
 
             putRequest.onsuccess = () => {
               completed++;

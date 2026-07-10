@@ -202,7 +202,7 @@ export class SQLiteConfigStrategy {
 
   async _loadFromIndexedDB(storeName) {
     return new Promise((resolve) => {
-      const request = indexedDB.open('configDB', 1);
+      const request = indexedDB.open('configDB');
 
       request.onerror = () => {
         console.error('[SQLiteConfigStrategy] ❌ IndexedDB 打开失败');
@@ -315,9 +315,11 @@ export class SQLiteConfigStrategy {
             let completed = 0;
             const total = data.length;
             data.forEach((item) => {
-              const cleanItem = { ...item };
-              delete cleanItem.loaded;
-              delete cleanItem.loading;
+              const cleanItem = JSON.parse(JSON.stringify(item, function (k, v) {
+                if (k === 'loaded' || k === 'loading' || k === 'children') return undefined;
+                if (v === undefined || typeof v === 'function' || typeof v === 'symbol') return undefined;
+                return v;
+              }));
 
               const keys = Object.keys(cleanItem);
               const placeholders = keys.map(() => '?').join(',');
@@ -353,9 +355,11 @@ export class SQLiteConfigStrategy {
               let completed = 0;
               const total = data.length;
               data.forEach((item) => {
-                const cleanItem = { ...item };
-                delete cleanItem.loaded;
-                delete cleanItem.loading;
+                const cleanItem = JSON.parse(JSON.stringify(item, function (k, v) {
+                  if (k === 'loaded' || k === 'loading' || k === 'children') return undefined;
+                  if (v === undefined || typeof v === 'function' || typeof v === 'symbol') return undefined;
+                  return v;
+                }));
                 const keys = Object.keys(cleanItem);
                 const placeholders = keys.map(() => '?').join(',');
                 const values = keys.map(k => {
@@ -388,7 +392,7 @@ export class SQLiteConfigStrategy {
    */
   async _saveToIndexedDB(storeName, data) {
     return new Promise((resolve) => {
-      const request = indexedDB.open('configDB', 1);
+      const request = indexedDB.open('configDB');
 
       request.onerror = (err) => {
         console.warn('[SQLiteConfigStrategy] ⚠️ IndexedDB 打开失败:', err?.target?.error?.message || err?.type || '未知错误',
@@ -417,7 +421,11 @@ export class SQLiteConfigStrategy {
                 if (data.length === 0) { resolve(true); db2.close(); return; }
                 let done = 0;
                 data.forEach(item => {
-                  const clean = { ...item }; delete clean.loaded; delete clean.loading;
+                  const clean = JSON.parse(JSON.stringify(item, function (k, v) {
+                    if (k === 'loaded' || k === 'loading') return undefined;
+                    if (v === undefined || typeof v === 'function' || typeof v === 'symbol') return undefined;
+                    return v;
+                  }));
                   st.put(clean).onsuccess = () => { done++; if (done === data.length) { resolve(true); db2.close(); } };
                 });
               };
@@ -444,9 +452,11 @@ export class SQLiteConfigStrategy {
           let completed = 0;
           const total = data.length;
           data.forEach((item) => {
-            const cleanItem = { ...item };
-            delete cleanItem.loaded;
-            delete cleanItem.loading;
+            const cleanItem = JSON.parse(JSON.stringify(item, function (k, v) {
+              if (k === 'loaded' || k === 'loading' || k === 'children') return undefined;
+              if (v === undefined || typeof v === 'function' || typeof v === 'symbol') return undefined;
+              return v;
+            }));
             const putRequest = store.put(cleanItem);
 
             putRequest.onsuccess = () => {
