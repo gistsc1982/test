@@ -4329,7 +4329,8 @@ export default {
             this._previousTerrainProvider = viewer.scene.terrainProvider;
 
             // 步骤6：设置到 globe
-            viewer.scene.globe.terrainProvider =terrainProvider;
+            // ⭐ 使用 window.__cesiumViewer__ 绕开 Vue Proxy，避免 Cesium 内部 _scene 引用丢失
+window.__cesiumViewer__.scene.globe.terrainProvider =terrainProvider;
             viewer.scene.globe.depthTestAgainstTerrain = true;
 
             // 步骤7：存储到 _cesiumLayers
@@ -4390,7 +4391,8 @@ export default {
             });
 
             this._previousTerrainProvider = viewer.scene.globe.terrainProvider;
-            viewer.scene.globe.terrainProvider = terrainProvider;
+            // ⭐ 使用 window.__cesiumViewer__ 绕开 Vue Proxy，避免 Cesium 内部 _scene 引用丢失
+window.__cesiumViewer__.scene.globe.terrainProvider = terrainProvider;
             viewer.scene.globe.depthTestAgainstTerrain = true;
 
             this._cesiumLayers.set(node.id, {
@@ -5284,7 +5286,8 @@ export default {
           }
           case 'local-terrain': {
             // 恢复之前的 terrainProvider
-            viewer.scene.globe.terrainProvider =this._previousTerrainProvider
+            // ⭐ 使用 window.__cesiumViewer__ 绕开 Vue Proxy，避免 Cesium 内部 _scene 引用丢失
+window.__cesiumViewer__.scene.globe.terrainProvider =this._previousTerrainProvider
               || new Cesium.EllipsoidTerrainProvider();
             this._previousTerrainProvider = null;
             console.log('[LayerTreeManager] ⛰️ Terrain Provider 已恢复为默认');
@@ -5292,7 +5295,8 @@ export default {
           }
           case 'local-terrain-tiles': {
             // 恢复为默认地形或之前的地形
-            viewer.scene.globe.terrainProvider =this._previousTerrainProvider
+            // ⭐ 使用 window.__cesiumViewer__ 绕开 Vue Proxy，避免 Cesium 内部 _scene 引用丢失
+window.__cesiumViewer__.scene.globe.terrainProvider =this._previousTerrainProvider
               || new Cesium.EllipsoidTerrainProvider();
             viewer.scene.globe.depthTestAgainstTerrain = true;
             this._previousTerrainProvider = null;
