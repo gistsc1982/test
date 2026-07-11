@@ -34,6 +34,7 @@
     this._bounds = options.bounds || { west: -180, east: 180, south: -90, north: 90 };
     this._minHeight = options.minHeight != null ? options.minHeight : -9999;
     this._maxHeight = options.maxHeight != null ? options.maxHeight : 9999;
+    this._maxLevel = options.maxLevel != null ? options.maxLevel : 8; // ⭐ 限制最大细化级别
 
     this._tilingScheme = new Cesium.GeographicTilingScheme();
     this.ready = true;
@@ -69,6 +70,9 @@
     var south = Cesium.Math.toDegrees(rect.south);
     var north = Cesium.Math.toDegrees(rect.north);
 
+    // ⭐ 超过 maxLevel 停止细化
+    if (level > this._maxLevel) return false;
+
     // 检查 tile 矩形与 DEM 范围是否有交集
     return west < this._bounds.east && east > this._bounds.west &&
            south < this._bounds.north && north > this._bounds.south;
@@ -76,8 +80,13 @@
 
   /**
    * 请求 tile 的地形几何数据
+   *
+   * ⭐ 关键设计：对于 coarse tile（低级别），即使只有极少像素落在 DEM
+   * 范围内，也必须返回有效的 HeightmapTerrainData（含 childTileMask），
+   * 否则 Cesium 认为该区域无数据，永远不会细化到更高级别。
    */
   GeoTiffTerrainProvider.prototype.requestTileGeometry = function (x, y, level, request) {
+
     // 检查请求是否已取消
     if (request && request.cancelled) {
       return undefined;
@@ -116,22 +125,16 @@
           validCount++;
           heights[row * gridSize + col] = Math.round(Math.max(-32768, Math.min(32767, h)));
         } else {
-          // ⭐ 关键修复：NODATA 像素用 0（椭球面高度），不能用 _minHeight
+          // ⭐ NODATA 像素用 0（椭球面高度），不能用 _minHeight
           // 否则粗级别 tile 会把整个半球都抬高到 _minHeight，导致地形"飞到太空"
           heights[row * gridSize + col] = 0;
         }
       }
     }
 
-    // 如果有效像素占比太低（粗级别 tile 只有极少量像素落在 DEM 范围内），
-    // 返回 undefined 让 Cesium 用椭球面，避免大量 NODATA=0 造成的错误平面
-    var minValidFraction = 0.02; // 至少 2% 像素有效才返回数据
-    if (validCount < totalPixels * minValidFraction) {
-      return undefined;
-    }
-
-    // 计算 childTileMask：哪些子 tile 有数据
-    // ⭐ 只有在子 tile 也有足够有效数据时才标记，避免粗级别 tile 过早细分
+    // ⭐ 计算 childTileMask — 必须在 validCount 判断之前！
+    // 即使当前 tile 的有效像素极少，也必须通过 childTileMask 告诉
+    // Cesium 哪些子 tile 有更多数据，否则细化链断裂，地形永远不出现。
     var childMask = 0;
     for (var childIdx = 0; childIdx < 4; childIdx++) {
       var childX = x * 2 + (childIdx % 2);
@@ -140,8 +143,14 @@
         childMask |= (1 << childIdx);
       }
     }
-    // ⭐ 如果没有任何子 tile 有数据，childMask=0 让 Cesium 在此 tile 停止细分
-    // 实测：Cesium 需要 childMask 来正确调度 LOD 细化，特别是在 DEM 边界处
+
+    // ⭐ Coarse tile 策略：即使有效像素占比极低，也要返回数据
+    // 这样 Cesium 才能通过 childTileMask 继续细化到更高级别。
+    // 没有可细化的子 tile 时（childMask === 0）才返回 undefined。
+    if (validCount < totalPixels * 0.02 && childMask === 0) {
+      // 当前 tile 几乎无数据 AND 没有任何子 tile 有数据 → 真正无数据区域
+      return undefined;
+    }
 
     try {
       var terrainData = new Cesium.HeightmapTerrainData({
@@ -153,7 +162,7 @@
           heightScale: 1.0,
           heightOffset: 0.0,
           elementsPerHeight: 1,
-          stride: gridSize,   // ⭐ 必须 = width(65)！Cesium 用 row*stride+col 索引，stride=1 会读错位置导致飞到太空
+          stride: gridSize,   // ⭐ 必须 = width(65)！Cesium 用 row*stride+col 索引
           elementMultiplier: 1,
           isBigEndian: false
         }
@@ -163,8 +172,9 @@
       var now = Date.now();
       if (this._tileSuccessCount % 50 === 0 || (now - this._lastLogTime) > 5000) {
         console.log('[GeoTiffTerrainProvider] 📊 tile 统计: 成功=' + this._tileSuccessCount +
-          ' level=' + level + ' (' + west.toFixed(4) + '°,' + south.toFixed(4) + '°)-(' +
-          east.toFixed(4) + '°,' + north.toFixed(4) + '°)');
+          ' level=' + level + ' childMask=' + childMask +
+          ' (' + west.toFixed(4) + '°,' + south.toFixed(4) + '°)-(' +
+          east.toFixed(4) + '°,' + north.toFixed(4) + '°) valid=' + validCount + '/' + totalPixels);
         this._lastLogTime = now;
       }
       return Promise.resolve(terrainData);
@@ -176,21 +186,24 @@
 
   /**
    * 双线性插值：从 GeoTIFF 栅格采样高度
+   *
+   * ⭐ 边缘处理：当 px/py 落在栅格边界上时（如 px=width-1），
+   * 钳制 x1/y1 到 width-1/height-1，使插值退化为单列/单行采样，
+   * 避免错误地将有效边缘像素判为 NODATA。
    */
   GeoTiffTerrainProvider.prototype._sampleHeightBilinear = function (px, py) {
     var width = this._width;
     var height = this._height;
     var data = this._rasterData;
 
+    // ⭐ 钳制浮点像素坐标到有效范围
+    px = Math.max(0, Math.min(width - 1, px));
+    py = Math.max(0, Math.min(height - 1, py));
+
     var x0 = Math.floor(px);
     var y0 = Math.floor(py);
-    var x1 = x0 + 1;
-    var y1 = y0 + 1;
-
-    // 边界检查
-    if (x0 < 0 || x1 >= width || y0 < 0 || y1 >= height) {
-      return -99999;
-    }
+    var x1 = Math.min(x0 + 1, width - 1);
+    var y1 = Math.min(y0 + 1, height - 1);
 
     var fx = px - x0;
     var fy = py - y0;

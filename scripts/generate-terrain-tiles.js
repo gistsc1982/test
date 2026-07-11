@@ -281,7 +281,6 @@ async function main() {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
   // 按 zoom level 生成 tiles
-  const availableRanges = [];
   let totalTiles = 0;
 
   for (let level = MIN_ZOOM; level <= MAX_ZOOM; level++) {
@@ -297,31 +296,35 @@ async function main() {
     console.log(`\n🔨 Level ${level}: tiles x[${xStart}..${xEnd}] y[${yStart}..${yEnd}] (${xCount}×${yCount} = ${levelTotal} tiles)`);
 
     let levelGenerated = 0;
+    let levelPlaceholders = 0;
+    // 空 heightmap 占位瓦片（65×65 Int16 全零 = 椭球面高度）
+    const placeholderHeightmap = new Int16Array(TILE_SIZE * TILE_SIZE);
+
     for (let tx = xStart; tx <= xEnd; tx++) {
       for (let ty = yStart; ty <= yEnd; ty++) {
         const heightmap = generateHeightmap(band, width, height, bounds, tx, ty, level);
+        const tileDir = path.join(OUTPUT_DIR, String(level), String(tx));
+        fs.mkdirSync(tileDir, { recursive: true });
         if (heightmap) {
-          const tileDir = path.join(OUTPUT_DIR, String(level), String(tx));
-          fs.mkdirSync(tileDir, { recursive: true });
           writeTerrainFile(path.join(tileDir, `${ty}.terrain`), heightmap);
           levelGenerated++;
+        } else {
+          // ⭐ 粗级别瓦片即使没有有效 DEM 像素，也要生成占位瓦片
+          // 否则 Cesium TerrainProvider 无法从 level 0 逐级细化到有数据的级别
+          writeTerrainFile(path.join(tileDir, `${ty}.terrain`), placeholderHeightmap);
+          levelPlaceholders++;
         }
       }
     }
 
-    console.log(`   ✅ 生成 ${levelGenerated}/${levelTotal} tiles`);
-    totalTiles += levelGenerated;
-
-    if (levelGenerated > 0) {
-      availableRanges.push([xStart, xEnd, yStart, yEnd, level, level]);
-    }
+    const label = levelPlaceholders > 0
+      ? `生成 ${levelGenerated} 有效 + ${levelPlaceholders} 占位 / ${levelTotal} tiles`
+      : `生成 ${levelGenerated}/${levelTotal} tiles`;
+    console.log(`   ✅ ${label}`);
+    totalTiles += levelGenerated + levelPlaceholders;
   }
 
-  // 从实际生成的瓦片推断 minzoom/maxzoom
-  const actualMinZoom = availableRanges.length > 0 ? availableRanges[0][4] : MIN_ZOOM;
-  const actualMaxZoom = availableRanges.length > 0 ? availableRanges[availableRanges.length - 1][5] : MAX_ZOOM;
-
-  // 生成 layer.json（仅包含 CesiumTerrainProvider 标准字段）
+  // 生成 layer.json
   const layerJson = {
     tilejson: '2.1.0',
     name: 'Copernicus GLO-30 DEM (Cesium Terrain)',
@@ -330,9 +333,10 @@ async function main() {
     format: 'heightmap-1.0',
     tiles: ['{z}/{x}/{y}.terrain'],
     bounds: [bounds.west, bounds.south, bounds.east, bounds.north],
-    minzoom: actualMinZoom,
-    maxzoom: actualMaxZoom,
-    available: availableRanges
+    minzoom: MIN_ZOOM,
+    maxzoom: MAX_ZOOM
+    // 不提供 available 字段 — CesiumTerrainProvider 会用 bounds 回退逻辑
+    // getTileDataAvailable 对 bounds 范围内的 tile 始终返回 true
   };
 
   const layerJsonPath = path.join(OUTPUT_DIR, 'layer.json');
