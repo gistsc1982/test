@@ -135,17 +135,19 @@
   }
 
   /**
-   * 异步预加载 tile（返回后存储到缓存，但不阻塞当前帧）
+   * 异步加载 tile 文件，返回 Promise<HeightmapTerrainData>
+   * 加载后缓存，后续请求命中缓存直接同步返回
    */
-  function prefetchTile(self, x, y, level) {
-    var key = cacheKey(x, y, level);
-    if (self._tileCache[key] || self._loadingTiles[key]) return;
+  function loadTileAsync(self, x, y, level, key) {
+    // 如果已有正在进行的加载，共享同一个 Promise
+    if (self._loadingTiles[key]) {
+      return self._loadingTiles[key];
+    }
 
     var url = self._baseUrl + '/' + level + '/' + x + '/' + y + '.terrain';
-    self._loadingTiles[key] = true;
     self._tileRequestCount++;
 
-    fetch(url)
+    var promise = fetch(url)
       .then(function (resp) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.arrayBuffer();
@@ -153,14 +155,14 @@
       .then(function (buf) {
         if (buf.byteLength < self._gridSize * self._gridSize * 2) {
           console.warn('[LocalTerrainProvider] ⚠️ 数据不足: ' + key);
-          return;
+          return undefined;
         }
         var heights = decodeHeights(buf, self._gridSize);
-        var valid = 0;
-        for (var i = 0; i < heights.length; i++) { if (heights[i] !== 0) valid++; }
-        if (valid < heights.length * 0.02) return;
 
-        self._tileCache[key] = makeTerrainData(self, x, y, level, heights);
+        // ⭐ 不按 valid 占比拒绝瓦片！粗级别瓦片即使大部分为 0 也要返回，
+        // 作为"路标"引导 Cesium 细化到更高级别。只有在完全没有数据时才拒绝。
+        var td = makeTerrainData(self, x, y, level, heights);
+        self._tileCache[key] = td;
         self._tileSuccessCount++;
         self._version++;
 
@@ -174,22 +176,35 @@
         var now = Date.now();
         if (self._tileSuccessCount % 50 === 0 || (now - self._lastLogTime) > 5000) {
           console.log('[LocalTerrainProvider] 📊 cache=' + keys.length +
-            ' level=' + level + ' valid=' + valid + '/' + heights.length);
+            ' level=' + level);
           self._lastLogTime = now;
         }
+
+        return td;
       })
       .catch(function (e) {
         console.warn('[LocalTerrainProvider] ⚠️ fetch 失败: ' + key + ' - ' + e.message);
+        return undefined;
       })
       .finally(function () {
         delete self._loadingTiles[key];
       });
+
+    self._loadingTiles[key] = promise;
+    return promise;
   }
 
+  // 挂载到原型
+  LocalTerrainProvider.prototype._loadTileAsync = function (x, y, level, key) {
+    return loadTileAsync(this, x, y, level, key);
+  };
+
+  // 保留旧 prefetchTile 供外部需要时使用（内部已改用 Promise）
+
   /**
-   * 请求 tile — 始终保持同步返回！
-   * 如果缓存命中 → 返回 HeightmapTerrainData
-   * 如果缓存未命中 → 触发异步 prefetch + 返回 undefined（Cesium 本帧用椭球体补齐）
+   * 请求 tile — 返回 Promise<HeightmapTerrainData> 或 undefined
+   * 缓存命中 → 同步返回 HeightmapTerrainData
+   * 未命中 → 返回 Promise，Cesium 等待异步加载完成后渲染
    */
   LocalTerrainProvider.prototype.requestTileGeometry = function (x, y, level, request) {
     if (request && request.cancelled) return undefined;
@@ -209,9 +224,10 @@
       return stub;
     }
 
-    // 细级别但未缓存 → 触发异步加载，本帧返回 undefined
-    prefetchTile(this, x, y, level);
-    return undefined;
+    // 细级别但未缓存 → 异步 fetch，返回 Promise
+    // ⭐ Cesium 通过 Promise 机制获知瓦片就绪，无需手动 retry
+    var self = this;
+    return this._loadTileAsync(x, y, level, key);
   };
 
   LocalTerrainProvider.prototype.getLevelMaximumGeometricError = function (level) {
