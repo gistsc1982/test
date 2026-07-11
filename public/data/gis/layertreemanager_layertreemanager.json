@@ -608,7 +608,7 @@
   },
   {
     "id": "local-dem-cop30",
-    "name": "Copernicus GLO-30 DEM（下载后放入文件）",
+    "name": "本地cop30高程（Copernicus GLO-30 DEM原始geotiff数据）",
     "parentId": "folder-local-dem",
     "nodeType": "layer",
     "url": "/data/dem/copernicus_glo30.tif",
@@ -622,5 +622,21 @@
     "demRenderMode": "3d",
     "demElevationScale": 1,
     "demColorRamp": true
+  },
+  {
+    "id": "local-terrain-cop30",
+    "name": "本地cop30高程（动态Geotiff转Cesium Terrain）",
+    "parentId": "folder-local-dem",
+    "nodeType": "layer",
+    "url": "/data/dem/copernicus_glo30.tif",
+    "sortOrder": 5,
+    "visible": 1,
+    "description": "将 Copernicus GLO-30 转为 Cesium Terrain，影像图层可贴合地形起伏",
+    "icon": "⛰️",
+    "centerLon": 116,
+    "centerLat": 40,
+    "centerHeight": 500000,
+    "demRenderMode": "terrain",
+    "demElevationScale": 1
   }
 ]

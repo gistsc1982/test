@@ -1297,7 +1297,9 @@ export default {
 	        { "id": "local-dem-srtm30","name": "SRTM 30M DEM（下载后放入文件）","parentId": "folder-local-dem","nodeType": "layer","url": "/data/dem/srtm_30m.tif","sortOrder":1,"visible":1,"description": "SRTM 30m 分辨率全球 DEM。从地理空间数据云 (gscloud.cn) 下载 → 解压 → 将 .tif 重命名为 srtm_30m.tif 放入 public/data/dem/","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 	        { "id": "local-dem-aster30","name":"ASTER GDEM 30M（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/aster_gdem_30m.tif","sortOrder":2,"visible":1,"description":"ASTER GDEM v3 30m 全球 DEM，覆盖 83°N-83°S。下载：www.gscloud.cn → DEM 数字高程数据 → ASTER GDEM 30M，或 earthexplorer.usgs.gov","icon":"⛰️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 	        { "id": "local-dem-aw3d30","name":"ALOS AW3D30 DEM（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/alos_aw3d30.tif","sortOrder":3,"visible":1,"description":"JAXA ALOS AW3D30 全球 30m DEM，精度~5m。下载：www.eorc.jaxa.jp/ALOS → AW3D30 → 注册后下载","icon":"🗻","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
-	        { "id": "local-dem-cop30","name":"Copernicus GLO-30 DEM（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":4,"visible":1,"description":"ESA Copernicus GLO-30 全球 30m DEM，精度~4m。下载：dataspace.copernicus.eu 或 portal.opentopography.org","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true}
+	        { "id": "local-dem-cop30","name":"本地cop30高程（Copernicus GLO-30 DEM原始geotiff数据）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":4,"visible":1,"description":"ESA Copernicus GLO-30 全球 30m DEM，精度~4m。下载：dataspace.copernicus.eu 或 portal.opentopography.org","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
+        { "id": "local-terrain-cop30","name":"本地cop30高程（动态Geotiff转Cesium Terrain）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":5,"visible":1,"description":"将 Copernicus GLO-30 转为 Cesium Terrain，影像图层可贴合地形起伏。使用自定义 GeoTiffTerrainProvider 从 GeoTIFF 直接提供高程数据","icon":"⛰️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"terrain","demElevationScale":1.0},
+        { "id": "local-terrain-cop30-tiles","name":"本地DEM高程数据(Cesium Terrain)","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/terrain/copernicus_glo30","sortOrder":6,"visible":1,"description":"Copernicus GLO-30 预生成 Cesium Terrain 瓦片，通过 layer.json 加载，影像图层可贴合地形起伏","icon":"⛰️","centerLon":103.5,"centerLat":30.5,"centerHeight":100000}
       ],
 
       // Cesium 图层加载状态 — 记录已加载的图层 ID → Cesium 对象
@@ -1542,7 +1544,9 @@ export default {
 	        { "id": "local-dem-srtm30","name": "SRTM 30M DEM（下载后放入文件）","parentId": "folder-local-dem","nodeType": "layer","url": "/data/dem/srtm_30m.tif","sortOrder":1,"visible":1,"description": "SRTM 30m 分辨率全球 DEM。从地理空间数据云 (gscloud.cn) 下载 → 解压 → 将 .tif 重命名为 srtm_30m.tif 放入 public/data/dem/","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 	        { "id": "local-dem-aster30","name":"ASTER GDEM 30M（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/aster_gdem_30m.tif","sortOrder":2,"visible":1,"description":"ASTER GDEM v3 30m 全球 DEM，覆盖 83°N-83°S。下载：www.gscloud.cn → DEM 数字高程数据 → ASTER GDEM 30M，或 earthexplorer.usgs.gov","icon":"⛰️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 	        { "id": "local-dem-aw3d30","name":"ALOS AW3D30 DEM（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/alos_aw3d30.tif","sortOrder":3,"visible":1,"description":"JAXA ALOS AW3D30 全球 30m DEM，精度~5m。下载：www.eorc.jaxa.jp/ALOS → AW3D30 → 注册后下载","icon":"🗻","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
-	        { "id": "local-dem-cop30","name":"Copernicus GLO-30 DEM（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":4,"visible":1,"description":"ESA Copernicus GLO-30 全球 30m DEM，精度~4m。下载：dataspace.copernicus.eu 或 portal.opentopography.org","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true}
+	        { "id": "local-dem-cop30","name":"本地cop30高程（Copernicus GLO-30 DEM原始geotiff数据）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":4,"visible":1,"description":"ESA Copernicus GLO-30 全球 30m DEM，精度~4m。下载：dataspace.copernicus.eu 或 portal.opentopography.org","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
+		        { "id": "local-terrain-cop30","name":"本地cop30高程（动态Geotiff转Cesium Terrain）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":5,"visible":1,"description":"将 Copernicus GLO-30 转为 Cesium Terrain，影像图层可贴合地形起伏。使用自定义 GeoTiffTerrainProvider 从 GeoTIFF 直接提供高程数据","icon":"⛰️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"terrain","demElevationScale":1.0},
+        { "id": "local-terrain-cop30-tiles","name":"本地DEM高程数据(Cesium Terrain)","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/terrain/copernicus_glo30","sortOrder":6,"visible":1,"description":"Copernicus GLO-30 预生成 Cesium Terrain 瓦片，通过 layer.json 加载，影像图层可贴合地形起伏","icon":"⛰️","centerLon":103.5,"centerLat":30.5,"centerHeight":100000}
       ];
 
       var added = [];
@@ -2989,6 +2993,10 @@ export default {
       // ⭐ 地理编码：天地图API 或 父目录标识
       if (url.includes('api.tianditu.gov.cn/search') || url.includes('api.tianditu.gov.cn/geocoding') || ancestorNames.includes('geocode') || ancestorNames.includes('地理编码')) return 'geocoding';
       // ⭐ WCS：URL含 wcs 或 父目录标识
+      // ⭐ 本地 Cesium Terrain tiles（通过 layer.json 目录加载，非 .tif 文件）
+      if (url.includes('/terrain/') && !url.endsWith('.tif') && !url.endsWith('.tiff')) return 'local-terrain-tiles';
+      // ⭐ 本地 DEM GeoTIFF 文件 terrain 模式（必须在 .tif 检测之前）
+      if ((url.endsWith('.tif') || url.endsWith('.tiff')) && node.demRenderMode === 'terrain') return 'local-terrain';
       // ⭐ 本地 DEM GeoTIFF 文件：.tif/.tiff 后缀 或 父目录为 local-dem
       if (url.endsWith('.tif') || url.endsWith('.tiff') || ancestorNames.includes('local-dem') || ancestorNames.includes('dem')) return 'local-dem';
       if (url.includes('wcs') || ancestorNames.includes('wcs')) return 'wcs';
@@ -4236,6 +4244,160 @@ export default {
             console.log(`[${this.componentName}] ✅ 地理编码图层加载成功: "${node.name}" → ${features.length} 个点位`);
             break;
           }
+          case 'local-terrain': {
+            // ⭐ 本地 DEM → Cesium Terrain：使用自定义 TerrainProvider 从 GeoTIFF 提供高程
+            var terrainUrl = node.url;
+            console.log(`[${this.componentName}] ⛰️ 加载本地 DEM 地形: ${terrainUrl}`);
+
+            deadline = Math.max(deadline, Date.now() + 60000);
+            await this._ensureGeoTiff();
+            await this._ensureGeoTiffTerrainProvider();
+
+            // 步骤1：fetch 本地 GeoTIFF 文件
+            var terrainResp = await fetch(terrainUrl, { signal: createTimeoutSignal(30000) });
+            if (!terrainResp.ok) throw new Error(`本地 DEM 文件加载失败 (HTTP ${terrainResp.status}): ${terrainUrl}`);
+            var terrainBlob = await terrainResp.blob();
+            console.log(`[${this.componentName}] 📦 本地 DEM 地形文件: ${(terrainBlob.size/1024/1024).toFixed(1)}MB`);
+
+            if (typeof window.GeoTIFF === 'undefined') {
+              throw new Error('geotiff.js 未加载，无法解析本地 DEM 文件');
+            }
+
+            // 步骤2：geotiff.js 解码
+            var terrainTiff = await window.GeoTIFF.fromArrayBuffer(await terrainBlob.arrayBuffer());
+            var terrainImg = await terrainTiff.getImage();
+            var terrainRaster = await terrainImg.readRasters();
+            var terrainBand = terrainRaster[0];
+            var terrainTw = terrainImg.getWidth(), terrainTh = terrainImg.getHeight();
+
+            var terrainMin = Infinity, terrainMax = -Infinity, terrainV = 0;
+            for (var tri = 0; tri < terrainBand.length; tri++) {
+              var tv = terrainBand[tri];
+              if (isFinite(tv) && tv > -9999) { if (tv < terrainMin) terrainMin = tv; if (tv > terrainMax) terrainMax = tv; terrainV++; }
+            }
+            console.log('[LayerTreeManager] 📊 Terrain DEM: ' + terrainMin.toFixed(1) + '~' + terrainMax.toFixed(1) + 'm 有效=' + terrainV + ' 尺寸=' + terrainTw + '×' + terrainTh);
+
+            // 步骤3：提取地理范围
+            var terrainWest, terrainEast, terrainSouth, terrainNorth;
+            try {
+              var tOrigin = terrainImg.getOrigin();
+              var tRes = terrainImg.getResolution();
+              if (tOrigin && tRes && tOrigin.length >= 2 && tRes.length >= 2 &&
+                  isFinite(tOrigin[0]) && isFinite(tOrigin[1]) &&
+                  isFinite(tRes[0]) && isFinite(tRes[1])) {
+                terrainWest = tOrigin[0];
+                terrainNorth = tOrigin[1];
+                terrainEast = tOrigin[0] + terrainTw * Math.abs(tRes[0]);
+                terrainSouth = tOrigin[1] - terrainTh * Math.abs(tRes[1]);
+              } else {
+                throw new Error('GeoTIFF 地理元数据无效');
+              }
+            } catch (e) {
+              terrainWest = node.centerLon != null ? node.centerLon - 10 : -180;
+              terrainEast = node.centerLon != null ? node.centerLon + 10 : 180;
+              terrainSouth = node.centerLat != null ? node.centerLat - 5 : -90;
+              terrainNorth = node.centerLat != null ? node.centerLat + 5 : 90;
+            }
+            console.log('[LayerTreeManager] 🌍 Terrain 地理范围: ' +
+              terrainWest.toFixed(4) + '°~' + terrainEast.toFixed(4) + '°E, ' +
+              terrainSouth.toFixed(4) + '°~' + terrainNorth.toFixed(4) + '°N');
+
+            // 步骤4：创建 GeoTiffTerrainProvider
+            if (typeof window.GeoTiffTerrainProvider === 'undefined') {
+              throw new Error('GeoTiffTerrainProvider 未加载');
+            }
+            var terrainProvider = new window.GeoTiffTerrainProvider({
+              rasterData: terrainBand,
+              width: terrainTw,
+              height: terrainTh,
+              bounds: { west: terrainWest, east: terrainEast, south: terrainSouth, north: terrainNorth },
+              minHeight: terrainMin,
+              maxHeight: terrainMax
+            });
+
+            // 步骤5：保存当前 terrainProvider 用于卸载时恢复
+            this._previousTerrainProvider = viewer.scene.terrainProvider;
+
+            // 步骤6：设置到 globe
+            viewer.scene.terrainProvider = terrainProvider;
+            viewer.scene.globe.depthTestAgainstTerrain = true;
+
+            // 步骤7：存储到 _cesiumLayers
+            this._cesiumLayers.set(node.id, {
+              type: 'local-terrain',
+              provider: terrainProvider,
+              _bounds: { west: terrainWest, east: terrainEast, south: terrainSouth, north: terrainNorth }
+            });
+            console.log('[LayerTreeManager] ⛰️ Terrain Provider 已激活: ' +
+              terrainTw + '×' + terrainTh + ' 高程=' + terrainMin.toFixed(0) + '~' + terrainMax.toFixed(0) + 'm');
+            console.log(`[${this.componentName}] ✅ 本地 DEM 地形加载成功: "${node.name}"`);
+            break;
+          }
+          case 'local-terrain-tiles': {
+            // ⭐ 本地 DEM Terrain（复用 GeoTiffTerrainProvider，已验证可用）
+            // 与 local-terrain-cop30 使用相同的加载方式，通过 GeoTIFF 提供地形数据
+            var terrainTilesUrl = node.url;
+            console.log(`[${this.componentName}] ⛰️ 加载本地 Terrain: ${terrainTilesUrl}`);
+
+            deadline = Math.max(deadline, Date.now() + 60000);
+            await this._ensureGeoTiff();
+            await this._ensureGeoTiffTerrainProvider();
+
+            if (typeof window.GeoTiffTerrainProvider === 'undefined') {
+              throw new Error('GeoTiffTerrainProvider 未加载');
+            }
+
+            // 使用 copernicus_glo30.tif 文件
+            var tifUrl = '/data/dem/copernicus_glo30.tif';
+            var terrainResp = await fetch(tifUrl, { signal: createTimeoutSignal(30000) });
+            if (!terrainResp.ok) throw new Error('DEM 文件加载失败 (HTTP ' + terrainResp.status + ')');
+            var terrainBlob = await terrainResp.blob();
+
+            var terrainTiff = await window.GeoTIFF.fromArrayBuffer(await terrainBlob.arrayBuffer());
+            var terrainImg = await terrainTiff.getImage();
+            var terrainRaster = await terrainImg.readRasters();
+            var terrainBand = terrainRaster[0];
+            var tW = terrainImg.getWidth(), tH = terrainImg.getHeight();
+
+            var tMin = Infinity, tMax = -Infinity;
+            for (var ti = 0; ti < terrainBand.length; ti++) {
+              var tv = terrainBand[ti];
+              if (isFinite(tv) && tv > -9999) { if (tv < tMin) tMin = tv; if (tv > tMax) tMax = tv; }
+            }
+
+            var tWest, tEast, tSouth, tNorth;
+            try {
+              var tOrg = terrainImg.getOrigin(), tRes = terrainImg.getResolution();
+              tWest = tOrg[0]; tNorth = tOrg[1];
+              tEast = tOrg[0] + tW * Math.abs(tRes[0]);
+              tSouth = tOrg[1] - tH * Math.abs(tRes[1]);
+            } catch(e) {
+              tWest = 103; tEast = 104; tSouth = 30; tNorth = 31;
+            }
+
+            // 保存当前 terrainProvider
+            this._previousTerrainProvider = viewer.scene.terrainProvider;
+
+            // 使用已验证的 GeoTiffTerrainProvider
+            var terrainProvider = new window.GeoTiffTerrainProvider({
+              rasterData: terrainBand,
+              width: tW, height: tH,
+              bounds: { west: tWest, east: tEast, south: tSouth, north: tNorth },
+              minHeight: tMin, maxHeight: tMax
+            });
+
+            viewer.scene.terrainProvider = terrainProvider;
+            viewer.scene.globe.depthTestAgainstTerrain = true;
+
+            this._cesiumLayers.set(node.id, {
+              type: 'local-terrain-tiles',
+              provider: terrainProvider,
+              _bounds: { west: tWest, east: tEast, south: tSouth, north: tNorth }
+            });
+            console.log('[LayerTreeManager] ⛰️ Terrain Provider 已激活: ' + tW + '×' + tH + ' 高程=' + tMin.toFixed(0) + '~' + tMax.toFixed(0) + 'm');
+            console.log(`[${this.componentName}] ✅ 本地 Terrain 加载成功: "${node.name}"`);
+            break;
+          }
           case 'local-dem': {
             // ⭐ 本地 DEM GeoTIFF 文件加载：无需网络请求，直接 fetch 本地文件
             var localDemUrl = node.url;
@@ -5104,8 +5266,6 @@ export default {
             }
             if (!this._isWebGLLost) {
               viewer.scene.requestRender();
-              // 强制同步渲染，立即刷新 GPU 画面（跳过 rAF 队列等待）
-              try { viewer.scene.render(viewer.clock.currentTime); } catch (e) { /* ignore */ }
             }
             break;
           }
@@ -5116,6 +5276,23 @@ export default {
             }
             viewer.dataSources.remove(entry.object, true);
             viewer.scene.requestRender();
+            break;
+          }
+          case 'local-terrain': {
+            // 恢复之前的 terrainProvider
+            viewer.scene.terrainProvider = this._previousTerrainProvider
+              || new Cesium.EllipsoidTerrainProvider();
+            this._previousTerrainProvider = null;
+            console.log('[LayerTreeManager] ⛰️ Terrain Provider 已恢复为默认');
+            break;
+          }
+          case 'local-terrain-tiles': {
+            // 恢复为默认地形或之前的地形
+            viewer.scene.terrainProvider = this._previousTerrainProvider
+              || new Cesium.EllipsoidTerrainProvider();
+            viewer.scene.globe.depthTestAgainstTerrain = false;
+            this._previousTerrainProvider = null;
+            console.log('[LayerTreeManager] 🌐 Terrain tiles Provider 已恢复为默认');
             break;
           }
           case 'wcs':
@@ -5135,7 +5312,6 @@ export default {
             }
             if (!this._isWebGLLost) {
               viewer.scene.requestRender();
-              try { viewer.scene.render(viewer.clock.currentTime); } catch (e) { /* ignore */ }
             }
             break;
           }
@@ -5173,33 +5349,32 @@ export default {
       if (!viewer || !Cesium) return;
 
       try {
-        // ⭐ WCS 图层：优先用 DescribeCoverage 获取的真实边界框中心定位
+        // ⭐ WCS 图层：优先用 DescribeCoverage 获取的真实边界框定位
         const wcsEntry = this._cesiumLayers.get(node.id);
         if (wcsEntry && wcsEntry._wcsBbox) {
           const bb = wcsEntry._wcsBbox;
           const flyLon = (bb.west + bb.east) / 2;
           const flyLat = (bb.south + bb.north) / 2;
-          const flyHeight = Math.max(2000, (bb.north - bb.south) * 500000);
+          // ⭐ 使用 Cesium.Rectangle 作为目标，Cesium 自动计算最佳视角高度
           viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(flyLon, flyLat, flyHeight),
+            destination: Cesium.Rectangle.fromDegrees(bb.west, bb.south, bb.east, bb.north),
             duration: 2
           });
-          console.log(`[${this.componentName}] 🎯 飞行至 WCS 边界框中心: ${node.name} (${flyLon.toFixed(4)}, ${flyLat.toFixed(4)}, ${flyHeight.toFixed(0)}m)`);
+          console.log(`[${this.componentName}] 🎯 飞行至 WCS 边界框: ${node.name} (${flyLon.toFixed(4)}, ${flyLat.toFixed(4)})`);
           return;
         }
 
-        // 1. 本地 DEM / WCS 3D — 从存储的地理边界计算飞行目标
+        // 1. 本地 DEM / WCS 3D / Terrain — 飞行至数据地理边界
         const entry = this._cesiumLayers.get(node.id);
         if (entry && entry._bounds) {
           const b = entry._bounds;
           const flyLon = (b.west + b.east) / 2;
           const flyLat = (b.south + b.north) / 2;
-          const flyHeight = Math.max(5000, (b.north - b.south) * 500000);
           viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees(flyLon, flyLat, flyHeight),
+            destination: Cesium.Rectangle.fromDegrees(b.west, b.south, b.east, b.north),
             duration: 2
           });
-          console.log(`[${this.componentName}] 🎯 飞行至数据实际范围: ${node.name} (${flyLon.toFixed(4)}, ${flyLat.toFixed(4)}, ${flyHeight.toFixed(0)}m)`);
+          console.log(`[${this.componentName}] 🎯 飞行至数据实际范围: ${node.name} (${flyLon.toFixed(4)}, ${flyLat.toFixed(4)})`);
           return;
         }
 
@@ -5285,6 +5460,34 @@ export default {
         document.head.appendChild(script);
       });
       return this._geoTiffLoading;
+    },
+
+    _ensureGeoTiffTerrainProvider() {
+      if (typeof window.GeoTiffTerrainProvider !== 'undefined') return Promise.resolve();
+      if (this._terrainProviderLoading) return this._terrainProviderLoading;
+      var self = this;
+      this._terrainProviderLoading = new Promise(function (resolve) {
+        var script = document.createElement('script');
+        script.src = '../../../src/components/utils/GeoTiffTerrainProvider.js';
+        script.onload = function () { console.log('[LayerTreeManager] ⛰️ GeoTiffTerrainProvider 加载完成'); resolve(); };
+        script.onerror = function () { console.warn('[LayerTreeManager] ⚠️ GeoTiffTerrainProvider 加载失败'); resolve(); };
+        document.head.appendChild(script);
+      });
+      return this._terrainProviderLoading;
+    },
+
+    _ensureLocalTerrainProvider() {
+      if (typeof window.LocalTerrainProvider !== 'undefined') return Promise.resolve();
+      if (this._localTerrainLoading) return this._localTerrainLoading;
+      var self = this;
+      this._localTerrainLoading = new Promise(function (resolve) {
+        var script = document.createElement('script');
+        script.src = '../../../src/components/utils/LocalTerrainProvider.js';
+        script.onload = function () { console.log('[LayerTreeManager] 🌐 LocalTerrainProvider 加载完成'); resolve(); };
+        script.onerror = function () { console.warn('[LayerTreeManager] ⚠️ LocalTerrainProvider 加载失败'); resolve(); };
+        document.head.appendChild(script);
+      });
+      return this._localTerrainLoading;
     },
 
     /**
