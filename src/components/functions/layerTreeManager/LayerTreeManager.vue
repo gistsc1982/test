@@ -4745,14 +4745,25 @@ window.__cesiumViewer__.scene.globe.terrainProvider = terrainProvider;
                 var errMatch = errBody.match(/<ows:ExceptionText[^>]*>([\s\S]*?)<\/ows:ExceptionText>/);
                 var errMsg = errMatch ? errMatch[1].trim() : errBody.slice(0, 500);
                 console.warn(`[${this.componentName}] ⚠️ ${strat.desc} → HTTP ${covResp.status}:`, errMsg);
+                // ⭐ 诊断：打印响应前 200 字符帮助定位问题
+                console.warn(`[${this.componentName}]    响应预览:`, errBody.slice(0, 200));
               } catch (e) {
                 console.warn(`[${this.componentName}] ⚠️ ${strat.desc} 失败:`, e.message);
+                // ⭐ 诊断：打印请求 URL（去除冗余前缀）
+                var shortUrl = wcsUrl.replace(/https?:\/\/[^\/]+/, '');
+                console.warn(`[${this.componentName}]    请求 URL: ${shortUrl.slice(0, 200)}`);
               }
             }
 
             if (!covBlob) {
+              // ⭐ 诊断：汇总失败信息
+              console.error(`[${this.componentName}] ❌ GetCoverage 全部策略失败. Coverage="${covName}"`);
+              console.error(`[${this.componentName}]    可用 Coverage: ${availableCoverages.slice(0, 10).join(', ')}`);
+              console.error(`[${this.componentName}]    轴名: ${JSON.stringify(axisNames)}, 额外轴: ${JSON.stringify(extraAxes)}, extraSlices: ${extraSlices || '(无)'}`);
+              console.error(`[${this.componentName}]    空间范围: ${axLon}(${subsetLon}) ${axLat}(${subsetLat})`);
+              console.error(`[${this.componentName}]    covVersion: ${covVersion}, covFormat: ${covFormat}`);
               throw new Error('WCS GetCoverage 失败：所有轴名组合均未成功。Coverage="' + covName +
-                '" 可用列表: ' + availableCoverages.slice(0, 5).join(', '));
+                '" 可用列表: ' + availableCoverages.slice(0, 5).join(', ') + ' — 详见上方日志');
             }
 
             // ── 步骤 4：栅格 → Cesium 影像层 ──

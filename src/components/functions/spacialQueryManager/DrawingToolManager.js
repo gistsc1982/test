@@ -267,8 +267,8 @@ function createCanvasDrawer(viewer, type, onComplete, bufferRadius) {
       if (Cesium.defined(c)) {
         var ll = cartesianToLonLat(c);
         clickLonLats[i] = ll;
-        // 统一归零到椭球面（空间查询不涉及高度）
-        clickCartesians[i] = Cesium.Cartesian3.fromDegrees(ll[0], ll[1], 0);
+        // ⭐ 保留原始 Cartesian3（含地形高度），用于屏幕投影；空间查询只用经纬度
+        clickCartesians[i] = c.clone();
       }
     }
   }

@@ -197,6 +197,15 @@ export default {
       activeTool: null,
       drawnGeometry: null,
 
+      // 重绘画布（非交互式，用于相机移动后重绘空间查询区域）
+      _redrawCanvas: null,
+      _drawType: null,
+      _cameraMoveStartCb: null,
+      _cameraMoveEndCb: null,
+
+      // ⭐ 存储绘图时的 Cartesian3（含地形高度），用于重绘时准确反投影
+      _drawCartesians: null,
+
       // 缓冲区半径（米）
       bufferRadius: 500,
 
@@ -270,10 +279,13 @@ export default {
   },
   beforeUnmount() {
     this._stopBlink();
+    this._cleanupCameraRedrawListeners();
+    this._removeRedrawCanvas();
     this.deactivateTool();
     this.clearHighlights();
     this._clearEntityMask();
     if (this._maskCamHandler) { this._maskCamHandler.destroy(); this._maskCamHandler = null; }
+    if (this._historyCamHandler) { this._historyCamHandler.destroy(); this._historyCamHandler = null; }
     if (this._drawingManager) {
       this._drawingManager.destroy();
       this._drawingManager = null;
@@ -441,13 +453,20 @@ export default {
       }
 
       // 根据绘制类型自动切换空间算子
-      var opMap = { point: 'BBOX', line: 'BBOX', circle: 'Intersects', rectangle: 'BBOX', polygon: 'Intersects' };
+      // rectangle 改用 Intersects：BBOX 只比较要素外接矩形，会导致"框外图形"被误命中
+      var opMap = { point: 'BBOX', line: 'BBOX', circle: 'Intersects', rectangle: 'Intersects', polygon: 'Intersects' };
       if (opMap[type]) this.spatialOperator = opMap[type];
 
-      // 先清理之前的
+      // 先清理之前的绘制（重绘画布、监听器、图形数据）
+      this._cleanupCameraRedrawListeners();
+      this._removeRedrawCanvas();
       if (this._historyCamClear) { this._historyCamClear.destroy(); this._historyCamClear = null; }
+      if (this._historyCamHandler) { this._historyCamHandler.destroy(); this._historyCamHandler = null; }
       if (this._historyCanvas) { try { this._historyCanvas.parentNode.removeChild(this._historyCanvas); } catch (e) {} this._historyCanvas = null; }
       this.deactivateTool();
+      this.drawnGeometry = null;
+      this._drawType = null;
+      this._drawCartesians = null;
       this.clearResults();
 
       var self = this;
@@ -478,10 +497,20 @@ export default {
       console.log('[' + this.componentName + '] 绘图完成:', geometry);
       this.drawnGeometry = geometry;
       var drawType = this.activeTool; // 保存绘制类型
+      this._drawType = drawType;
       this.activeTool = null;
 
-      // 启动相机变化监听——变化时存入历史并清除绘制
-      this._watchCameraForHistory(geometry, drawType);
+      // ⭐ 捕获含地形高度的 Cartesian3，用于重绘时准确反投影（避免 terrain parallax）
+      if (this._drawingManager && this._drawingManager._activeDrawer) {
+        var drawer = this._drawingManager._activeDrawer;
+        var rawCarts = drawer.getCartesians ? drawer.getCartesians() : null;
+        if (rawCarts) {
+          this._drawCartesians = rawCarts.filter(function(c) { return c && window.Cesium.defined(c); });
+        }
+      }
+
+      // 启动相机变化处理——首次交互存入历史，moveEnd 后重绘空间查询区域
+      this._setupPostDrawHandlers(geometry, drawType);
 
       // 绘图完成后自动执行查询（如果有图层选择）
       if (this.selectedLayerId) {
@@ -749,9 +778,9 @@ export default {
       this.clearHighlights();
 
       try {
-        // 构建空间几何
+        // 构建空间几何 — 用 drawnGeometry（与 canvas 重绘同源的 lon/lat），遮罩不准
         var gmlGeom = '';
-        var drawingType = this._detectDrawingType();
+        var drawingType = this._drawType || this._detectDrawingType();
 
         if (this.drawnGeometry) {
           console.log('[SpacialQueryManager] 查询: type=' + drawingType + ' geom=' + JSON.stringify(this.drawnGeometry).substring(0, 200) + ' bufferR=' + this.bufferRadius);
@@ -759,8 +788,7 @@ export default {
           if (filterResult && filterResult.gml) {
             console.log('[SpacialQueryManager] GML geom type=' + (filterResult.geoJson ? filterResult.geoJson.type : 'unknown'));
             gmlGeom = filterResult.gml;
-          } else if (this.drawnGeometry) {
-            // 如果 filter 结果为空但有几何图形，使用回退（如仅属性查询）
+          } else {
             console.warn('[' + this.componentName + '] 无法构建空间几何，仅使用属性查询');
           }
         }
@@ -1163,14 +1191,24 @@ export default {
       }
     },
 
-    // ==================== 历史记录 ====================
-    _watchCameraForHistory(geometry, drawType) {
+    // ==================== 历史记录 & 相机移动重绘 ====================
+
+    /**
+     * 绘制完成后的处理器：
+     * 1. 首次相机交互时保存到查询历史
+     * 2. 移除交互式绘图 canvas（屏幕坐标已失效）
+     * 3. 注册 camera.moveStart / moveEnd 监听，相机停止后重绘空间查询区域
+     */
+    _setupPostDrawHandlers(geometry, drawType) {
       var self = this;
       var viewer = this.getViewer();
       var Cesium = this.getCesium();
       if (!viewer || !Cesium) return;
 
-      // 保存当前相机状态和图形信息
+      // 先清理旧的监听器，避免重复注册
+      this._cleanupCameraRedrawListeners();
+
+      // 保存当前相机快照（用于历史记录回放）
       var camera = viewer.camera;
       var camState = {
         position: camera.position.clone(),
@@ -1179,15 +1217,17 @@ export default {
         roll: camera.roll
       };
 
-      var handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+      // ---- 一次性：首次相机交互时存入查询历史 ----
+      var startHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
       var saved = false;
 
-      function saveToHistory() {
+      function onFirstInteraction() {
         if (saved) return;
         saved = true;
-        handler.destroy();
+        startHandler.destroy();
+        self._historyCamHandler = null;
 
-        // 从 drawer 获取屏幕坐标用于重绘
+        // 从 drawer 获取经纬度坐标
         var screenPts = null;
         if (self._drawingManager && self._drawingManager._activeDrawer && self._drawingManager._activeDrawer.getLonLats) {
           screenPts = self._drawingManager._activeDrawer.getLonLats();
@@ -1211,23 +1251,218 @@ export default {
         };
         self.queryHistory.unshift(item);
 
-        // 清除当前绘制
+        // 移除交互式绘图 canvas（后续用 display canvas 重绘）
         if (self._drawingManager) self._drawingManager.deactivate();
-        self.drawnGeometry = null;
-        self.clearResults();
       }
 
-      handler.setInputAction(saveToHistory, Cesium.ScreenSpaceEventType.LEFT_DOWN);
-      handler.setInputAction(saveToHistory, Cesium.ScreenSpaceEventType.MIDDLE_DOWN);
-      handler.setInputAction(saveToHistory, Cesium.ScreenSpaceEventType.RIGHT_DOWN);
-      handler.setInputAction(saveToHistory, Cesium.ScreenSpaceEventType.WHEEL);
-      this._historyCamHandler = handler;
+      startHandler.setInputAction(onFirstInteraction, Cesium.ScreenSpaceEventType.LEFT_DOWN);
+      startHandler.setInputAction(onFirstInteraction, Cesium.ScreenSpaceEventType.MIDDLE_DOWN);
+      startHandler.setInputAction(onFirstInteraction, Cesium.ScreenSpaceEventType.RIGHT_DOWN);
+      startHandler.setInputAction(onFirstInteraction, Cesium.ScreenSpaceEventType.WHEEL);
+      this._historyCamHandler = startHandler;
+
+      // ---- 持久：相机移动时移除所有 canvas，移动结束后重新绘制 ----
+      this._cameraMoveStartCb = function () {
+        // 移除重绘画布
+        self._removeRedrawCanvas();
+        // ⭐ 同时移除 DrawingToolManager 的原始绘图 canvas（首次未交互就触发的 camera 移动，如 flyTo）
+        if (self._drawingManager) self._drawingManager.deactivate();
+      };
+      this._cameraMoveEndCb = function () {
+        self._redrawGeometryOnCanvas();
+      };
+      viewer.camera.moveStart.addEventListener(this._cameraMoveStartCb);
+      viewer.camera.moveEnd.addEventListener(this._cameraMoveEndCb);
+    },
+
+    /**
+     * 在相机移动结束后，将空间查询几何图形重新投影到屏幕并绘制在 overlay canvas 上
+     * 该 canvas 是非交互式的（pointer-events: none），仅在视觉上标记空间查询区域
+     *
+     * ⭐ 坐标系统说明：
+     *   - Cesium canvas: width/height = 物理像素 (CSS像素 × DPR)
+     *   - wgs84ToWindowCoordinates: 返回物理像素坐标，原点为 Cesium canvas 左上角
+     *   - overlay canvas 定位在 container 的 top:0;left:0，尺寸 = cesiumCanvas.clientWidth/Height (CSS像素)
+     *   - 转换公式: canvasX = (sc.x - rect.left * dpr) / dpr = sc.x/dpr - rect.left
+     *     但历史代码使用 sc.x - rect.left（混合单位），与 _redrawHistoryGeometry 保持一致
+     */
+    _redrawGeometryOnCanvas() {
+      var viewer = this.getViewer();
+      var Cesium = this.getCesium();
+      if (!viewer || !Cesium || !this.drawnGeometry) return;
+
+      this._removeRedrawCanvas();
+
+      var geom = this.drawnGeometry;
+      var drawType = this._drawType;
+      var container = viewer.container;
+      var cesiumCanvas = viewer.scene.canvas;
+      if (!container || !cesiumCanvas) return;
+
+      var cw = cesiumCanvas.clientWidth || cesiumCanvas.width || 1024;
+      var ch = cesiumCanvas.clientHeight || cesiumCanvas.height || 768;
+
+      var canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      canvas.style.cssText = 'position:absolute;top:0;left:0;width:' + cw + 'px;height:' + ch + 'px;z-index:999;pointer-events:none;';
+      container.appendChild(canvas);
+      this._redrawCanvas = canvas;
+
+      var ctx = canvas.getContext('2d');
+      var cesiumRect = cesiumCanvas.getBoundingClientRect();
+      var self = this;
+
+      // ⭐ 根据经纬度匹配含地形高度的 Cartesian3（避免 terrain parallax 偏差）
+      function findCartesian3(lon, lat) {
+        if (!self._drawCartesians || self._drawCartesians.length === 0) return null;
+        for (var k = 0; k < self._drawCartesians.length; k++) {
+          var cart = self._drawCartesians[k];
+          if (!cart) continue;
+          var cg = Cesium.Cartographic.fromCartesian(cart);
+          var cLon = Cesium.Math.toDegrees(cg.longitude);
+          var cLat = Cesium.Math.toDegrees(cg.latitude);
+          if (Math.abs(cLon - lon) < 0.000001 && Math.abs(cLat - lat) < 0.000001) {
+            return cart;
+          }
+        }
+        return null;
+      }
+
+      // ⭐ 矩形中间角点：用已知角点的平均地形高度估算
+      function getInterpolatedCartesian3(lon, lat) {
+        if (!self._drawCartesians || self._drawCartesians.length < 2) return null;
+        var totalH = 0, count = 0;
+        for (var k = 0; k < self._drawCartesians.length; k++) {
+          var cart = self._drawCartesians[k];
+          if (!cart) continue;
+          var cg = Cesium.Cartographic.fromCartesian(cart);
+          totalH += cg.height;
+          count++;
+        }
+        if (count === 0) return null;
+        return Cesium.Cartesian3.fromDegrees(lon, lat, totalH / count);
+      }
+
+      // 经纬度 → 屏幕坐标，优先使用地形高度 Cartesian3
+      function projectLonLat(lon, lat) {
+        var cart = findCartesian3(lon, lat) || getInterpolatedCartesian3(lon, lat) || Cesium.Cartesian3.fromDegrees(lon, lat, 0);
+        var sc = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, cart);
+        if (!Cesium.defined(sc)) return null;
+        return { x: sc.x - cesiumRect.left, y: sc.y - cesiumRect.top };
+      }
+
+      // 计算缓冲区像素半径
+      function calcPixelRadius(lonLat, radiusM) {
+        if (!radiusM || radiusM <= 0 || !lonLat) return 0;
+        var latRad = lonLat[1] * Math.PI / 180;
+        var dLonDeg = radiusM / (111320 * Math.cos(latRad));
+        var c0 = Cesium.Cartesian3.fromDegrees(lonLat[0], lonLat[1], 0);
+        var c1 = Cesium.Cartesian3.fromDegrees(lonLat[0] + dLonDeg, lonLat[1], 0);
+        var s0 = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, c0);
+        var s1 = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, c1);
+        if (Cesium.defined(s0) && Cesium.defined(s1)) return Math.abs(s1.x - s0.x);
+        return 0;
+      }
+
+      ctx.lineWidth = 2;
+
+      if (geom.type === 'Point') {
+        var pt = projectLonLat(geom.coordinates[0], geom.coordinates[1]);
+        if (!pt) { this._removeRedrawCanvas(); return; }
+
+        var radiusM = geom.radius || ((drawType === 'point') ? this.bufferRadius : 0);
+        if (radiusM > 0) {
+          var pr = calcPixelRadius(geom.coordinates, radiusM);
+          if (pr > 0) {
+            ctx.fillStyle = 'rgba(255, 200, 0, 0.15)';
+            ctx.strokeStyle = 'rgba(255, 200, 0, 0.5)';
+            ctx.beginPath(); ctx.arc(pt.x, pt.y, pr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          }
+        }
+        ctx.fillStyle = 'rgba(255, 200, 0, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 200, 0, 0.9)';
+        ctx.beginPath(); ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+      } else if (geom.type === 'LineString') {
+        var pts = geom.coordinates;
+        if (pts.length < 2) { this._removeRedrawCanvas(); return; }
+
+        if (drawType === 'line' && this.bufferRadius > 0) {
+          var midPt = pts[Math.floor(pts.length / 2)];
+          var lw = calcPixelRadius(midPt, this.bufferRadius) * 2;
+          if (lw > 0) {
+            ctx.strokeStyle = 'rgba(255, 200, 0, 0.3)';
+            ctx.lineWidth = lw;
+            ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+          } else {
+            ctx.strokeStyle = 'rgba(255, 200, 0, 0.7)';
+          }
+        } else {
+          ctx.strokeStyle = 'rgba(255, 200, 0, 0.7)';
+        }
+
+        ctx.beginPath();
+        var firstPt = projectLonLat(pts[0][0], pts[0][1]);
+        if (!firstPt) { this._removeRedrawCanvas(); return; }
+        ctx.moveTo(firstPt.x, firstPt.y);
+        for (var i = 1; i < pts.length; i++) {
+          var np = projectLonLat(pts[i][0], pts[i][1]);
+          if (np) ctx.lineTo(np.x, np.y);
+        }
+        ctx.stroke();
+
+      } else if (geom.type === 'Polygon') {
+        var ring = geom.coordinates[0];
+        if (!ring || ring.length < 3) { this._removeRedrawCanvas(); return; }
+
+        ctx.strokeStyle = 'rgba(255, 200, 0, 0.8)';
+        ctx.fillStyle = 'rgba(255, 200, 0, 0.15)';
+        ctx.beginPath();
+        var f = projectLonLat(ring[0][0], ring[0][1]);
+        if (!f) { this._removeRedrawCanvas(); return; }
+        ctx.moveTo(f.x, f.y);
+        for (var j = 1; j < ring.length; j++) {
+          var np2 = projectLonLat(ring[j][0], ring[j][1]);
+          if (np2) ctx.lineTo(np2.x, np2.y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    },
+
+    /** 移除重绘的 display canvas */
+    _removeRedrawCanvas() {
+      if (this._redrawCanvas && this._redrawCanvas.parentNode) {
+        this._redrawCanvas.parentNode.removeChild(this._redrawCanvas);
+      }
+      this._redrawCanvas = null;
+    },
+
+    /** 清理 camera.moveStart / moveEnd 监听器 */
+    _cleanupCameraRedrawListeners() {
+      var viewer = this.getViewer();
+      if (viewer) {
+        if (this._cameraMoveStartCb) {
+          viewer.camera.moveStart.removeEventListener(this._cameraMoveStartCb);
+          this._cameraMoveStartCb = null;
+        }
+        if (this._cameraMoveEndCb) {
+          viewer.camera.moveEnd.removeEventListener(this._cameraMoveEndCb);
+          this._cameraMoveEndCb = null;
+        }
+      }
     },
 
     replayHistory(item) {
       var viewer = this.getViewer();
       var Cesium = this.getCesium();
       if (!viewer || !Cesium || !item) return;
+
+      // 停止当前绘图的相机重绘监听（避免 flyTo 途中触发 _redrawGeometryOnCanvas 冲突）
+      this._cleanupCameraRedrawListeners();
+      this._removeRedrawCanvas();
 
       // 先清除当前绘制
       if (this._drawingManager) this._drawingManager.deactivate();
@@ -1394,12 +1629,16 @@ export default {
     // ==================== 清理 ====================
     clearAll() {
       this._stopBlink();
+      this._cleanupCameraRedrawListeners();
+      this._removeRedrawCanvas();
       if (this._historyCamHandler) { this._historyCamHandler.destroy(); this._historyCamHandler = null; }
       if (this._maskCamHandler) { this._maskCamHandler.destroy(); this._maskCamHandler = null; }
       if (this._historyCamClear) { this._historyCamClear.destroy(); this._historyCamClear = null; }
       if (this._historyCanvas) { try { this._historyCanvas.parentNode.removeChild(this._historyCanvas); } catch (e) {} this._historyCanvas = null; }
       this.deactivateTool();
       this.drawnGeometry = null;
+      this._drawType = null;
+      this._drawCartesians = null;
       this.clearResults();
       this._clearEntityMask();
       if (this._drawingManager) {

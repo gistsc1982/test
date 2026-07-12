@@ -86,6 +86,7 @@ export default {
       componentName: 'LittleModelManager',
       panelMetadata,
       _modelLayers: new Map(),
+      _modelPrimitives: new Map(), // layerId → [Model, ...] 独立追踪，避免 Vue Proxy 干扰引用
       _wireframeStates: {},
       _activeLayerId: null,
       _editorVisible: false,
@@ -137,7 +138,11 @@ export default {
       const viewer = this.getViewer();
       const Cesium = this.getCesium();
       if (!viewer || !Cesium) return;
-      if (this._modelLayers.has(layer.id)) return;
+
+      // ⭐ 如果该图层已加载，先彻底清理旧模型，再加载新的（避免残留）
+      if (this._modelLayers.has(layer.id)) {
+        this.removeLayer(layer);
+      }
 
       try {
         this.updateItemState(layer.id, { loading: true });
@@ -163,6 +168,7 @@ export default {
         const heightOffset = Number(layer.heightOffset || 0);
 
         const entities = [];
+        const primitives = []; // ⭐ 独立追踪，避免 Vue Proxy 影响引用
         geoJsonData.features.forEach((feature, idx) => {
           const c = feature.geometry.coordinates;
           const worldPos = Cesium.Cartesian3.fromDegrees(c[0], c[1], (c[2] || 0) + heightOffset);
@@ -184,6 +190,9 @@ export default {
             });
             viewer.scene.primitives.add(modelPrimitive);
             entity._modelPrimitive = modelPrimitive;
+            primitives.push(modelPrimitive);
+            // ⭐ 在 Model 上标记所属图层 ID，用于清理时精确匹配
+            modelPrimitive._lmlLayerId = layer.id;
 
             var checkReady = function () {
               if (modelPrimitive && modelPrimitive.ready) viewer.scene.requestRender();
@@ -197,6 +206,7 @@ export default {
         });
 
         this._modelLayers.set(layer.id, { entities, modelUrl: fullUrl });
+        this._modelPrimitives.set(layer.id, primitives); // ⭐ 独立追踪
         this._activeLayerId = layer.id;
         this._wireframeStates = { ...this._wireframeStates, [layer.id]: false };
         this.updateItemState(layer.id, { loading: false, loaded: true });
@@ -213,10 +223,22 @@ export default {
       const viewer = this.getViewer();
       const layerData = this._modelLayers.get(layer.id);
       if (layerData && viewer) {
-        layerData.entities.forEach(e => {
-          if (e._modelPrimitive && !e._modelPrimitive.isDestroyed) {
-            try { viewer.scene.primitives.remove(e._modelPrimitive); } catch (ex) {}
+        // ⭐ 遍历 scene.primitives，按 _lmlLayerId 标记精确匹配并销毁
+        var plen = viewer.scene.primitives.length;
+        for (var pi = plen - 1; pi >= 0; pi--) {
+          var p = viewer.scene.primitives.get(pi);
+          if (p && p._lmlLayerId === layer.id) {
+            try { viewer.scene.primitives.remove(p); } catch (ex) {}
+            try { p.destroy(); } catch (ex) {}
           }
+        }
+
+        // 清理独立追踪 Map
+        this._modelPrimitives.delete(layer.id);
+
+        // 移除 Entity
+        layerData.entities.forEach(e => {
+          if (e._modelPrimitive) { e._modelPrimitive = null; }
           if (!e.isDestroyed) viewer.entities.remove(e);
         });
         this._modelLayers.delete(layer.id);
@@ -360,11 +382,19 @@ export default {
         cfgItem.modelScale = result.scale;
         if (result.labelField !== undefined) cfgItem.labelField = result.labelField;
         if (this.$refs.basePanel) this.$refs.basePanel.configList = [].concat(this.configList);
+        // ⭐ 持久化保存缩放比例（及点位变更）到 SQLite / IndexedDB
+        if (this.$refs.basePanel && typeof this.$refs.basePanel.saveConfig === 'function') {
+          this.$refs.basePanel.saveConfig().catch(function(err) {
+            console.error('[LittleModelManager] 保存配置失败:', err);
+          });
+        }
       }
+
       if (layerData) {
         this.removeLayer({ id: layerId, name: result.layerName });
         if (cfgItem) this.loadLayer(cfgItem);
       }
+
       this._editorVisible = false;
     },
 
