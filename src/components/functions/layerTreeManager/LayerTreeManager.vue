@@ -1270,13 +1270,18 @@ export default {
       flatNodeList: [
         { "id": "root-ogc",      "name": "OGC标准服务",       "parentId": null,     "nodeType": "folder", "sortOrder": 1, "visible": 1, "description": "OGC标准协议图层（WMS/WFS/WMTS）", "icon": "📁" },
         { "id": "folder-wms",    "name": "WMS 地图服务",      "parentId": "root-ogc","nodeType": "folder", "sortOrder": 1, "visible": 1, "description": "Web Map Service", "icon": "🗺️" },
-        { "id": "wms-nasa",      "name": "NASA GIBS 全球影像(WMS)", "parentId": "folder-wms","nodeType": "layer","url":"https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi","sortOrder":1,"visible":1,"description":"NASA官方WMS服务，无需API Key","icon":"🛰️","centerLon":0,"centerLat":20,"centerHeight":15000000},
-        { "id": "wms-usgs",      "name": "USGS 国家地形图(WMS)", "parentId": "folder-wms","nodeType": "layer","url":"https://basemap.nationalmap.gov/arcgis/services/USGSTopo/MapServer/WMSServer","sortOrder":2,"visible":1,"description":"USGS官方WMS","icon":"🗺️","centerLon":-98.5,"centerLat":39.8,"centerHeight":5000000},
+        { "id": "wms-nasa",      "name": "NASA GIBS 全球影像(WMS)", "parentId": "folder-wms","nodeType": "layer","url":"https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi","sortOrder":1,"visible":1,"description":"NASA官方WMS服务，无需API Key","icon":"🛰️","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
+        { "id": "wms-usgs",      "name": "USGS 国家地形图(WMS)", "parentId": "folder-wms","nodeType": "layer","url":"https://basemap.nationalmap.gov/arcgis/services/USGSTopo/MapServer/WMSServer","sortOrder":2,"visible":1,"description":"USGS官方WMS","icon":"🗺️","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
         { "id": "folder-wfs",    "name": "WFS 要素服务",      "parentId": "root-ogc","nodeType": "folder", "sortOrder": 2, "visible": 1, "description": "OGC WFS 矢量要素服务（GetFeature + GeoJSON输出）", "icon": "📊" },
         { "id": "wfs-geoserver","name":"GeoServer 示例要素(WFS 2.0)","parentId":"folder-wfs","nodeType":"layer","url":"https://demo.geo-solutions.it/geoserver/wfs?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0&TYPENAMES=topp%3Astates&OUTPUTFORMAT=application%2Fjson&MAXFEATURES=500","sortOrder":1,"visible":1,"description":"GeoServer官方Demo WFS 2.0，返回美国各州边界GeoJSON。意大利托管，中国大陆可访问","icon":"🌍","centerLon":-98,"centerLat":39,"centerHeight":5000000},
         { "id": "wfs-emsc-quake","name":"EMSC 全球地震事件(WFS)","parentId":"folder-wfs","nodeType":"layer","url":"https://www.seismicportal.eu/wfs?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0&TYPENAMES=event&OUTPUTFORMAT=application%2Fjson&MAXFEATURES=500","sortOrder":2,"visible":1,"description":"EMSC欧洲地中海地震中心，全球实时地震数据WFS。法国托管，中国大陆可访问","icon":"🌋","centerLon":15,"centerLat":42,"centerHeight":15000000},
         { "id": "wfs-ingv-quake","name":"INGV 意大利地震(WFS)","parentId":"folder-wfs","nodeType":"layer","url":"https://emidius.mi.ingv.it/geoserver/wfs?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0&TYPENAMES=event&OUTPUTFORMAT=application%2Fjson&MAXFEATURES=500","sortOrder":3,"visible":1,"description":"INGV意大利国家地球物理研究所，地中海区域地震数据WFS。意大利托管，中国大陆可访问","icon":"🇮🇹","centerLon":12.5,"centerLat":42,"centerHeight":5000000},
-        { "id": "root-xyz",      "name": "XYZ/TMS 瓦片底图",  "parentId": null,     "nodeType": "folder", "sortOrder": 2, "visible": 1, "description": "互联网标准瓦片底图服务", "icon": "📁" },
+        { "id": "geojson-usgs-quake","name":"USGS 近30日全球M2.5+地震(GeoJSON)","parentId":"folder-geojson","nodeType":"layer","url":"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_month.geojson","sortOrder":4,"visible":1,"description":"USGS 美国地质调查局，近30天全球震级≥2.5地震事件 GeoJSON。包含 mag(震级)/place(地点)/time(时间)/depth(深度) 等字段。","icon":"🌍","centerLon":116.4,"centerLat":39.9,"centerHeight":15000000,"geoJsonStyle":{"markerColor":"#FF4400","markerSize":24,"fillOpacity":0.5},"pinField":"mag","pinFontSize":16,"pinTextColor":"#FFFFFF","pinPixelOffsetY":-200},
+	        { "id": "geojson-datav-china","name":"DataV 中国省级行政区划(GeoJSON)","parentId":"folder-geojson","nodeType":"layer","url":"https://geo.datav.aliyun.com/areas_v3/bound/geojson?code=100000_full","sortOrder":5,"visible":1,"description":"阿里云 DataV GeoAtlas 中国全图省级行政区划边界。阿里云CDN，国内访问极快。","icon":"🇨🇳","centerLon":104,"centerLat":35,"centerHeight":5000000,"geoJsonStyle":{"stroke":"#3388FF","strokeWidth":2,"fill":"#3388FF","fillOpacity":0.15,"outlineColor":"#2266CC","outlineWidth":2,"markerColor":"#3388FF","markerSize":12}},
+	        { "id": "geojson-datav-beijing","name":"DataV 北京市行政区划(GeoJSON)","parentId":"folder-geojson","nodeType":"layer","url":"https://geo.datav.aliyun.com/areas_v3/bound/geojson?code=110000_full","sortOrder":6,"visible":1,"description":"阿里云 DataV 北京市区县级行政区划边界。阿里云CDN，国内访问极快。","icon":"🏙️","centerLon":116.4,"centerLat":39.9,"centerHeight":80000,"geoJsonStyle":{"stroke":"#FF6644","strokeWidth":2,"fill":"#FF6644","fillOpacity":0.12,"outlineColor":"#CC4422","outlineWidth":2,"markerColor":"#FF6644","markerSize":10}},
+	        { "id": "geojson-ne-cities","name":"Natural Earth 全球主要城市点位(GeoJSON)","parentId":"folder-geojson","nodeType":"layer","url":"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_populated_places_simple.geojson","sortOrder":7,"visible":1,"description":"Natural Earth 全球约1200个主要城市点位。CloudFront CDN。字段: name(城市)/adm0name(国家)/pop_max(人口)。","icon":"🏙️","centerLon":104,"centerLat":35,"centerHeight":30000000,"geoJsonStyle":{"markerColor":"#3388FF","markerSize":18,"strokeWidth":1,"fillOpacity":0.6},"pinField":"name","pinFontSize":14,"pinTextColor":"#FFFFFF","pinPixelOffsetY":-16},
+	        { "id": "geojson-ne-airports","name":"Natural Earth 全球机场点位(GeoJSON)","parentId":"folder-geojson","nodeType":"layer","url":"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson","sortOrder":8,"visible":1,"description":"Natural Earth 全球主要机场点位。CloudFront CDN。字段: name(机场)/iata_code(IATA)/type(类型)。","icon":"✈️","centerLon":106,"centerLat":32,"centerHeight":20000000,"geoJsonStyle":{"markerColor":"#FF4400","markerSize":14,"strokeWidth":1,"fillOpacity":0.5},"pinField":"name","pinFontSize":13,"pinTextColor":"#FFFFFF","pinPixelOffsetY":-14},
+	        { "id": "root-xyz",      "name": "XYZ/TMS 瓦片底图",  "parentId": null,     "nodeType": "folder", "sortOrder": 2, "visible": 1, "description": "互联网标准瓦片底图服务", "icon": "📁" },
         { "id": "xyz-osm",       "name": "OpenStreetMap 标准底图","parentId":"root-xyz","nodeType":"layer","url":"https://tile.openstreetmap.org/{z}/{x}/{y}.png","sortOrder":1,"visible":1,"description":"OSM全球众源地图","icon":"🗺️","centerLon":116.4,"centerLat":39.9,"centerHeight":50000},
         { "id": "xyz-esri-img",  "name": "ESRI 全球卫星影像",   "parentId":"root-xyz","nodeType":"layer","url":"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}","sortOrder":2,"visible":1,"description":"ESRI卫星影像底图","icon":"🛰️","centerLon":116.4,"centerLat":39.9,"centerHeight":8000},
         { "id": "root-mvt",      "name": "矢量瓦片(MVT)",      "parentId": null,     "nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "Mapbox Vector Tile矢量瓦片", "icon": "📁" },
@@ -1290,9 +1295,10 @@ export default {
         { "id": "root-geocode",  "name": "地理编码服务",      "parentId": null,     "nodeType": "folder", "sortOrder": 4, "visible": 1, "description": "正向/反向地理编码，名称↔坐标互查", "icon": "📁" },
         { "id": "geocode-tianditu","name":"天地图 地址→坐标(地理编码)","parentId":"root-geocode","nodeType":"layer","url":"https://api.tianditu.gov.cn/search","sortOrder":1,"visible":1,"description":"天地图POI搜索/地理编码API。需替换URL中的tk参数为你的天地图Key。查询结果自动构建为GeoJSON点图层。","icon":"🔍","centerLon":116.4,"centerLat":39.9,"centerHeight":50000,"geocodingAddress":"北京市天安门","geocodingKey":"你的天地图Key"},
         { "id": "folder-wcs",     "name": "WCS 栅格服务",      "parentId": "root-ogc","nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "OGC WCS 栅格覆盖服务（GetCoverage）", "icon": "📁" },
-        { "id": "wcs-rasdaman-dem","name":"rasdaman 巴伐利亚 DSM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Bavaria_50_DSM。德国巴伐利亚州50m分辨率数字地表模型（海拔色带渲染）。","icon":"🏔️","centerLon":11.5,"centerLat":48.5,"centerHeight":80000,"wcsCoverageName":"Bavaria_50_DSM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
+        { "id": "wcs-rasdaman-chloro","name":"rasdaman 全球叶绿素浓度(WCS 2D)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=AverageChloroColorScaled，全球海洋叶绿素浓度预着色图，PNG格式数据量小。","icon":"🌊","centerLon":116.4,"centerLat":39.9,"centerHeight":15000000,"wcsCoverageName":"AverageChloroColorScaled","wcsFormat":"image/png","wcsVersion":"2.0.1","wcsAlpha":0.6,"wcsRenderMode":"2d"},
         { "id": "wcs-rasdaman-s2","name":"rasdaman 德国 DTM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":2,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Germany_DTM。德国全境数字地形模型（色带渲染）。","icon":"🇩🇪","centerLon":10,"centerLat":51,"centerHeight":500000,"wcsCoverageName":"Germany_DTM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
 	        { "id": "wcs-rasdaman-avgtemp","name":"rasdaman 全球地表温度(WCS 3D-Timeline)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":3,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=AvgLandTemp，185个时间切片(2000-2015)，支持Timeline时间轴动画。","icon":"🌡️","centerLon":0,"centerLat":20,"centerHeight":15000000,"wcsCoverageName":"AvgLandTemp","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsAlpha":0.4,"wcsTimeAxis":"ansi","wcsTimeSlice":"2000-02-01T00:00:00Z","wcsColorRamp":true,"wcsRenderMode":"3d","wcsElevationScale":50.0},
+	        { "id": "wcs-rasdaman-nir","name":"rasdaman 全球近红外(WCS 3D)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":4,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=NIR，全球近红外反射率数据，单波段数值可做3D起伏。无时间轴，单张全球图。","icon":"🛰️","centerLon":116.4,"centerLat":39.9,"centerHeight":15000000,"wcsCoverageName":"NIR","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsAlpha":0.5,"wcsColorRamp":true,"wcsRenderMode":"3d","wcsElevationScale":30.0},
 	        { "id": "folder-local-dem","name": "本地 DEM 高程数据","parentId": null,"nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "本地 GeoTIFF 格式数字高程模型，无需网络请求，直接从本地文件加载 3D 渲染", "icon": "📁" },
 	        { "id": "local-dem-srtm30","name": "SRTM 30M DEM（下载后放入文件）","parentId": "folder-local-dem","nodeType": "layer","url": "/data/dem/srtm_30m.tif","sortOrder":1,"visible":1,"description": "SRTM 30m 分辨率全球 DEM。从地理空间数据云 (gscloud.cn) 下载 → 解压 → 将 .tif 重命名为 srtm_30m.tif 放入 public/data/dem/","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 	        { "id": "local-dem-aster30","name":"ASTER GDEM 30M（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/aster_gdem_30m.tif","sortOrder":2,"visible":1,"description":"ASTER GDEM v3 30m 全球 DEM，覆盖 83°N-83°S。下载：www.gscloud.cn → DEM 数字高程数据 → ASTER GDEM 30M，或 earthexplorer.usgs.gov","icon":"⛰️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
@@ -1528,8 +1534,10 @@ export default {
     _mergeBuiltinNodes() {
       // 必须是已存在的节点才不注入（以 id 为唯一键）
       var existingIds = {};
+      var existingIndex = {};
       for (var i = 0; i < this.flatNodeList.length; i++) {
         existingIds[this.flatNodeList[i].id] = true;
+        existingIndex[this.flatNodeList[i].id] = i;
       }
 
       // 内置根文件夹 + 子节点的默认定义（与 data() 中 flatNodeList 保持同步）
@@ -1537,18 +1545,53 @@ export default {
         { "id": "root-geocode", "name": "地理编码服务", "parentId": null, "nodeType": "folder", "sortOrder": 4, "visible": 1, "description": "正向/反向地理编码，名称↔坐标互查", "icon": "📁" },
         { "id": "geocode-tianditu","name":"天地图 地址→坐标(地理编码)","parentId":"root-geocode","nodeType":"layer","url":"https://api.tianditu.gov.cn/search","sortOrder":1,"visible":1,"description":"天地图POI搜索/地理编码API。需替换URL中的tk参数为你的天地图Key。查询结果自动构建为GeoJSON点图层。","icon":"🔍","centerLon":116.4,"centerLat":39.9,"centerHeight":50000,"geocodingAddress":"北京市天安门","geocodingKey":"你的天地图Key"},
         { "id": "folder-wcs", "name": "WCS 栅格服务", "parentId": "root-ogc", "nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "OGC WCS 栅格覆盖服务（GetCoverage）", "icon": "📁" },
-        { "id": "wcs-rasdaman-dem","name":"rasdaman 巴伐利亚 DSM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Bavaria_50_DSM。德国巴伐利亚州50m分辨率数字地表模型（海拔色带渲染）。","icon":"🏔️","centerLon":11.5,"centerLat":48.5,"centerHeight":80000,"wcsCoverageName":"Bavaria_50_DSM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
+        { "id": "wcs-rasdaman-chloro","name":"rasdaman 全球叶绿素浓度(WCS 2D)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":1,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=AverageChloroColorScaled，全球海洋叶绿素浓度预着色图，PNG格式数据量小。","icon":"🌊","centerLon":116.4,"centerLat":39.9,"centerHeight":15000000,"wcsCoverageName":"AverageChloroColorScaled","wcsFormat":"image/png","wcsVersion":"2.0.1","wcsAlpha":0.6,"wcsRenderMode":"2d"},
         { "id": "wcs-rasdaman-s2","name":"rasdaman 德国 DTM (WCS 2.0)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":2,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务，Coverage=Germany_DTM。德国全境数字地形模型（色带渲染）。","icon":"🇩🇪","centerLon":10,"centerLat":51,"centerHeight":500000,"wcsCoverageName":"Germany_DTM","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsRenderMode":"2d"},
 	        { "id": "wcs-rasdaman-avgtemp","name":"rasdaman 全球地表温度(WCS 3D-Timeline)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":3,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=AvgLandTemp，185个时间切片(2000-2015)，支持Timeline时间轴动画。","icon":"🌡️","centerLon":0,"centerLat":20,"centerHeight":15000000,"wcsCoverageName":"AvgLandTemp","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsAlpha":0.4,"wcsTimeAxis":"ansi","wcsTimeSlice":"2000-02-01T00:00:00Z","wcsColorRamp":true,"wcsRenderMode":"3d","wcsElevationScale":50.0},
+	        { "id": "wcs-rasdaman-nir","name":"rasdaman 全球近红外(WCS 3D)","parentId":"folder-wcs","nodeType":"layer","url":"https://ows.rasdaman.org/rasdaman/ows","sortOrder":4,"visible":1,"description":"rasdaman 公共 WCS 2.0.1 服务。Coverage=NIR，全球近红外反射率数据，单波段数值可做3D起伏。无时间轴，单张全球图。","icon":"🛰️","centerLon":116.4,"centerLat":39.9,"centerHeight":15000000,"wcsCoverageName":"NIR","wcsFormat":"image/tiff","wcsVersion":"2.0.1","wcsAlpha":0.5,"wcsColorRamp":true,"wcsRenderMode":"3d","wcsElevationScale":30.0},
 	        { "id": "folder-local-dem","name": "本地 DEM 高程数据","parentId": null,"nodeType": "folder", "sortOrder": 3, "visible": 1, "description": "本地 GeoTIFF 格式数字高程模型，无需网络请求，直接从本地文件加载 3D 渲染", "icon": "📁" },
 	        { "id": "local-dem-srtm30","name": "SRTM 30M DEM（下载后放入文件）","parentId": "folder-local-dem","nodeType": "layer","url": "/data/dem/srtm_30m.tif","sortOrder":1,"visible":1,"description": "SRTM 30m 分辨率全球 DEM。从地理空间数据云 (gscloud.cn) 下载 → 解压 → 将 .tif 重命名为 srtm_30m.tif 放入 public/data/dem/","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 	        { "id": "local-dem-aster30","name":"ASTER GDEM 30M（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/aster_gdem_30m.tif","sortOrder":2,"visible":1,"description":"ASTER GDEM v3 30m 全球 DEM，覆盖 83°N-83°S。下载：www.gscloud.cn → DEM 数字高程数据 → ASTER GDEM 30M，或 earthexplorer.usgs.gov","icon":"⛰️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 	        { "id": "local-dem-aw3d30","name":"ALOS AW3D30 DEM（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/alos_aw3d30.tif","sortOrder":3,"visible":1,"description":"JAXA ALOS AW3D30 全球 30m DEM，精度~5m。下载：www.eorc.jaxa.jp/ALOS → AW3D30 → 注册后下载","icon":"🗻","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 	        { "id": "local-dem-cop30","name":"本地cop30高程（Copernicus GLO-30 DEM原始geotiff数据）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":4,"visible":1,"description":"ESA Copernicus GLO-30 全球 30m DEM，精度~4m。下载：dataspace.copernicus.eu 或 portal.opentopography.org","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 		        { "id": "local-terrain-cop30","name":"本地cop30高程（动态Geotiff转Cesium Terrain）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":5,"visible":1,"description":"将 Copernicus GLO-30 转为 Cesium Terrain，影像图层可贴合地形起伏。使用自定义 GeoTiffTerrainProvider 从 GeoTIFF 直接提供高程数据","icon":"⛰️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"terrain","demElevationScale":1.0},
-        { "id": "local-terrain-cop30-tiles","name":"本地DEM高程数据(Cesium Terrain)","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/terrain/copernicus_glo30","sortOrder":6,"visible":1,"description":"Copernicus GLO-30 预生成 Cesium Terrain 瓦片，通过 layer.json 加载，影像图层可贴合地形起伏","icon":"⛰️","centerLon":103.5,"centerLat":30.5,"centerHeight":100000}
+        { "id": "local-terrain-cop30-tiles","name":"本地DEM高程数据(Cesium Terrain)","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/terrain/copernicus_glo30","sortOrder":6,"visible":1,"description":"Copernicus GLO-30 预生成 Cesium Terrain 瓦片，通过 layer.json 加载，影像图层可贴合地形起伏","icon":"⛰️","centerLon":103.5,"centerLat":30.5,"centerHeight":100000},
+        // ⭐ WMS 内置层定位在天安门附近，便于对比
+        { "id": "wms-nasa", "name": "NASA GIBS 全球影像(WMS)", "parentId": "folder-wms", "nodeType": "layer", "url": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi", "sortOrder": 1, "visible": 1, "description": "NASA官方WMS服务，无需API Key", "icon": "🛰️", "centerLon": 116.4, "centerLat": 39.9, "centerHeight": 50000 },
+        { "id": "wms-usgs", "name": "USGS 国家地形图(WMS)", "parentId": "folder-wms", "nodeType": "layer", "url": "https://basemap.nationalmap.gov/arcgis/services/USGSTopo/MapServer/WMSServer", "sortOrder": 2, "visible": 1, "description": "USGS官方WMS", "icon": "🗺️", "centerLon": 116.4, "centerLat": 39.9, "centerHeight": 50000 },
+        // ⭐ USGS 地震 GeoJSON（外部 URL + pinField）
+        { "id": "geojson-usgs-quake","name":"USGS 近30日全球M2.5+地震(GeoJSON)","parentId":"folder-geojson","nodeType":"layer","url":"https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_month.geojson","sortOrder":2,"visible":1,"description":"USGS 近30天全球震级≥2.5地震 GeoJSON。字段: mag/place/time/depth。","icon":"🌍","centerLon":116.4,"centerLat":39.9,"centerHeight":15000000,"geoJsonStyle":{"markerColor":"#FF4400","markerSize":24},"pinField":"mag","pinFontSize":16,"pinTextColor":"#FFFFFF","pinPixelOffsetY":-200},
+        { "id": "geojson-datav-china","name":"DataV 中国省级行政区划(GeoJSON)","parentId":"folder-geojson","nodeType":"layer","url":"https://geo.datav.aliyun.com/areas_v3/bound/geojson?code=100000_full","sortOrder":3,"visible":1,"description":"阿里云 DataV 中国全图省级行政区划边界。阿里云CDN，国内访问极快。","icon":"🇨🇳","centerLon":104,"centerLat":35,"centerHeight":5000000,"geoJsonStyle":{"stroke":"#3388FF","strokeWidth":2,"fill":"#3388FF","fillOpacity":0.15,"outlineColor":"#2266CC","outlineWidth":2,"markerColor":"#3388FF","markerSize":12}},
+        { "id": "geojson-datav-beijing","name":"DataV 北京市行政区划(GeoJSON)","parentId":"folder-geojson","nodeType":"layer","url":"https://geo.datav.aliyun.com/areas_v3/bound/geojson?code=110000_full","sortOrder":4,"visible":1,"description":"阿里云 DataV 北京市区县级行政区划边界。阿里云CDN，国内访问极快。","icon":"🏙️","centerLon":116.4,"centerLat":39.9,"centerHeight":80000,"geoJsonStyle":{"stroke":"#FF6644","strokeWidth":2,"fill":"#FF6644","fillOpacity":0.12,"outlineColor":"#CC4422","outlineWidth":2,"markerColor":"#FF6644","markerSize":10}},
+	        { "id": "geojson-ne-cities","name":"Natural Earth 全球主要城市点位(GeoJSON)","parentId":"folder-geojson","nodeType":"layer","url":"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_50m_populated_places_simple.geojson","sortOrder":5,"visible":1,"description":"Natural Earth 全球约1200个主要城市点位。CloudFront CDN。字段: name(城市)/adm0name(国家)/pop_max(人口)。","icon":"🏙️","centerLon":104,"centerLat":35,"centerHeight":30000000,"geoJsonStyle":{"markerColor":"#3388FF","markerSize":18,"strokeWidth":1,"fillOpacity":0.6},"pinField":"name","pinFontSize":14,"pinTextColor":"#FFFFFF","pinPixelOffsetY":-16},
+	        { "id": "geojson-ne-airports","name":"Natural Earth 全球机场点位(GeoJSON)","parentId":"folder-geojson","nodeType":"layer","url":"https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson","sortOrder":6,"visible":1,"description":"Natural Earth 全球主要机场点位。CloudFront CDN。字段: name(机场)/iata_code(IATA)/type(类型)。","icon":"✈️","centerLon":106,"centerLat":32,"centerHeight":20000000,"geoJsonStyle":{"markerColor":"#FF4400","markerSize":14,"strokeWidth":1,"fillOpacity":0.5},"pinField":"name","pinFontSize":13,"pinTextColor":"#FFFFFF","pinPixelOffsetY":-14}
       ];
 
+      // ⭐ ID 迁移：将旧 ID 重命名为新 ID（一次性，迁移后旧 ID 不再存在）
+      var ID_MIGRATIONS = {
+        'geojson-usgs-earthquake-month': 'geojson-usgs-quake'
+      };
+      var migrated = [];
+      for (var oldId in ID_MIGRATIONS) {
+        if (ID_MIGRATIONS.hasOwnProperty(oldId)) {
+          var newId = ID_MIGRATIONS[oldId];
+          if (existingIds[oldId] && !existingIds[newId]) {
+            var oldIdx = existingIndex[oldId];
+            var oldNode = this.flatNodeList[oldIdx];
+            oldNode.id = newId;
+            delete existingIds[oldId];
+            existingIds[newId] = true;
+            existingIndex[newId] = oldIdx;
+            delete existingIndex[oldId];
+            migrated.push(oldId + '→' + newId);
+          }
+        }
+      }
+      if (migrated.length > 0) {
+        console.log('[LayerTreeManager] 🔄 ID 迁移: ' + migrated.join(', '));
+      }
+
+      // ⭐ 只新增不存在的内置节点，已有节点以数据库为准（不覆盖用户修改）
       var added = [];
       for (var b = 0; b < builtinNodes.length; b++) {
         var node = builtinNodes[b];
@@ -1559,13 +1602,13 @@ export default {
         }
       }
 
-      if (added.length > 0) {
+      if (added.length > 0 || migrated.length > 0) {
         // 触发响应式更新
         this.flatNodeList = [...this.flatNodeList];
-        console.log('[LayerTreeManager] 📥 已注入 ' + added.length + ' 个新增内置节点:', added.join(', '));
+        if (added.length > 0) console.log('[LayerTreeManager] 📥 已注入 ' + added.length + ' 个新增内置节点:', added.join(', '));
         // 持久化到数据库
         this.saveConfig().then(function () {
-          console.log('[LayerTreeManager] 💾 新增内置节点已持久化');
+          console.log('[LayerTreeManager] 💾 内置节点已持久化');
         }).catch(function () {});
       }
     },
@@ -2980,6 +3023,8 @@ export default {
       if (url.includes('.pbf') || url.includes('.mvt') || ancestorNames.includes('mvt')) return 'mvt';
       if (url.includes('wmts') || url.includes('wmtscapabilities') || ancestorNames.includes('wmts')) return 'wmts';
       if (url.includes('wms') && url.includes('service=wms')) return 'wms';
+      // 路径型 WMS（NASA GIBS 等 /wms/... 路径）和 MapServer WMSServer
+      if (url.includes('/wms/') || url.includes('wmsserver')) return 'wms';
       // WFS 检测：适配多种 WFS URL 模式
       // 1. 标准 OGC WFS: ?service=wfs
       // 2. ArcGIS REST WFS: /WFSServer
@@ -3007,6 +3052,7 @@ export default {
         url.includes('request=') ||
         url.includes('getcapabilities') ||
         url.includes('wmsserver') ||
+        url.includes('/wms/') ||
         url.includes('wfs') ||
         url.includes('wmts')
       );
@@ -3522,15 +3568,14 @@ export default {
               }
             }
 
-            // 构建地理范围（参考 forestry-cesium-vue 的 rectangle 参数）
+            // ⭐ rectangle 不应从相机参数推导（camera 位置只是视角，不是数据范围）
+            // 全局 WMS 服务不设 rectangle，Cesium 自动全球请求瓦片
+            // 仅当用户显式配置 node.tilingExtent (west,south,east,north) 时才限制范围
             let rectangle;
-            if (node.centerLon != null && node.centerLat != null && node.centerHeight) {
-              const halfDeg = (node.centerHeight / 111000) * 0.5;
+            if (node.tilingExtent && Array.isArray(node.tilingExtent) && node.tilingExtent.length === 4) {
               rectangle = Cesium.Rectangle.fromDegrees(
-                node.centerLon - halfDeg,
-                node.centerLat - halfDeg,
-                node.centerLon + halfDeg,
-                node.centerLat + halfDeg
+                node.tilingExtent[0], node.tilingExtent[1],
+                node.tilingExtent[2], node.tilingExtent[3]
               );
             }
 
@@ -3852,6 +3897,36 @@ export default {
             console.log(`[${this.componentName}] 🎨 后处理样式完成: ${ents.length} 个实体`);
             _timings['后处理样式'] = (performance.now() - _tCesiumLoad - parseFloat(_timings['Cesium实体创建'])).toFixed(0) + 'ms';
 
+            // ⭐ pinField 图层：将 Point→Billboard 转换（Point 无深度缓冲，标签穿透地球）
+            const layerCfg = dynamicLayerConfig || (node.pinField ? { pinField: node.pinField, pinFontSize: node.pinFontSize, pinTextColor: node.pinTextColor, pinPixelOffsetY: node.pinPixelOffsetY } : {});
+            if (layerCfg.pinField) {
+              var dotSize = (s.markerSize || 24);
+              var dotColor = markerC;
+              var sharedDotCanvas = document.createElement('canvas');
+              sharedDotCanvas.width = 64; sharedDotCanvas.height = 64;
+              var dctx = sharedDotCanvas.getContext('2d');
+              // 径向渐变圆点（模拟 PinBuilder fromColor 效果）
+              var gradient = dctx.createRadialGradient(32, 32, 4, 32, 32, 28);
+              gradient.addColorStop(0, 'white');
+              gradient.addColorStop(0.3, dotColor.toCssColorString());
+              gradient.addColorStop(1, dotColor.withAlpha(0.3).toCssColorString());
+              dctx.fillStyle = gradient;
+              dctx.beginPath(); dctx.arc(32, 32, 28, 0, Math.PI * 2); dctx.fill();
+              for (var pi2 = 0; pi2 < ents.length; pi2++) {
+                var ent2 = ents[pi2];
+                if (ent2.point && !ent2.billboard) {
+                  ent2.point.show = new Cesium.ConstantProperty(false);
+                  ent2.billboard = new Cesium.BillboardGraphics({
+                    image: sharedDotCanvas,
+                    scale: dotSize / 64,
+                    horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                    verticalOrigin: Cesium.VerticalOrigin.CENTER,
+                    disableDepthTestDistance: Number.POSITIVE_INFINITY  // 小圆点始终可见，穿透无感知
+                  });
+                }
+              }
+            }
+
             // ⭐ emoji/SVG 图标后处理（与 GeoJsonLayerManager 逻辑一致）
             //   单 ASCII 已通过 markerSymbol 传递给 Cesium，emoji 需要 canvas 绘制到 billboard
             if (markerIcon && markerIcon.length > 1) {
@@ -3887,34 +3962,72 @@ export default {
             dataSource.name = node.name;
 
             // ⭐ pinField：在气泡上叠加 Cesium Label 显示字段值
-            const layerCfg = dynamicLayerConfig || {};
             const _tPinField = performance.now();
             if (layerCfg.pinField && ents.length > 0) {
               const pinField = layerCfg.pinField;
               const pinFontSize = layerCfg.pinFontSize || 18;
               const pinTextColor = layerCfg.pinTextColor || '#FFFFFF';
+              console.log('[' + this.componentName + '] 📌 pinField="' + pinField + '" 开始处理 ' + ents.length + ' 个实体');
 
               // 预创建一个测量 canvas（所有实体复用）
               const measureCanvas = document.createElement('canvas');
               const measureCtx = measureCanvas.getContext('2d');
+              var labelCount = 0;
+              var noPropCount = 0;
+              var noValueCount = 0;
 
               for (let pi = 0; pi < ents.length; pi++) {
                 try {
                   const ent = ents[pi];
-                  const props = ent.properties ? (ent.properties.getValue ? ent.properties.getValue() : ent.properties) : null;
-                  const pinText = props ? String(props[pinField] || '') : '';
-                  if (!pinText) continue;
+                  // ⭐ PropertyBag.getValue() 需要 time 参数；fallback 到直接读取
+                  var props;
+                  if (ent.properties) {
+                    if (typeof ent.properties.getValue === 'function') {
+                      try { props = ent.properties.getValue(viewer.clock.currentTime); } catch (e1) { props = ent.properties; }
+                    } else {
+                      props = ent.properties;
+                    }
+                  }
+                  if (!props) { noPropCount++; continue; }
 
-                  // canvas 实测文字宽度，精确计算气泡所需大小
-                  if (ent.billboard && ent.billboard.image) {
-                    const bImg = ent.billboard.image;
-                    const bw = bImg.width || 64;
+                  const pinText = String(props[pinField] != null ? props[pinField] : '');
+                  if (!pinText) { noValueCount++; continue; }
+
+                  // 按文字宽度动态绘制圆角矩形气泡（替换固定圆形）
+                  if (ent.billboard) {
                     measureCtx.font = 'bold ' + pinFontSize + 'px sans-serif';
                     const actualTextW = measureCtx.measureText(pinText).width;
-                    const minBubbleW = actualTextW + pinFontSize; // 文字宽 + 1 字间距
-                    if (minBubbleW > bw) {
-                      ent.billboard.scale = Math.min(minBubbleW / bw, 5.0);
-                    }
+                    const padX = pinFontSize * 0.7;
+                    const padY = pinFontSize * 0.35;
+                    const bubbleW = Math.ceil(Math.max(actualTextW + padX * 2, dotSize * 1.5));
+                    const bubbleH = Math.ceil(Math.max(pinFontSize * 1.5, dotSize));
+
+                    const bubbleCanvas = document.createElement('canvas');
+                    bubbleCanvas.width = bubbleW;
+                    bubbleCanvas.height = bubbleH;
+                    const bctx = bubbleCanvas.getContext('2d');
+
+                    const r = bubbleH / 3;  // 圆角半径
+                    bctx.beginPath();
+                    bctx.moveTo(r, 0);
+                    bctx.lineTo(bubbleW - r, 0);
+                    bctx.quadraticCurveTo(bubbleW, 0, bubbleW, r);
+                    bctx.lineTo(bubbleW, bubbleH - r);
+                    bctx.quadraticCurveTo(bubbleW, bubbleH, bubbleW - r, bubbleH);
+                    bctx.lineTo(r, bubbleH);
+                    bctx.quadraticCurveTo(0, bubbleH, 0, bubbleH - r);
+                    bctx.lineTo(0, r);
+                    bctx.quadraticCurveTo(0, 0, r, 0);
+                    bctx.closePath();
+
+                    var bubbleGrad = bctx.createLinearGradient(0, 0, 0, bubbleH);
+                    bubbleGrad.addColorStop(0, dotColor.withAlpha(0.85).toCssColorString());
+                    bubbleGrad.addColorStop(1, dotColor.withAlpha(0.4).toCssColorString());
+                    bctx.fillStyle = bubbleGrad;
+                    bctx.fill();
+
+                    ent.billboard.image = bubbleCanvas;
+                    ent.billboard.scale = 1.0;
                   }
 
                   ent.label = new Cesium.LabelGraphics({
@@ -3927,14 +4040,15 @@ export default {
                     horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
                     verticalOrigin: Cesium.VerticalOrigin.CENTER,
                     pixelOffset: new Cesium.Cartesian2(0, (layerCfg.pinPixelOffsetY != null ? layerCfg.pinPixelOffsetY : 30)),
-                    disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                    disableDepthTestDistance: 5e6,  // 5000km内不穿透地形，超过则被地球遮挡
                     scale: 1.0,
                     eyeOffset: new Cesium.Cartesian3(0, 0, -50)
                   });
+                  labelCount++;
                 } catch (e) { /* skip */ }
               }
               viewer.scene.requestRender();
-              console.log(`[${this.componentName}] 📌 pinField="${pinField}": ${ents.length} 个实体已添加 Label`);
+              console.log(`[${this.componentName}] 📌 pinField="${pinField}": ${labelCount}/${ents.length} labels, ${noPropCount} 无属性, ${noValueCount} 无值`);
             }
             _timings['pinField标签'] = (performance.now() - _tPinField).toFixed(0) + 'ms';
 
