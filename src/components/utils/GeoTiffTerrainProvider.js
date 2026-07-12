@@ -34,7 +34,8 @@
     this._bounds = options.bounds || { west: -180, east: 180, south: -90, north: 90 };
     this._minHeight = options.minHeight != null ? options.minHeight : -9999;
     this._maxHeight = options.maxHeight != null ? options.maxHeight : 9999;
-    this._maxLevel = options.maxLevel != null ? options.maxLevel : 8; // ⭐ 限制最大细化级别
+    this._minLevel = options.minLevel != null ? options.minLevel : 7; // ⭐ level 0-6 返回占位 tile，加快初始加载
+    this._maxLevel = options.maxLevel != null ? options.maxLevel : 12; // ⭐ 限制最大细化级别
 
     this._tilingScheme = new Cesium.GeographicTilingScheme();
     this.ready = true;
@@ -94,6 +95,26 @@
 
     if (!this.getTileDataAvailable(x, y, level)) {
       return undefined;
+    }
+
+    // ⭐ level < minLevel：返回占位 tile（零高度 + childTileMask），引导 Cesium 细化
+    if (level < this._minLevel) {
+      var stubHeights = new Int16Array(65 * 65);
+      var stubChildMask = 0;
+      for (var ci = 0; ci < 4; ci++) {
+        var cx = x * 2 + (ci % 2);
+        var cy = y * 2 + (Math.floor(ci / 2));
+        if (this.getTileDataAvailable(cx, cy, level + 1)) {
+          stubChildMask |= (1 << ci);
+        }
+      }
+      var stubData = new Cesium.HeightmapTerrainData({
+        buffer: stubHeights,
+        width: 65, height: 65,
+        childTileMask: stubChildMask,
+        structure: { heightScale: 1.0, heightOffset: 0.0, elementsPerHeight: 1, stride: 65, elementMultiplier: 1, isBigEndian: false }
+      });
+      return Promise.resolve(stubData);
     }
 
     var self = this;

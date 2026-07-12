@@ -102,7 +102,7 @@
       height: self._gridSize,
       childTileMask: childMask,
       structure: {
-        heightScale: 1.0,
+        heightScale: 1.0 / 5.0,
         heightOffset: 0.0,
         elementsPerHeight: 1,
         stride: self._gridSize,
@@ -124,14 +124,10 @@
    * 将 heightmap-1.0 Int16LE 数组解码为 raw meters
    * 预生成瓦片编码: value = elevation * 5 → elevation = value / 5
    */
-  function decodeHeights(rawBuffer, gridSize) {
-    var raw = new Int16Array(rawBuffer, 0, gridSize * gridSize);
-    var heights = new Int16Array(gridSize * gridSize);
-    for (var i = 0; i < heights.length; i++) {
-      var val = Math.round(raw[i] / 5);  // elevation = stored_value / 5
-      heights[i] = val;
-    }
-    return heights;
+  // ⭐ Cesium 1.97: 不做客户端解码，传原始 stored_value，通过 heightScale=1/5 让 Cesium 内部换算
+  // 避免自己解码导致的 interpolateHeight NaN 问题
+  function rawHeightsFromBuffer(rawBuffer, gridSize) {
+    return new Int16Array(rawBuffer, 0, gridSize * gridSize);
   }
 
   /**
@@ -157,7 +153,7 @@
           console.warn('[LocalTerrainProvider] ⚠️ 数据不足: ' + key);
           return undefined;
         }
-        var heights = decodeHeights(buf, self._gridSize);
+        var heights = rawHeightsFromBuffer(buf, self._gridSize);
 
         // ⭐ 不按 valid 占比拒绝瓦片！粗级别瓦片即使大部分为 0 也要返回，
         // 作为"路标"引导 Cesium 细化到更高级别。只有在完全没有数据时才拒绝。
