@@ -395,6 +395,9 @@ export default {
     this._drawingManager = new DrawingToolManager();
     this.discoverWfsLayers();
 
+    // 预加载本地图层名称缓存（保证下拉首次展开就有正确名称）
+    this._fetchLocalLayerNamesFromJson();
+
     // 动态加载 Turf.js（用于精确空间运算，buffer / booleanIntersects 等）
     if (!window.turf) {
       var turfScript = document.createElement('script');
@@ -1099,6 +1102,7 @@ export default {
 
       var allResults = [];
       var errors = [];
+      var seenFeatureKeys = {};  // 去重：geometry+sourceDs 组合键
       var PER_LAYER_TIMEOUT = 8000;
 
       for (var i = 0; i < layers.length; i++) {
@@ -1205,16 +1209,16 @@ export default {
       var geojsonId = layer.id.replace(/^local-geojson-/, '');
       var features = [];
 
+      // 用 GeoJsonLayerManager item 名匹配 DataSource
+      var itemDisplayName = this._getLocalLayerName(geojsonId);
+
       for (var i = 0; i < viewer.dataSources.length; i++) {
         var ds = viewer.dataSources.get(i);
         if (!ds || !ds.entities) continue;
         var dsName = ds.name || '';
 
-        // 匹配：DataSource 名包含图层显示名 或 geojsonId
-        var displayName = (layer.name || '').replace(/（Cesium实体）$/, '').replace(/（本地）$/, '');
-        var match = dsName === displayName ||
-                    dsName.indexOf(displayName) >= 0 ||
-                    (geojsonId && dsName.indexOf(geojsonId) >= 0);
+        // 匹配：DataSource 名包含 itemDisplayName（GeoJsonLayerManager 中的原始名称）
+        var match = itemDisplayName && dsName.indexOf(itemDisplayName) >= 0;
 
         if (match) {
           var ents = ds.entities.values;
@@ -1241,8 +1245,9 @@ export default {
           }
         }
       }
-      // 兜底：名称匹配失败时，从全部 DataSource 提取实体
-      if (features.length === 0) {
+      // 兜底：名称匹配失败时，从全部 DataSource 提取实体（每个图层最多一次）
+      if (features.length === 0 && !layer._fallbackDone) {
+        layer._fallbackDone = true;
         console.log('[SM] 名称匹配失败，从全部 ' + viewer.dataSources.length + ' 个 DataSource 兜底提取...');
         for (var k = 0; k < viewer.dataSources.length; k++) {
           var ds2 = viewer.dataSources.get(k);
@@ -2224,34 +2229,19 @@ export default {
     },
 
     // 下拉框展开时刷新，同步 LayerTreeManager 勾选状态
+    // 本地 GeoJSON 图层名缓存（geojsonId → name）
+    _localLayerNameCache: null,
+
     refreshVisibleLayers() {
       var self = this;
       // 补录动态注入的本地图层（不在静态 JSON 中）
       this._loadedIds.forEach(function (id) {
         if (!self.queryableLayers.find(function (l) { return l.id === id; })) {
-          // 查找显示名称：面板状态 > Cesium dataSources > ID 回退
           var name = id;
-          try {
-            var ps = window.__panelSingletonManager__;
-            if (ps) {
-              var state = ps.getPanelState('LayerTreeManager');
-              if (state && state.configList) {
-                var node = state.configList.find(function (n) { return n.id === id; });
-                if (node && node.name) name = node.name;
-              }
-            }
-          } catch (e) {}
-          if (name === id) {
-            try {
-              var viewer = self.getViewer();
-              if (viewer) {
-                for (var i = 0; i < viewer.dataSources.length; i++) {
-                  var ds = viewer.dataSources.get(i);
-                  if (ds && ds.name && ds.name.indexOf(id) >= 0) { name = ds.name; break; }
-                }
-              }
-            } catch (e2) {}
-          }
+          var geojsonId = id.replace(/^local-geojson-/, '');
+          // 从缓存或 JSON 文件获取名称
+          var cache = self._getLocalLayerNameCache();
+          if (cache[geojsonId]) name = cache[geojsonId];
           self.queryableLayers.push({
             id: id, name: name, url: '',
             layerType: 'geojson', baseUrl: '', typeName: '',
@@ -2260,9 +2250,50 @@ export default {
         }
       });
 
+      // 刷新下拉列表
       this.visibleQueryableLayers = this._loadedIds.length > 0
         ? this.queryableLayers.filter(function (l) { return self._loadedIds.indexOf(l.id) >= 0; })
         : this.queryableLayers.slice();
+    },
+
+    // 读取 GeoJsonLayerManager，构建 geojsonId → name 映射
+    _getLocalLayerNameCache() {
+      if (this._localLayerNameCache) return this._localLayerNameCache;
+      this._localLayerNameCache = {};
+      // 1. 面板状态
+      try {
+        var ps = window.__panelSingletonManager__;
+        if (ps) {
+          var state = ps.getPanelState('GeoJsonLayerManager');
+          if (state && state.configList && state.configList.length > 0) {
+            state.configList.forEach(function (it) { this._localLayerNameCache[it.id] = it.name || it.id; }.bind(this));
+          }
+        }
+      } catch (e) {}
+      // 2. JSON 文件兜底（面板未打开时状态为空）
+      if (Object.keys(this._localLayerNameCache).length === 0) {
+        this._fetchLocalLayerNamesFromJson();
+      }
+      return this._localLayerNameCache;
+    },
+
+    // 异步从 JSON 文件加载名称（不阻塞，本次用不上则下次用）
+    async _fetchLocalLayerNamesFromJson() {
+      try {
+        var resp = await fetch('/data/gis/GeoJsonLayerManager/GeoJsonLayerManager.json');
+        if (!resp.ok) return;
+        var items = await resp.json();
+        if (Array.isArray(items)) {
+          var self = this;
+          items.forEach(function (it) { self._localLayerNameCache[it.id] = it.name || it.id; });
+        }
+      } catch (e) {}
+    },
+
+    /** 获取 geojsonId 对应的显示名称（用于下拉和 DataSource 匹配） */
+    _getLocalLayerName(geojsonId) {
+      var cache = this._getLocalLayerNameCache();
+      return cache[geojsonId] || geojsonId;
     },
 
     clearResults() {
