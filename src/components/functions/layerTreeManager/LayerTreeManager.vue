@@ -1441,8 +1441,14 @@ export default {
       // ⚠️ Cesium 资源保护：延迟设置（等待 viewer 就绪）
       this._setupCesiumProtections();
 
-      // 应用初始分区可见性（列表默认隐藏）
+      // 响应 SpacialQueryManager 的状态请求
       var self = this;
+      window.addEventListener('layertree-request-state', function () {
+        var ids = Object.keys(self.loadedLayerIds).filter(function (id) { return self.loadedLayerIds[id]; });
+        window.dispatchEvent(new CustomEvent('layertree-loaded-change', { detail: { loadedIds: ids } }));
+      });
+
+      // 应用初始分区可见性（列表默认隐藏）
       this.$nextTick(function() {
         self.$nextTick(function() {
           var treeEl = self.$refs.treeContainer;
@@ -3170,6 +3176,10 @@ export default {
             `[${this.componentName}] 👁️ 图层可见性切换: "${node.name}" → ${newShow ? '显示' : '隐藏'}` +
             ` (type=${entry.type}, 休眠池=${this._hibernatedOrder.length})`
           );
+          // 通知 SpacialQueryManager 等面板：已加载图层列表变化
+          window.dispatchEvent(new CustomEvent('layertree-loaded-change', {
+            detail: { loadedIds: Object.keys(this.loadedLayerIds).filter(function (id) { return this.loadedLayerIds[id]; }.bind(this)) }
+          }));
         } else {
           console.warn(`[${this.componentName}] ⚠️ 图层 "${node.name}" 在 _cesiumLayers 中但 object 无效，重新加载`);
           this._cesiumLayers.delete(node.id);
@@ -5155,6 +5165,10 @@ window.__cesiumViewer__.scene.globe.terrainProvider = terrainProvider;
         // 记录加载顺序（用于超出上限时淘汰最旧图层）
         this._addToLoadOrder(node.id);
         console.log(`[${this.componentName}] ✅ 图层已加载: ${node.name} (当前共 ${this._cesiumLayers.size} 个)`);
+        // 通知 SpacialQueryManager 等面板
+        window.dispatchEvent(new CustomEvent('layertree-loaded-change', {
+          detail: { loadedIds: Object.keys(this.loadedLayerIds).filter(function (id) { return this.loadedLayerIds[id]; }.bind(this)) }
+        }));
 
         // 加载后飞至图层位置
         this.flyToLayerNode(node);

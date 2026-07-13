@@ -25,12 +25,13 @@
   >
     <!-- ========== 工具栏 ========== -->
     <template #toolbar-extra>
-      <!-- WFS 图层选择器 -->
+      <!-- 可查询图层选择器（WFS / GeoJSON 矢量图层） -->
       <div class="toolbar-group">
-        <select v-model="selectedLayerId" class="layer-select" @change="onLayerChange">
-          <option value="">-- 选择WFS图层 --</option>
-          <option v-for="layer in wfsLayers" :key="layer.id" :value="layer.id">
-            {{ layer.name }}
+        <select v-model="selectedLayerId" class="layer-select" @change="onLayerChange" @mousedown="refreshVisibleLayers" @focus="refreshVisibleLayers">
+          <option value="">-- 全部图层 --</option>
+          <option value="" disabled>────────── 指定图层 ──────────</option>
+          <option v-for="layer in visibleQueryableLayers" :key="layer.id" :value="layer.id">
+            {{ layer.name }} [{{ layer.layerType.toUpperCase() }}]
           </option>
         </select>
       </div>
@@ -39,18 +40,18 @@
 
       <!-- 绘图工具按钮组 -->
       <div class="toolbar-group">
-        <CesiumToolbarButton icon="📍" label="点" tooltip="点缓冲区查询" :active="activeTool === 'point'" @click="activateTool('point')" :disabled="!selectedLayerId" />
-        <CesiumToolbarButton icon="📏" label="线" tooltip="线缓冲区查询" :active="activeTool === 'line'" @click="activateTool('line')" :disabled="!selectedLayerId" />
-        <CesiumToolbarButton icon="⭕" label="圆" tooltip="圆形查询" :active="activeTool === 'circle'" @click="activateTool('circle')" :disabled="!selectedLayerId" />
-        <CesiumToolbarButton icon="🔲" label="矩形" tooltip="矩形查询" :active="activeTool === 'rectangle'" @click="activateTool('rectangle')" :disabled="!selectedLayerId" />
-        <CesiumToolbarButton icon="⬢" label="多边形" tooltip="多边形查询" :active="activeTool === 'polygon'" @click="activateTool('polygon')" :disabled="!selectedLayerId" />
+        <CesiumToolbarButton icon="📍" label="点" tooltip="点缓冲区查询" :active="activeTool === 'point'" @click="activateTool('point')"  />
+        <CesiumToolbarButton icon="📏" label="线" tooltip="线缓冲区查询" :active="activeTool === 'line'" @click="activateTool('line')"  />
+        <CesiumToolbarButton icon="⭕" label="圆" tooltip="圆形查询" :active="activeTool === 'circle'" @click="activateTool('circle')"  />
+        <CesiumToolbarButton icon="🔲" label="矩形" tooltip="矩形查询" :active="activeTool === 'rectangle'" @click="activateTool('rectangle')"  />
+        <CesiumToolbarButton icon="⬢" label="多边形" tooltip="多边形查询" :active="activeTool === 'polygon'" @click="activateTool('polygon')"  />
       </div>
 
       <span class="toolbar-sep"></span>
 
       <!-- 空间算子选择器 -->
       <div class="toolbar-group">
-        <select v-model="spatialOperator" class="operator-select" :disabled="!selectedLayerId">
+        <select v-model="spatialOperator" class="operator-select" >
           <option value="Intersects">相交 (Intersects)</option>
           <option value="Within">包含于 (Within)</option>
           <option value="Contains">包含 (Contains)</option>
@@ -154,7 +155,114 @@ import CesiumToolbarButton from '@componentsLib/CesiumToolbarButton.mjs';
 import QueryResultPanel from './QueryResultPanel.vue';
 import { DrawingToolManager } from './DrawingToolManager.js';
 import { commonGIS } from './jsDrawLib/commonGIS.js';
-import { geometryForXmlFilter } from './TurfSpatialFilter.js';
+import { geometryForXmlFilter, getTurf } from './TurfSpatialFilter.js';
+
+// ═══ 纯 JS 几何工具（Turf.js 不可用时的兜底） ═══
+function _bboxOfGeometry(geom) {
+  var coords = [];
+  function _walk(g) {
+    if (!g) return;
+    if (g.type === 'Point') coords.push(g.coordinates);
+    else if (g.type === 'MultiPoint' || g.type === 'LineString') coords = coords.concat(g.coordinates);
+    else if (g.type === 'Polygon' || g.type === 'MultiLineString') g.coordinates.forEach(function (r) { coords = coords.concat(r); });
+    else if (g.type === 'MultiPolygon') g.coordinates.forEach(function (p) { p.forEach(function (r) { coords = coords.concat(r); }); });
+  }
+  _walk(geom);
+  if (coords.length === 0) return null;
+  var xs = coords.map(function (c) { return c[0]; });
+  var ys = coords.map(function (c) { return c[1]; });
+  return [Math.min.apply(null, xs), Math.min.apply(null, ys), Math.max.apply(null, xs), Math.max.apply(null, ys)];
+}
+
+function _pointInPolygon(pt, ring) {
+  var x = pt[0], y = pt[1], inside = false;
+  for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function _pointsInPoly(geom, ring) {
+  if (!ring) return true; // 无精确多边形则全部通过
+  var coords = [];
+  function _collect(g) {
+    if (!g) return;
+    if (g.type === 'Point') coords.push(g.coordinates);
+    else if (g.type === 'MultiPoint' || g.type === 'LineString') coords = coords.concat(g.coordinates);
+    else if (g.type === 'Polygon') (g.coordinates[0] || []).forEach(function (c) { coords.push(c); });
+    else if (g.type === 'MultiLineString' || g.type === 'MultiPolygon') {
+      g.coordinates.forEach(function (r) { (Array.isArray(r[0]) ? r : [r]).forEach(function (c) { coords = coords.concat(c); }); });
+    }
+  }
+  _collect(geom);
+  for (var i = 0; i < coords.length; i++) {
+    if (_pointInPolygon(coords[i], ring)) return true;
+  }
+  return false;
+}
+
+function _geometryIntersects(geom, ring, bbox, qBbox) {
+  // BBOX 相交是前提
+  if (bbox[0] > qBbox[2] || bbox[2] < qBbox[0] || bbox[1] > qBbox[3] || bbox[3] < qBbox[1]) return false;
+  if (!ring) return true;
+  // 点包含或线段交点
+  if (geom.type === 'Point' || geom.type === 'MultiPoint') return _pointsInPoly(geom, ring);
+  // 线/面：检查顶点是否在查询区域内，以及边是否穿过查询区域
+  if (_pointsInPoly(geom, ring)) return true;
+  // 简单检查：查询区域的顶点是否在要素内
+  for (var i = 0; i < ring.length; i++) {
+    if (_pointInPolygon(ring[i], _getOuterRing(geom))) return true;
+  }
+  return false;
+}
+
+function _getOuterRing(geom) {
+  if (geom.type === 'Polygon') return geom.coordinates[0] || [];
+  if (geom.type === 'MultiPolygon' && geom.coordinates[0]) return geom.coordinates[0][0] || [];
+  return [];
+}
+
+/** Cesium Entity → GeoJSON geometry（Cartesian3 → lon/lat 转换） */
+function _entityToGeoJson(entity) {
+  var Cesium = window.Cesium;
+  if (!Cesium) return null;
+
+  function _toLonLat(p) {
+    // Cesium Cartesian3 → [lon, lat]（度）
+    if (p.longitude !== undefined && p.latitude !== undefined) return [p.longitude, p.latitude]; // 已是 Cartographic/角度
+    var c = Cesium.Cartographic.fromCartesian(p);
+    return [Cesium.Math.toDegrees(c.longitude), Cesium.Math.toDegrees(c.latitude)];
+  }
+
+  // Polygon
+  if (entity.polygon && entity.polygon.hierarchy) {
+    var hierarchy = entity.polygon.hierarchy.getValue(Cesium.JulianDate.now());
+    if (hierarchy) {
+      var rings = [];
+      function _extractRing(ring) { return ring.map(_toLonLat); }
+      rings.push(_extractRing(hierarchy.positions));
+      if (hierarchy.holes) {
+        hierarchy.holes.forEach(function (hole) { rings.push(_extractRing(hole.positions)); });
+      }
+      return { type: 'Polygon', coordinates: rings };
+    }
+  }
+
+  // LineString
+  if (entity.polyline && entity.polyline.positions) {
+    var pos = entity.polyline.positions.getValue(Cesium.JulianDate.now());
+    if (pos) return { type: 'LineString', coordinates: pos.map(_toLonLat) };
+  }
+
+  // Point
+  if (entity.position) {
+    var pt = entity.position.getValue(Cesium.JulianDate.now());
+    if (pt) return { type: 'Point', coordinates: _toLonLat(pt) };
+  }
+
+  return null;
+}
 import {
   executeQuery as wfsExecuteQuery,
   extractBaseUrl,
@@ -184,8 +292,10 @@ export default {
       componentName: 'SpacialQueryManager',
       panelMetadata: panelMetadata,
 
-      // WFS 图层列表
-      wfsLayers: [],
+      // 可查询图层列表（WFS + GeoJSON 矢量图层）
+      queryableLayers: [],
+      visibleQueryableLayers: [],  // 仅显示已勾选的（下拉列表用）
+      _loadedIds: [],              // 从 LayerTreeManager 事件获取的已加载图层 ID
       selectedLayerId: '',
 
       // 字段
@@ -250,22 +360,30 @@ export default {
       return !!(this.selectedLayerId && this.selectedField && this.fuzzyValue);
     },
     canSpatialQuery() {
-      return !!(this.selectedLayerId && this.drawnGeometry);
+      return !!(this.drawnGeometry);
     },
     canQuery() {
-      return this.selectedLayerId && !this.queryLoading && (this.drawnGeometry || (this.selectedField && this.fuzzyValue));
+      return !this.queryLoading && (this.drawnGeometry || (this.selectedLayerId && this.selectedField && this.fuzzyValue));
+    },
+    _selectedLayer() {
+      var self = this;
+      return this.queryableLayers.find(function (l) { return l.id === self.selectedLayerId; }) || null;
     },
     currentLayerName() {
-      var layer = this.wfsLayers.find(function (l) { return l.id === this.selectedLayerId; }.bind(this));
+      var layer = this._selectedLayer;
       return layer ? layer.name : '';
     },
     currentLayerBaseUrl() {
-      var layer = this.wfsLayers.find(function (l) { return l.id === this.selectedLayerId; }.bind(this));
+      var layer = this._selectedLayer;
       return layer ? layer.baseUrl : '';
     },
     currentLayerTypeName() {
-      var layer = this.wfsLayers.find(function (l) { return l.id === this.selectedLayerId; }.bind(this));
+      var layer = this._selectedLayer;
       return layer ? layer.typeName : '';
+    },
+    currentLayerType() {
+      var layer = this._selectedLayer;
+      return layer ? layer.layerType : '';
     }
   },
   created() {
@@ -276,8 +394,25 @@ export default {
     console.log('[' + this.componentName + '] SpacialQueryManager mounted');
     this._drawingManager = new DrawingToolManager();
     this.discoverWfsLayers();
+
+    // 动态加载 Turf.js（用于精确空间运算，buffer / booleanIntersects 等）
+    if (!window.turf) {
+      var turfScript = document.createElement('script');
+      turfScript.src = '/data/gis/spacialQueryManager/jsDrawLib/turf.min.js';
+      turfScript.onload = function () { console.log('[SpacialQueryManager] ✅ Turf.js 已加载'); };
+      document.head.appendChild(turfScript);
+    }
+
+    // 监听 LayerTreeManager 的图层加载/卸载事件
+    var self = this;
+    this._onLayerTreeChange = function (e) {
+      self._loadedIds = e.detail && e.detail.loadedIds ? e.detail.loadedIds : [];
+      self.refreshVisibleLayers();
+    };
+    window.addEventListener('layertree-loaded-change', this._onLayerTreeChange);
   },
   beforeUnmount() {
+    window.removeEventListener('layertree-loaded-change', this._onLayerTreeChange);
     this._stopBlink();
     this._cleanupCameraRedrawListeners();
     this._removeRedrawCanvas();
@@ -327,8 +462,11 @@ export default {
           var state = panelSingleton.getPanelState('LayerTreeManager');
           if (state && state.configList && state.configList.length > 0) {
             self._parseLayersFromConfig(state.configList);
-            if (self.wfsLayers.length > 0) {
-              console.log('[' + self.componentName + '] 从 PanelSingletonManager 发现 ' + self.wfsLayers.length + ' 个 WFS 图层');
+            // 主动请求 LayerTreeManager 当前已加载图层
+            window.dispatchEvent(new CustomEvent('layertree-request-state'));
+            self.refreshVisibleLayers();
+            if (self.queryableLayers.length > 0) {
+              console.log('[' + self.componentName + '] 从 PanelSingletonManager 发现 ' + self.queryableLayers.length + ' 个可查询图层');
               return;
             }
           }
@@ -338,39 +476,73 @@ export default {
       }
 
       // 回退：从静态 JSON 文件加载
-      this._loadWfsLayersFromJson();
+      this._loadWfsLayersFromJson().then(function () {
+        // 主动请求 LayerTreeManager 当前已加载图层
+        window.dispatchEvent(new CustomEvent('layertree-request-state'));
+        self.refreshVisibleLayers();
+      });
     },
 
     _parseLayersFromConfig(nodes) {
       var self = this;
-      self.wfsLayers = [];
+      self.queryableLayers = [];
       if (!nodes || !Array.isArray(nodes)) return;
 
       nodes.forEach(function (node) {
         if (!node || node.nodeType !== 'layer') return;
+
+        // 本地 GeoJSON 图层（GeoJsonLayerManager 动态加载）
+        var isLocalGeoJson = node._dynamicSource === 'GeoJsonLayerManager';
+        if (isLocalGeoJson) {
+          if (self.queryableLayers.find(function (l) { return l.id === node.id; })) return;
+          self.queryableLayers.push({
+            id: node.id,
+            name: (node.name || node.id) + '（本地）',
+            url: '',  // 无外部 URL，通过 LayerTreeManager 加载时获取数据
+            layerType: 'geojson',
+            baseUrl: '',
+            typeName: '',
+            fields: []
+          });
+          return;
+        }
+
         if (!node.url) return;
 
+        // WFS 检测
         var isWfs = node.url.indexOf('SERVICE=WFS') >= 0 ||
                     node.url.indexOf('REQUEST=GetFeature') >= 0 ||
                     node.url.indexOf('/wfs') >= 0 ||
                     node.url.indexOf('/wfsserver') >= 0;
 
-        if (!isWfs) return;
+        // GeoJSON 检测（与 LayerTreeManager 一致）
+        var isGeoJson = node.url.indexOf('geojson') >= 0 ||
+                        node.url.endsWith('.json') ||
+                        node.url.endsWith('.geojson');
 
-        var typeName = extractTypeName(node.url);
-        var baseUrl = extractBaseUrl(node.url);
+        if (!isWfs && !isGeoJson) return;
 
         // 避免重复
-        if (self.wfsLayers.find(function (l) { return l.id === node.id; })) return;
+        if (self.queryableLayers.find(function (l) { return l.id === node.id; })) return;
 
-        self.wfsLayers.push({
+        var entry = {
           id: node.id,
           name: node.name || node.id,
           url: node.url,
-          baseUrl: baseUrl,
-          typeName: typeName,
           fields: []
-        });
+        };
+
+        if (isWfs) {
+          entry.layerType = 'wfs';
+          entry.baseUrl = extractBaseUrl(node.url);
+          entry.typeName = extractTypeName(node.url);
+        } else {
+          entry.layerType = 'geojson';
+          entry.baseUrl = '';
+          entry.typeName = '';
+        }
+
+        self.queryableLayers.push(entry);
       });
     },
 
@@ -382,10 +554,10 @@ export default {
         var nodes = await resp.json();
         if (Array.isArray(nodes)) {
           self._parseLayersFromConfig(nodes);
-          console.log('[' + self.componentName + '] 从 JSON 文件发现 ' + self.wfsLayers.length + ' 个 WFS 图层');
+          console.log('[' + self.componentName + '] 从 JSON 文件发现 ' + self.queryableLayers.length + ' 个可查询图层');
         }
       } catch (e) {
-        console.warn('[' + self.componentName + '] 从 JSON 文件加载 WFS 图层失败:', e);
+        console.warn('[' + self.componentName + '] 从 JSON 文件加载可查询图层失败:', e);
       }
     },
 
@@ -397,7 +569,7 @@ export default {
 
       if (!this.selectedLayerId) return;
 
-      var layer = this.wfsLayers.find(function (l) { return l.id === this.selectedLayerId; }.bind(this));
+      var layer = this.queryableLayers.find(function (l) { return l.id === this.selectedLayerId; }.bind(this));
       if (!layer) return;
 
       // 已有缓存的字段
@@ -409,6 +581,23 @@ export default {
 
       this.fieldsLoading = true;
       try {
+        // GeoJSON 图层：直接 fetch 样本数据提取字段
+        if (layer.layerType === 'geojson') {
+          if (!layer.url) { this.fieldsLoading = false; return; }  // 本地图层无 URL，跳过字段发现
+          var resp = await fetch(layer.url, { signal: AbortSignal.timeout(15000) });
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          var data = await resp.json();
+          if (data && data.features && data.features.length > 0) {
+            var sampleFields = Object.keys(data.features[0].properties || {});
+            layer.fields = sampleFields;
+            this.availableFields = sampleFields.slice();
+            this.geometryPropertyName = 'geometry';
+          }
+          this.fieldsLoading = false;
+          return;
+        }
+
+        // WFS 图层：先尝试 DescribeFeatureType
         // 先尝试 DescribeFeatureType
         var result = await describeFeatureType(layer.baseUrl, layer.typeName);
         var fields = result ? result.fields : [];
@@ -512,12 +701,12 @@ export default {
       // 启动相机变化处理——首次交互存入历史，moveEnd 后重绘空间查询区域
       this._setupPostDrawHandlers(geometry, drawType);
 
-      // 绘图完成后自动执行查询（如果有图层选择）
-      if (this.selectedLayerId) {
-        this.$nextTick(function () {
-          this.executeQuery();
-        }.bind(this));
-      }
+      // 绘图完成后自动执行查询
+      console.log('[SM] 绘图完成，nextTick 执行查询...');
+      this.$nextTick(function () {
+        console.log('[SM] nextTick 回调，调用 executeQuery');
+        this.executeQuery();
+      }.bind(this));
     },
 
     _hideCanvasOnCameraMove() {
@@ -761,11 +950,28 @@ export default {
 
     // ==================== 查询 ====================
     async executeQuery() {
+      console.log('[SM] executeQuery canQuery=' + this.canQuery + ' selId=' + (this.selectedLayerId || '(all)') + ' hasGeom=' + !!this.drawnGeometry);
       if (!this.canQuery) return;
-      if (!this.selectedLayerId) return;
 
-      var baseUrl = this.currentLayerBaseUrl;
-      var typeName = this.currentLayerTypeName;
+      // 取消上一次全部图层查询（如果有）
+      if (this._allQueryAbort) { try { this._allQueryAbort.abort(); } catch (e) {} }
+
+      // 未选图层 → 查询全部可查询图层
+      if (!this.selectedLayerId) {
+        return this._executeAllLayersQuery();
+      }
+
+      var layer = this._selectedLayer;
+      if (!layer) { this.queryError = '未找到选中图层'; return; }
+
+      // GeoJSON 图层走客户端本地过滤
+      if (layer.layerType === 'geojson') {
+        return this._executeGeoJsonQuery(layer);
+      }
+
+      // WFS 图层走服务端 XML Filter
+      var baseUrl = layer.baseUrl;
+      var typeName = layer.typeName;
 
       if (!baseUrl || !typeName) {
         this.queryError = '无法解析 WFS 图层地址或类型名';
@@ -778,18 +984,13 @@ export default {
       this.clearHighlights();
 
       try {
-        // 构建空间几何 — 用 drawnGeometry（与 canvas 重绘同源的 lon/lat），遮罩不准
         var gmlGeom = '';
         var drawingType = this._drawType || this._detectDrawingType();
 
         if (this.drawnGeometry) {
-          console.log('[SpacialQueryManager] 查询: type=' + drawingType + ' geom=' + JSON.stringify(this.drawnGeometry).substring(0, 200) + ' bufferR=' + this.bufferRadius);
           var filterResult = geometryForXmlFilter(drawingType, this.drawnGeometry, this.bufferRadius);
           if (filterResult && filterResult.gml) {
-            console.log('[SpacialQueryManager] GML geom type=' + (filterResult.geoJson ? filterResult.geoJson.type : 'unknown'));
             gmlGeom = filterResult.gml;
-          } else {
-            console.warn('[' + this.componentName + '] 无法构建空间几何，仅使用属性查询');
           }
         }
 
@@ -818,6 +1019,377 @@ export default {
       } finally {
         this.queryLoading = false;
       }
+    },
+
+    /**
+     * GeoJSON 图层查询：fetch 全量数据 → 客户端本地过滤
+     */
+    async _executeGeoJsonQuery(layer) {
+      this.queryLoading = true;
+      this.queryError = null;
+      this.queryResults = [];
+      this.clearHighlights();
+
+      try {
+        console.log('[SM] _executeGeoJsonQuery layer="' + layer.name + '" url=' + (layer.url || '(empty)'));
+        // 本地图层无 URL → 从 Cesium entities 提取
+        if (!layer.url) {
+          console.log('[SM] 本地图层，从 Cesium entities 提取...');
+          var localFeatures = this._queryLocalEntities(layer);
+          console.log('[SM] 本地实体提取结果: ' + localFeatures.length + ' 个');
+          this.queryResults = localFeatures;
+          if (this.queryResults.length > 0) this.highlightFeaturesOnMap(this.queryResults);
+          this.queryLoading = false;
+          return;
+        }
+
+        var resp = await fetch(layer.url, { signal: AbortSignal.timeout(30000) });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var data = await resp.json();
+        if (!data || !data.features) throw new Error('返回数据非 FeatureCollection');
+        console.log('[SpacialQueryManager] GeoJSON 全量数据: ' + data.features.length + ' 个要素');
+
+        var features = this._filterFeaturesLocally(data.features);
+
+        this.queryResults = features;
+        if (this.queryResults.length > 0) {
+          this.highlightFeaturesOnMap(this.queryResults);
+        }
+      } catch (e) {
+        this.queryError = 'GeoJSON 查询异常: ' + (e.message || e);
+        console.error('[SpacialQueryManager] GeoJSON 查询异常:', e);
+      } finally {
+        this.queryLoading = false;
+      }
+    },
+
+    /**
+     * 查询全部图层：只查询 LayerTreeManager 中已勾选（visible=1）的图层
+     */
+    async _executeAllLayersQuery() {
+      if (this._allQueryAbort) {
+        try { this._allQueryAbort.abort(); } catch (e) {}
+      }
+      this._allQueryAbort = new AbortController();
+      var abortSignal = this._allQueryAbort.signal;
+
+      var MAX_TOTAL = 500;
+      var MAX_HIGHLIGHT = 300;
+
+      // 使用事件驱动的 _loadedIds（由 LayerTreeManager dispatch 更新）
+      var visibleIds = this._loadedIds;
+
+      // 过滤出已勾选的可查询图层
+      var layers = this.queryableLayers;
+      if (visibleIds.length > 0) {
+        layers = layers.filter(function (l) { return visibleIds.indexOf(l.id) >= 0; });
+      }
+
+      console.log('[SpacialQueryManager] 🔍 查询开始：' + layers.length + ' 个可见图层（共 ' + this.queryableLayers.length + ' 个可查询）');
+
+      if (layers.length === 0) {
+        this.queryError = '没有勾选任何可查询图层（请在 LayerTreeManager 中勾选 WFS 或 GeoJSON 图层）';
+        return;
+      }
+
+      this.queryLoading = true;
+      this.queryError = null;
+      this.queryResults = [];
+      this.clearHighlights();
+
+      var allResults = [];
+      var errors = [];
+      var PER_LAYER_TIMEOUT = 8000;
+
+      for (var i = 0; i < layers.length; i++) {
+        if (abortSignal.aborted) break;
+
+        if (allResults.length >= MAX_TOTAL) {
+          console.log('[SpacialQueryManager] ⏹ 已达总数上限 ' + MAX_TOTAL + '，跳过剩余图层');
+          break;
+        }
+
+        var layer = layers[i];
+        this.queryError = '查询中... (' + (i + 1) + '/' + layers.length + ') ' + layer.name;
+
+        try {
+          // 为每个图层创建独立超时
+          var layerAbort = new AbortController();
+          var timeoutId = setTimeout(function () { layerAbort.abort(); }, PER_LAYER_TIMEOUT);
+
+          // 如果外部取消，联动取消当前图层
+          var onAbort = function () { layerAbort.abort(); };
+          abortSignal.addEventListener('abort', onAbort, { once: true });
+
+          var features;
+          if (layer.layerType === 'geojson') {
+            features = await this._querySingleGeoJsonLayer(layer, layerAbort.signal);
+          } else {
+            features = await this._querySingleWfsLayer(layer, layerAbort.signal);
+          }
+
+          clearTimeout(timeoutId);
+          abortSignal.removeEventListener('abort', onAbort);
+
+          if (features && features.length > 0) {
+            // 截断到总数上限
+            var remaining = MAX_TOTAL - allResults.length;
+            if (features.length > remaining) features = features.slice(0, remaining);
+
+            features.forEach(function (f) {
+              f._sourceLayer = layer.name;
+              f._sourceLayerId = layer.id;
+            });
+            allResults = allResults.concat(features);
+            this.queryResults = allResults.slice();
+            console.log('[SpacialQueryManager] ' + layer.name + ': ' + features.length + ' 个结果（累计 ' + allResults.length + '）');
+          }
+        } catch (e) {
+          clearTimeout(timeoutId);
+          var errMsg = (e.name === 'AbortError') ? '超时或取消' : (e.message || '未知错误');
+          errors.push(layer.name + ': ' + errMsg);
+          continue;
+        }
+      }
+
+      this.queryLoading = false;
+
+      if (abortSignal.aborted) {
+        this.queryError = null;
+        return;
+      }
+
+      if (errors.length > 0) {
+        console.warn('[SpacialQueryManager] 部分图层查询失败:', errors);
+      }
+
+      // 高亮：最多 MAX_HIGHLIGHT 个，防止 Cesium 卡死
+      var highlightFeatures = allResults.length > MAX_HIGHLIGHT
+        ? allResults.slice(0, MAX_HIGHLIGHT)
+        : allResults;
+
+      if (allResults.length === 0) {
+        this.queryError = errors.length > 0
+          ? '所有图层均无结果（' + errors.length + ' 个失败）'
+          : '所有图层均无匹配结果';
+      } else {
+        this.queryError = null;  // 有结果时不显示错误，让结果列表展示
+        var infoMsg = '找到 ' + allResults.length + ' 个结果';
+        if (allResults.length > MAX_HIGHLIGHT) infoMsg += '（仅高亮前 ' + MAX_HIGHLIGHT + ' 个）';
+        if (allResults.length >= MAX_TOTAL) infoMsg += '（已达上限）';
+        if (errors.length > 0) infoMsg += '，' + errors.length + ' 个图层失败';
+        console.log('[SpacialQueryManager] ✅ ' + infoMsg);
+        this.highlightFeaturesOnMap(highlightFeatures);
+      }
+    },
+
+    /** 查询单个 GeoJSON 图层 */
+    async _querySingleGeoJsonLayer(layer, signal) {
+      // 本地图层（无外部 URL）：从 Cesium entities 提取数据
+      if (!layer.url) {
+        return this._queryLocalEntities(layer);
+      }
+      var resp = await fetch(layer.url, { signal: signal || AbortSignal.timeout(30000) });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      var data = await resp.json();
+      if (!data || !data.features) throw new Error('非 FeatureCollection');
+      return this._filterFeaturesLocally(data.features);
+    },
+
+    /** 从 Cesium viewer 中提取已加载的本地图层实体，转为 GeoJSON features */
+    _queryLocalEntities(layer) {
+      var viewer = this.getViewer();
+      if (!viewer) throw new Error('Cesium Viewer 不可用');
+
+      // 从 layer.id 提取 geojsonId（格式：local-geojson-{geojsonId}）
+      var geojsonId = layer.id.replace(/^local-geojson-/, '');
+      var features = [];
+
+      for (var i = 0; i < viewer.dataSources.length; i++) {
+        var ds = viewer.dataSources.get(i);
+        if (!ds || !ds.entities) continue;
+        var dsName = ds.name || '';
+
+        // 匹配：DataSource 名包含图层显示名 或 geojsonId
+        var displayName = (layer.name || '').replace(/（Cesium实体）$/, '').replace(/（本地）$/, '');
+        var match = dsName === displayName ||
+                    dsName.indexOf(displayName) >= 0 ||
+                    (geojsonId && dsName.indexOf(geojsonId) >= 0);
+
+        if (match) {
+          var ents = ds.entities.values;
+          for (var j = 0; j < ents.length; j++) {
+            var e = ents[j];
+            if (!e.position && !e.polygon && !e.polyline && !e.point) continue;
+            try {
+              var geom = _entityToGeoJson(e);
+              if (!geom) continue;
+              var props = {};
+              if (e.properties) {
+                if (typeof e.properties.getValue === 'function') {
+                  try { props = e.properties.getValue(viewer.clock.currentTime) || {}; } catch (ex) { props = e.properties; }
+                } else {
+                  props = e.properties;
+                }
+              }
+              features.push({ type: 'Feature', geometry: geom, properties: props });
+            } catch (ex) { /* skip malformed entity */ }
+          }
+          if (features.length > 0 && match) {
+            console.log('[SpacialQueryManager] 从 Cesium entities 提取: ' + layer.name + ' → ' + features.length + ' 个要素');
+            break;
+          }
+        }
+      }
+      // 兜底：名称匹配失败时，从全部 DataSource 提取实体
+      if (features.length === 0) {
+        console.log('[SM] 名称匹配失败，从全部 ' + viewer.dataSources.length + ' 个 DataSource 兜底提取...');
+        for (var k = 0; k < viewer.dataSources.length; k++) {
+          var ds2 = viewer.dataSources.get(k);
+          if (!ds2 || !ds2.entities) continue;
+          var ents2 = ds2.entities.values;
+          for (var m = 0; m < ents2.length; m++) {
+            var e2 = ents2[m];
+            if (!e2.position && !e2.polygon && !e2.polyline && !e2.point) continue;
+            try {
+              var g2 = _entityToGeoJson(e2);
+              if (!g2) continue;
+              var p2 = {};
+              if (e2.properties) {
+                try { p2 = typeof e2.properties.getValue === 'function' ? (e2.properties.getValue(viewer.clock.currentTime) || {}) : e2.properties; } catch (ex) {}
+              }
+              features.push({ type: 'Feature', geometry: g2, properties: p2 });
+            } catch (ex) {}
+          }
+        }
+      }
+      console.log('[SM] _queryLocalEntities 最终: ' + features.length + ' 个实体（空间过滤前）');
+      var filtered = this._filterFeaturesLocally(features);
+      console.log('[SM] _filterFeaturesLocally 后: ' + filtered.length + ' 个（空间过滤后）');
+      return filtered;
+    },
+
+    /** 查询单个 WFS 图层（复用核心逻辑） */
+    async _querySingleWfsLayer(layer, signal) {
+      var gmlGeom = '';
+      var drawingType = this._drawType || this._detectDrawingType();
+      if (this.drawnGeometry) {
+        var filterResult = geometryForXmlFilter(drawingType, this.drawnGeometry, this.bufferRadius);
+        if (filterResult && filterResult.gml) gmlGeom = filterResult.gml;
+      }
+
+      // 几何字段名：尝试多种常见名称（不同 WFS 服务器命名不同）
+      var geomNames = ['geometry', 'the_geom', 'SHAPE', 'wkb_geometry']
+        .filter(function (v, i, a) { return a.indexOf(v) === i; });
+      // 把当前选中的放在最前面（单图层模式已通过 DescribeFeatureType 发现）
+      if (this.geometryPropertyName && geomNames.indexOf(this.geometryPropertyName) < 0) {
+        geomNames.unshift(this.geometryPropertyName);
+      }
+
+      var result = null;
+      // 1. 优先 POST XML Filter（尝试不同几何字段名）
+      for (var gi = 0; gi < geomNames.length && !result; gi++) {
+        try {
+          var r = await wfsExecuteQuery(layer.baseUrl, {
+            typeName: layer.typeName,
+            propertyName: this.selectedField || '',
+            fuzzyValue: this.fuzzyValue || '',
+            spatialOperator: gmlGeom ? this.spatialOperator : '',
+            gmlGeometry: gmlGeom,
+            geometryPropertyName: geomNames[gi]
+          }, 8000);
+          if (!r.error) { result = r; layer._geometryPropertyName = geomNames[gi]; }
+        } catch (e) { /* 尝试下一个 */ }
+      }
+
+      if (result && result.features) return result.features;
+
+      // 2. GET 回退：fetch 全量数据 → 客户端本地过滤
+      console.log('[SpacialQueryManager] POST 失败，GET 回退: ' + layer.name);
+      var getUrl = layer.baseUrl
+        + '?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0'
+        + '&TYPENAMES=' + encodeURIComponent(layer.typeName)
+        + '&OUTPUTFORMAT=application%2Fjson&COUNT=500';
+
+      var resp = await fetch(getUrl, { signal: signal || AbortSignal.timeout(15000) });
+      if (!resp.ok) throw new Error('GET 回退失败 HTTP ' + resp.status);
+      var data = await resp.json();
+      if (!data || !data.features) throw new Error('GET 回退返回非 FeatureCollection');
+
+      // 用本地过滤处理属性+空间条件
+      return this._filterFeaturesLocally(data.features);
+    },
+
+    /** 本地过滤要素（属性 + 空间，纯 JS BBOX → Turf 精确过滤） */
+    _filterFeaturesLocally(features) {
+      if (this.selectedField && this.fuzzyValue) {
+        var field = this.selectedField;
+        var val = this.fuzzyValue.toLowerCase();
+        features = features.filter(function (f) {
+          var propVal = f.properties && f.properties[field];
+          return propVal != null && String(propVal).toLowerCase().indexOf(val) >= 0;
+        });
+      }
+      if (this.drawnGeometry && features.length > 0) {
+        var drawingType = this._drawType || this._detectDrawingType();
+        // 用 Turf 构建查询几何（buffer 处理等）
+        var filterResult = geometryForXmlFilter(drawingType, this.drawnGeometry, this.bufferRadius);
+        var queryBbox = null; // [minX, minY, maxX, maxY]
+        var queryPolyCoords = null; // 精确多边形环 [[lng,lat],...]
+
+        if (filterResult && filterResult.geoJson) {
+          var turf = getTurf();
+          if (turf) {
+            try { queryBbox = turf.bbox(filterResult.geoJson); } catch (e) {}
+          }
+          // 提取多边形坐标用于纯 JS 点包含检测
+          if (filterResult.geoJson.type === 'Polygon') {
+            queryPolyCoords = filterResult.geoJson.coordinates[0]; // 外环
+          }
+        }
+
+        // BBOX 从绘制的矩形直接计算（作为兜底）
+        if (!queryBbox && this.drawnGeometry.type === 'Polygon') {
+          var ring = this.drawnGeometry.coordinates[0];
+          var xs = ring.map(function (c) { return c[0]; });
+          var ys = ring.map(function (c) { return c[1]; });
+          queryBbox = [Math.min.apply(null, xs), Math.min.apply(null, ys), Math.max.apply(null, xs), Math.max.apply(null, ys)];
+          queryPolyCoords = ring;
+        }
+
+        if (!queryBbox) return features; // 无法确定查询范围，全部通过
+
+        console.log('[SM] 查询 BBOX: ' + JSON.stringify(queryBbox) + ' polyRings=' + (queryPolyCoords ? queryPolyCoords.length : 0) + ' input=' + features.length);
+
+        var op = this.spatialOperator;
+        var qBbox = queryBbox;
+        var qPoly = queryPolyCoords;
+
+        var _firstLogged = false;
+        features = features.filter(function (f) {
+          if (!f.geometry || !f.geometry.coordinates) return false;
+          try {
+            // BBOX 粗筛（纯 JS）
+            var fb = _bboxOfGeometry(f.geometry);
+            if (!_firstLogged) { _firstLogged = true; console.log('[SM] 首实体 BBOX: ' + JSON.stringify(fb) + ' type=' + f.geometry.type); }
+            if (!fb) return false;
+            if (fb[0] > qBbox[2] || fb[2] < qBbox[0] || fb[1] > qBbox[3] || fb[3] < qBbox[1]) return false;
+
+            // 精确过滤：优先 Turf.js，回退纯 JS
+            if (op === 'BBOX') return true;
+            var turf = getTurf();
+            if (turf && filterResult && filterResult.geoJson) {
+              try {
+                if (op === 'Within') return turf.booleanWithin(f, filterResult.geoJson);
+                return turf.booleanIntersects(f, filterResult.geoJson);
+              } catch (e) {}
+            }
+            if (op === 'Within') return _pointsInPoly(f.geometry, qPoly);
+            return _geometryIntersects(f.geometry, qPoly, fb, qBbox);
+          } catch (e) { return false; }
+        });
+      }
+      return features;
     },
 
     _detectDrawingType() {
@@ -855,25 +1427,30 @@ export default {
 
       this.clearHighlights();
 
+      // 包装为 FeatureCollection 批量加载（效率更高，Cesium 兼容性更好）
+      var collection = { type: 'FeatureCollection', features: features.filter(function (f) { return f && f.geometry; }) };
+      if (collection.features.length === 0) return;
+
       var self = this;
-      features.forEach(function (feature, idx) {
-        if (!feature.geometry) return;
-        try {
-          var dataSource = Cesium.GeoJsonDataSource.load(feature, {
-            stroke: Cesium.Color.fromCssColorString('#00FF00'),
-            strokeWidth: 2,
-            fill: Cesium.Color.fromCssColorString('#00FF00').withAlpha(0.3),
-            markerColor: Cesium.Color.fromCssColorString('#00FF00'),
-            markerSize: 18
-          });
-          dataSource.then(function (ds) {
+      try {
+        var promise = Cesium.GeoJsonDataSource.load(collection, {
+          stroke: Cesium.Color.fromCssColorString('#00FF00'),
+          strokeWidth: 2,
+          fill: Cesium.Color.fromCssColorString('#00FF00').withAlpha(0.3),
+          markerColor: Cesium.Color.fromCssColorString('#00FF00'),
+          markerSize: 18
+        });
+        if (promise && promise.then) {
+          promise.then(function (ds) {
             self._highlightEntities.push(ds);
             viewer.dataSources.add(ds);
-          }).catch(function () {});
-        } catch (e) {
-          // 单个 feature 加载失败，继续处理下一个
+          }).catch(function (e) {
+            console.warn('[SpacialQueryManager] 高亮加载失败:', e);
+          });
         }
-      });
+      } catch (e) {
+        console.warn('[SpacialQueryManager] 高亮异常:', e);
+      }
     },
 
     clearHighlights() {
@@ -1490,11 +2067,9 @@ export default {
       this.queryError = null;
 
       // 自动重新查询
-      if (this.selectedLayerId) {
-        setTimeout(function () {
-          self.executeQuery();
-        }, 1200);
-      }
+      setTimeout(function () {
+        self.executeQuery();
+      }, 1200);
     },
 
     _redrawHistoryGeometry(item) {
@@ -1646,7 +2221,51 @@ export default {
       }
     },
 
+    // 下拉框展开时刷新，同步 LayerTreeManager 勾选状态
+    refreshVisibleLayers() {
+      var self = this;
+      // 补录动态注入的本地图层（不在静态 JSON 中）
+      this._loadedIds.forEach(function (id) {
+        if (!self.queryableLayers.find(function (l) { return l.id === id; })) {
+          // 查找显示名称：面板状态 > Cesium dataSources > ID 回退
+          var name = id;
+          try {
+            var ps = window.__panelSingletonManager__;
+            if (ps) {
+              var state = ps.getPanelState('LayerTreeManager');
+              if (state && state.configList) {
+                var node = state.configList.find(function (n) { return n.id === id; });
+                if (node && node.name) name = node.name;
+              }
+            }
+          } catch (e) {}
+          if (name === id) {
+            try {
+              var viewer = self.getViewer();
+              if (viewer) {
+                for (var i = 0; i < viewer.dataSources.length; i++) {
+                  var ds = viewer.dataSources.get(i);
+                  if (ds && ds.name && ds.name.indexOf(id) >= 0) { name = ds.name; break; }
+                }
+              }
+            } catch (e2) {}
+          }
+          self.queryableLayers.push({
+            id: id, name: name, url: '',
+            layerType: 'geojson', baseUrl: '', typeName: '',
+            fields: [], _dynamic: true
+          });
+        }
+      });
+
+      this.visibleQueryableLayers = this._loadedIds.length > 0
+        ? this.queryableLayers.filter(function (l) { return self._loadedIds.indexOf(l.id) >= 0; })
+        : this.queryableLayers.slice();
+    },
+
     clearResults() {
+      // 取消正在进行的全部图层查询
+      if (this._allQueryAbort) { try { this._allQueryAbort.abort(); } catch (e) {} this._allQueryAbort = null; }
       // ⭐ 闪烁激活时不停止——由 toggleHighlightFeature 控制生命周期
       if (this._blinkIndex < 0) {
         this._stopBlink();

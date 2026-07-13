@@ -9,7 +9,7 @@
  */
 
 // 动态加载 Turf.js（兼容 CDN 全局引入和 npm 包引入两种方式）
-function getTurf() {
+export function getTurf() {
   if (typeof window.turf !== 'undefined') return window.turf;
   // 如果 @turf/turf 以 npm 包形式引入，需要在调用方动态 import
   return null;
