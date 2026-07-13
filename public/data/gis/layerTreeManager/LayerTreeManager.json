@@ -52,6 +52,34 @@
     "centerHeight": 15000000
   },
   {
+    "id": "wms-nasa",
+    "name": "NASA GIBS 全球影像(WMS)",
+    "parentId": "folder-wms",
+    "nodeType": "layer",
+    "url": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi",
+    "sortOrder": 1,
+    "visible": 1,
+    "description": "NASA官方WMS服务，无需API Key",
+    "icon": "🛰️",
+    "centerLon": 116.4,
+    "centerLat": 39.9,
+    "centerHeight": 50000
+  },
+  {
+    "id": "wms-usgs",
+    "name": "USGS 国家地形图(WMS)",
+    "parentId": "folder-wms",
+    "nodeType": "layer",
+    "url": "https://basemap.nationalmap.gov/arcgis/services/USGSTopo/MapServer/WMSServer",
+    "sortOrder": 2,
+    "visible": 1,
+    "description": "USGS官方WMS",
+    "icon": "🗺️",
+    "centerLon": 116.4,
+    "centerLat": 39.9,
+    "centerHeight": 50000
+  },
+  {
     "id": "folder-wfs",
     "name": "WFS 要素服务",
     "parentId": "root-ogc",
@@ -339,6 +367,48 @@
     }
   },
   {
+    "id": "wfs-geoserver",
+    "name": "GeoServer 示例要素(WFS 2.0)",
+    "parentId": "folder-wfs",
+    "nodeType": "layer",
+    "url": "https://demo.geo-solutions.it/geoserver/wfs?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0&TYPENAMES=topp%3Astates&OUTPUTFORMAT=application%2Fjson&MAXFEATURES=500",
+    "sortOrder": 1,
+    "visible": 1,
+    "description": "GeoServer官方Demo WFS 2.0，返回美国各州边界GeoJSON。意大利托管，中国大陆可访问",
+    "icon": "🌍",
+    "centerLon": -98,
+    "centerLat": 39,
+    "centerHeight": 5000000
+  },
+  {
+    "id": "wfs-emsc-quake",
+    "name": "EMSC 全球地震事件(WFS)",
+    "parentId": "folder-wfs",
+    "nodeType": "layer",
+    "url": "https://www.seismicportal.eu/wfs?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0&TYPENAMES=event&OUTPUTFORMAT=application%2Fjson&MAXFEATURES=500",
+    "sortOrder": 2,
+    "visible": 1,
+    "description": "EMSC欧洲地中海地震中心，全球实时地震数据WFS。法国托管，中国大陆可访问",
+    "icon": "🌋",
+    "centerLon": 15,
+    "centerLat": 42,
+    "centerHeight": 15000000
+  },
+  {
+    "id": "wfs-ingv-quake",
+    "name": "INGV 意大利地震(WFS)",
+    "parentId": "folder-wfs",
+    "nodeType": "layer",
+    "url": "https://emidius.mi.ingv.it/geoserver/wfs?SERVICE=WFS&REQUEST=GetFeature&VERSION=2.0.0&TYPENAMES=event&OUTPUTFORMAT=application%2Fjson&MAXFEATURES=500",
+    "sortOrder": 3,
+    "visible": 1,
+    "description": "INGV意大利国家地球物理研究所，地中海区域地震数据WFS。意大利托管，中国大陆可访问",
+    "icon": "🇮🇹",
+    "centerLon": 12.5,
+    "centerLat": 42,
+    "centerHeight": 5000000
+  },
+  {
     "id": "folder-wmts",
     "name": "WMTS 瓦片地图服务",
     "parentId": "root-ogc",
@@ -487,6 +557,34 @@
     "icon": "🚗"
   },
   {
+    "id": "xyz-esri-img",
+    "name": "ESRI 全球卫星影像",
+    "parentId": "root-xyz",
+    "nodeType": "layer",
+    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    "sortOrder": 2,
+    "visible": 1,
+    "description": "ESRI卫星影像底图",
+    "icon": "🛰️",
+    "centerLon": 116.4,
+    "centerLat": 39.9,
+    "centerHeight": 8000
+  },
+  {
+    "id": "xyz-versatiles-raster",
+    "name": "VersaTiles 浅色栅格底图(XYZ)",
+    "parentId": "root-xyz",
+    "nodeType": "layer",
+    "url": "https://tiles.versatiles.org/tiles/versatiles-light/{z}/{x}/{y}.png",
+    "sortOrder": 9,
+    "visible": 1,
+    "description": "VersaTiles免费浅色栅格瓦片，XYZ格式，全球覆盖，直接可用",
+    "icon": "🎨",
+    "centerLon": 116.4,
+    "centerLat": 39.9,
+    "centerHeight": 50000
+  },
+  {
     "id": "root-mvt",
     "name": "矢量瓦片服务（MVT）",
     "parentId": null,
@@ -556,6 +654,76 @@
     "icon": "🇩🇪"
   },
   {
+    "id": "mvt-versatiles",
+    "name": "VersaTiles 全球矢量瓦片(Shortbread)",
+    "parentId": "root-mvt",
+    "nodeType": "layer",
+    "url": "https://tiles.versatiles.org/tiles/osm/{z}/{x}/{y}",
+    "sortOrder": 1,
+    "visible": 1,
+    "description": "免费全球OSM矢量瓦片，无需API Key",
+    "icon": "🌍",
+    "centerLon": 116.4,
+    "centerLat": 39.9,
+    "centerHeight": 50000
+  },
+  {
+    "id": "mvt-bkg",
+    "name": "BKG 德国官方矢量底图",
+    "parentId": "root-mvt",
+    "nodeType": "layer",
+    "url": "https://sgx.geodatenzentrum.de/gdz_basemapde_vektor/tiles/v2/bm_web_de_3857/{z}/{x}/{y}.pbf",
+    "sortOrder": 2,
+    "visible": 1,
+    "description": "德国政府官方MVT，无需API Key，覆盖德国全境",
+    "icon": "🇩🇪",
+    "centerLon": 10.45,
+    "centerLat": 51.16,
+    "centerHeight": 500000
+  },
+  {
+    "id": "mvt-geofabrik",
+    "name": "Geofabrik Shortbread 矢量瓦片",
+    "parentId": "root-mvt",
+    "nodeType": "layer",
+    "url": "https://tiles.shortbread.geofabrik.de/tiles/shortbread_v1/{z}/{x}/{y}.mvt",
+    "sortOrder": 4,
+    "visible": 1,
+    "description": "德国Geofabrik免费MVT",
+    "icon": "🧩",
+    "centerLon": 8.68,
+    "centerLat": 50.11,
+    "centerHeight": 500000
+  },
+  {
+    "id": "mvt-maptiler-cn",
+    "name": "MapTiler 矢量瓦片(全球CDN)",
+    "parentId": "root-mvt",
+    "nodeType": "layer",
+    "url": "https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=get-free-key",
+    "sortOrder": 5,
+    "visible": 1,
+    "description": "MapTiler全球CDN矢量瓦片，OpenMapTiles schema，需免费注册Key替换URL，国内可访问",
+    "icon": "🎯",
+    "centerLon": 116.4,
+    "centerLat": 39.9,
+    "centerHeight": 50000
+  },
+  {
+    "id": "mvt-planet",
+    "name": "OpenFreeMap 全球矢量瓦片",
+    "parentId": "root-mvt",
+    "nodeType": "layer",
+    "url": "https://tiles.openfreemap.org/planet/{z}/{x}/{y}.pbf",
+    "sortOrder": 6,
+    "visible": 1,
+    "description": "OpenFreeMap免费全球MVT，无需API Key",
+    "icon": "🌏",
+    "centerLon": 116.4,
+    "centerLat": 39.9,
+    "centerHeight": 50000
+  },
+  {
     "id": "root-special",
     "name": "专题与特色图层",
     "parentId": null,
@@ -578,7 +746,7 @@
     "description": "来源：OneGeology / 全球地质调查局联盟 | 服务类型：WMS 1.3.0 | 全球地质图国际合作项目，整合超过120个国家地质调查局的数据。手动指定 layer=OneGeology 以避免 GRanD_Dams 等服务器端数据缺失的图层。",
     "icon": "⛏️",
     "centerLon": 12.5,
-    "centerLat": 42.0,
+    "centerLat": 42,
     "centerHeight": 12000000
   },
   {
@@ -682,7 +850,7 @@
     "wcsTimeSlice": "2000-02-01T00:00:00Z",
     "wcsColorRamp": true,
     "wcsRenderMode": "3d",
-    "wcsElevationScale": 1.0
+    "wcsElevationScale": 1
   },
   {
     "id": "wcs-rasdaman-nir",
@@ -703,7 +871,7 @@
     "wcsAlpha": 0.5,
     "wcsColorRamp": true,
     "wcsRenderMode": "3d",
-    "wcsElevationScale": 30.0
+    "wcsElevationScale": 30
   },
   {
     "id": "folder-local-dem",
@@ -713,6 +881,16 @@
     "sortOrder": 3,
     "visible": 1,
     "description": "本地 GeoTIFF 格式数字高程模型，无需网络请求，直接从本地文件加载 3D 渲染",
+    "icon": "📁"
+  },
+  {
+    "id": "root-geocode",
+    "name": "地理编码服务",
+    "parentId": null,
+    "nodeType": "folder",
+    "sortOrder": 4,
+    "visible": 1,
+    "description": "正向/反向地理编码，名称↔坐标互查",
     "icon": "📁"
   },
   {
@@ -729,7 +907,7 @@
     "centerLat": 40,
     "centerHeight": 500000,
     "demRenderMode": "3d",
-    "demElevationScale": 1.0,
+    "demElevationScale": 1,
     "demColorRamp": true
   },
   {
@@ -746,7 +924,7 @@
     "centerLat": 40,
     "centerHeight": 500000,
     "demRenderMode": "terrain",
-    "demElevationScale": 1.0
+    "demElevationScale": 1
   },
   {
     "id": "local-terrain-cop30-tiles",
@@ -761,5 +939,72 @@
     "centerLon": 103.5,
     "centerLat": 30.5,
     "centerHeight": 100000
+  },
+  {
+    "id": "local-dem-srtm30",
+    "name": "SRTM 30M DEM（下载后放入文件）",
+    "parentId": "folder-local-dem",
+    "nodeType": "layer",
+    "url": "/data/dem/srtm_30m.tif",
+    "sortOrder": 1,
+    "visible": 1,
+    "description": "SRTM 30m 分辨率全球 DEM。从地理空间数据云 (gscloud.cn) 下载 → 解压 → 将 .tif 重命名为 srtm_30m.tif 放入 public/data/dem/",
+    "icon": "🏔️",
+    "centerLon": 116,
+    "centerLat": 40,
+    "centerHeight": 500000,
+    "demRenderMode": "3d",
+    "demElevationScale": 1,
+    "demColorRamp": true
+  },
+  {
+    "id": "local-dem-aster30",
+    "name": "ASTER GDEM 30M（下载后放入文件）",
+    "parentId": "folder-local-dem",
+    "nodeType": "layer",
+    "url": "/data/dem/aster_gdem_30m.tif",
+    "sortOrder": 2,
+    "visible": 1,
+    "description": "ASTER GDEM v3 30m 全球 DEM，覆盖 83°N-83°S。下载：www.gscloud.cn → DEM 数字高程数据 → ASTER GDEM 30M，或 earthexplorer.usgs.gov",
+    "icon": "⛰️",
+    "centerLon": 116,
+    "centerLat": 40,
+    "centerHeight": 500000,
+    "demRenderMode": "3d",
+    "demElevationScale": 1,
+    "demColorRamp": true
+  },
+  {
+    "id": "local-dem-aw3d30",
+    "name": "ALOS AW3D30 DEM（下载后放入文件）",
+    "parentId": "folder-local-dem",
+    "nodeType": "layer",
+    "url": "/data/dem/alos_aw3d30.tif",
+    "sortOrder": 3,
+    "visible": 1,
+    "description": "JAXA ALOS AW3D30 全球 30m DEM，精度~5m。下载：www.eorc.jaxa.jp/ALOS → AW3D30 → 注册后下载",
+    "icon": "🗻",
+    "centerLon": 116,
+    "centerLat": 40,
+    "centerHeight": 500000,
+    "demRenderMode": "3d",
+    "demElevationScale": 1,
+    "demColorRamp": true
+  },
+  {
+    "id": "geocode-tianditu",
+    "name": "天地图 地址→坐标(地理编码)",
+    "parentId": "root-geocode",
+    "nodeType": "layer",
+    "url": "https://api.tianditu.gov.cn/search",
+    "sortOrder": 1,
+    "visible": 1,
+    "description": "天地图POI搜索/地理编码API。需替换URL中的tk参数为你的天地图Key。查询结果自动构建为GeoJSON点图层。",
+    "icon": "🔍",
+    "centerLon": 116.4,
+    "centerLat": 39.9,
+    "centerHeight": 50000,
+    "geocodingAddress": "北京市天安门",
+    "geocodingKey": "你的天地图Key"
   }
 ]
