@@ -243,6 +243,54 @@
     "pinPixelOffsetY": -14
   },
   {
+    "id": "geojson-china-cities",
+    "name": "中国主要城市点位（GeoJSON·本地）",
+    "parentId": "folder-geojson",
+    "nodeType": "layer",
+    "url": "/data/gis/geojson/china_cities.geojson",
+    "sortOrder": 7,
+    "visible": 1,
+    "description": "来源：Natural Earth（筛选中国） | 服务类型：本地GeoJSON | 从全球数据中筛选出的中国98个主要城市点位，本地文件加载极快。字段: name(城市名)/adm0name(国家)/pop_max(人口)。",
+    "icon": "🇨🇳",
+    "centerLon": 104,
+    "centerLat": 35,
+    "centerHeight": 5000000,
+    "geoJsonStyle": {
+      "markerColor": "#3388FF",
+      "markerSize": 18,
+      "strokeWidth": 1,
+      "fillOpacity": 0.6
+    },
+    "pinField": "name",
+    "pinFontSize": 14,
+    "pinTextColor": "#FFFFFF",
+    "pinPixelOffsetY": -16
+  },
+  {
+    "id": "geojson-china-airports",
+    "name": "中国主要机场点位（GeoJSON·本地）",
+    "parentId": "folder-geojson",
+    "nodeType": "layer",
+    "url": "/data/gis/geojson/china_airports.geojson",
+    "sortOrder": 8,
+    "visible": 1,
+    "description": "来源：Natural Earth（筛选中国） | 服务类型：本地GeoJSON | 从全球数据中按ICAO代码(Z/RC/VH/VM)筛选的中国46个机场点位（含台港澳），本地文件加载极快。字段: name(机场名)/iata_code(IATA码)/gps_code(ICAO码)/type(类型)。",
+    "icon": "✈️",
+    "centerLon": 106,
+    "centerLat": 32,
+    "centerHeight": 5000000,
+    "geoJsonStyle": {
+      "markerColor": "#FF4400",
+      "markerSize": 14,
+      "strokeWidth": 1,
+      "fillOpacity": 0.5
+    },
+    "pinField": "name",
+    "pinFontSize": 13,
+    "pinTextColor": "#FFFFFF",
+    "pinPixelOffsetY": -14
+  },
+  {
     "id": "wfs-tianditu-water",
     "name": "天地图 中国水系面要素（WFS）",
     "parentId": "folder-wfs",

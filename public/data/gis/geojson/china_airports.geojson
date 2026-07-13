@@ -1,0 +1,973 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 8,
+        "type": "military mid",
+        "name": "台南机场",
+        "abbrev": "TNN",
+        "location": "ramp",
+        "gps_code": "RCNN",
+        "iata_code": "TNN",
+        "wikipedia": "http://en.wikipedia.org/wiki/Tainan_Airport",
+        "natlscale": 10,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          120.20973331809326,
+          22.950667918346994
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 8,
+        "type": "military mid",
+        "name": "台中机场",
+        "abbrev": "RMQ",
+        "location": "ramp",
+        "gps_code": "RCMQ",
+        "iata_code": "RMQ",
+        "wikipedia": "http://en.wikipedia.org/wiki/Taichung_Airport",
+        "natlscale": 10,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          120.63070354758395,
+          24.26665555671146
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 8,
+        "type": "major",
+        "name": "长春龙嘉国际机场",
+        "abbrev": "CGQ",
+        "location": "terminal",
+        "gps_code": "ZYCC",
+        "iata_code": "CGQ",
+        "wikipedia": "http://en.wikipedia.org/wiki/Changchun_Longjia_International_Airport",
+        "natlscale": 10,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          125.69045681299836,
+          43.99301147957697
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 8,
+        "type": "mid",
+        "name": "合肥骆岗机场",
+        "abbrev": "HFE",
+        "location": "ramp",
+        "gps_code": "ZSOF",
+        "iata_code": "HFE",
+        "wikipedia": "http://en.wikipedia.org/wiki/Hefei_Luogang_International_Airport",
+        "natlscale": 10,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          117.30419701588772,
+          31.77985767957784
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 8,
+        "type": "major",
+        "name": "太原武宿国际机场",
+        "abbrev": "TYN",
+        "location": "terminal",
+        "gps_code": "ZBYN",
+        "iata_code": "TYN",
+        "wikipedia": "http://en.wikipedia.org/wiki/Taiyuan_Wusu_International_Airport",
+        "natlscale": 10,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          112.62589153931525,
+          37.754511779151215
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 8,
+        "type": "major and military",
+        "name": "烟台机场",
+        "abbrev": "YNT",
+        "location": "terminal",
+        "gps_code": "ZSYT",
+        "iata_code": "YNT",
+        "wikipedia": "http://en.wikipedia.org/wiki/Yantai_Laishan_International_Airport",
+        "natlscale": 10,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.37204741777312,
+          37.407704472692394
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 8,
+        "type": "mid",
+        "name": "佳木斯东郊机场",
+        "abbrev": "JMU",
+        "location": "ramp",
+        "gps_code": "ZYJM",
+        "iata_code": "JMU",
+        "wikipedia": "http://en.wikipedia.org/wiki/Jiamusi_Dongjiao_Airport",
+        "natlscale": 10,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          130.4562047044068,
+          46.843015022337944
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 8,
+        "type": "major",
+        "name": "牡丹江海浪机场",
+        "abbrev": "MDG",
+        "location": "ramp",
+        "gps_code": "ZYMD",
+        "iata_code": "MDG",
+        "wikipedia": "http://en.wikipedia.org/wiki/Mudanjiang_Hailang_Airport",
+        "natlscale": 10,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          129.5801515322203,
+          44.53429362999352
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 7,
+        "type": "mid",
+        "name": "南昌昌北国际机场",
+        "abbrev": "KHN",
+        "location": "terminal",
+        "gps_code": "ZSCN",
+        "iata_code": "KHN",
+        "wikipedia": "http://en.wikipedia.org/wiki/Nanchang_Changbei_International_Airport",
+        "natlscale": 15,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          115.91197991860221,
+          28.862489120066552
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 7,
+        "type": "major",
+        "name": "昆明巫家坝国际机场",
+        "abbrev": "KMG",
+        "location": "terminal",
+        "gps_code": "ZPPP",
+        "iata_code": "KMG",
+        "wikipedia": "http://en.wikipedia.org/wiki/Kunming_Wujiaba_International_Airport",
+        "natlscale": 15,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          102.74211757882347,
+          24.99999611008102
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 7,
+        "type": "major",
+        "name": "澳门国际机场",
+        "abbrev": "MFM",
+        "location": "terminal",
+        "gps_code": "VMMC",
+        "iata_code": "MFM",
+        "wikipedia": "http://en.wikipedia.org/wiki/Macau_International_Airport",
+        "natlscale": 15,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          113.57451294861951,
+          22.15765725296336
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 7,
+        "type": "major",
+        "name": "宁波栎社国际机场",
+        "abbrev": "NGB",
+        "location": "terminal",
+        "gps_code": "ZSNB",
+        "iata_code": "NGB",
+        "wikipedia": "http://en.wikipedia.org/wiki/Ningbo_Lishe_International_Airport",
+        "natlscale": 15,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.46181938848366,
+          29.820823190686056
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 7,
+        "type": "mid",
+        "name": "青岛流亭国际机场",
+        "abbrev": "TAO",
+        "location": "terminal",
+        "gps_code": "ZSQD",
+        "iata_code": "TAO",
+        "wikipedia": "http://en.wikipedia.org/wiki/Qingdao_Liuting_International_Airport",
+        "natlscale": 15,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          120.3806859490605,
+          36.267757808103866
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 7,
+        "type": "major",
+        "name": "天津滨海国际机场",
+        "abbrev": "TSN",
+        "location": "terminal",
+        "gps_code": "ZBTJ",
+        "iata_code": "TSN",
+        "wikipedia": "http://en.wikipedia.org/wiki/Tianjin_Binhai_International_Airport",
+        "natlscale": 15,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          117.35272315991853,
+          39.12946099090075
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 7,
+        "type": "major",
+        "name": "乌鲁木齐地窝堡国际机场",
+        "abbrev": "URC",
+        "location": "terminal",
+        "gps_code": "ZWWW",
+        "iata_code": "URC",
+        "wikipedia": "http://en.wikipedia.org/wiki/%C3%9Cr%C3%BCmqi_Diwopu_International_Airport",
+        "natlscale": 15,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          87.46712984878084,
+          43.898338219365286
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 7,
+        "type": "major",
+        "name": "厦门高崎国际机场",
+        "abbrev": "XMN",
+        "location": "terminal",
+        "gps_code": "ZSAM",
+        "iata_code": "XMN",
+        "wikipedia": "http://en.wikipedia.org/wiki/Xiamen_Gaoqi_International_Airport",
+        "natlscale": 15,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          118.12696884672026,
+          24.537192570557004
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 7,
+        "type": "major",
+        "name": "石家庄正定国际机场",
+        "abbrev": "SJW",
+        "location": "terminal",
+        "gps_code": "ZBSJ",
+        "iata_code": "SJW",
+        "wikipedia": "http://en.wikipedia.org/wiki/Shijiazhuang_Zhengding_International_Airport",
+        "natlscale": 15,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          114.6922665989016,
+          38.27814091311202
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 7,
+        "type": "major",
+        "name": "杭州萧山国际机场",
+        "abbrev": "HGH",
+        "location": "terminal",
+        "gps_code": "ZSHC",
+        "iata_code": "HGH",
+        "wikipedia": "http://en.wikipedia.org/wiki/Hangzhou_Xiaoshan_International_Airport",
+        "natlscale": 15,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          120.43209737631294,
+          30.235186279041436
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 6,
+        "type": "major",
+        "name": "哈尔滨太平机场",
+        "abbrev": "HRB",
+        "location": "terminal",
+        "gps_code": "ZYHB",
+        "iata_code": "HRB",
+        "wikipedia": "http://en.wikipedia.org/wiki/Harbin_Taiping_International_Airport",
+        "natlscale": 20,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          126.2369830308627,
+          45.62060117232452
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 6,
+        "type": "major",
+        "name": "南京禄口国际机场",
+        "abbrev": "NKG",
+        "location": "terminal",
+        "gps_code": "ZSNJ",
+        "iata_code": "NKG",
+        "wikipedia": "http://en.wikipedia.org/wiki/Nanjing_Lukou_International_Airport",
+        "natlscale": 20,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          118.86610214690592,
+          31.73532492961766
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 6,
+        "type": "major",
+        "name": "长沙黄花国际机场",
+        "abbrev": "CSX",
+        "location": "terminal",
+        "gps_code": "ZGHA",
+        "iata_code": "CSX",
+        "wikipedia": "http://en.wikipedia.org/wiki/Changsha_airport",
+        "natlscale": 20,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          113.21405420325205,
+          28.189921861945066
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 6,
+        "type": "mid",
+        "name": "福州长乐国际机场",
+        "abbrev": "FOC",
+        "location": "terminal",
+        "gps_code": "ZSFZ",
+        "iata_code": "FOC",
+        "wikipedia": "http://en.wikipedia.org/wiki/Fuzhou_Changle_International_Airport",
+        "natlscale": 20,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          119.6680438209992,
+          25.931823314814313
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 6,
+        "type": "mid",
+        "name": "呼和浩特白塔国际机场",
+        "abbrev": "HET",
+        "location": "terminal",
+        "gps_code": "ZBHH",
+        "iata_code": "HET",
+        "wikipedia": "http://en.wikipedia.org/wiki/Hohhot_Baita_International_Airport",
+        "natlscale": 20,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          111.81468182162591,
+          40.85406009065522
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 6,
+        "type": "major",
+        "name": "桂林两江国际机场",
+        "abbrev": "KWL",
+        "location": "terminal",
+        "gps_code": "ZGKL",
+        "iata_code": "KWL",
+        "wikipedia": "http://en.wikipedia.org/wiki/Guilin_Liangjiang_International_Airport",
+        "natlscale": 20,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          110.04689349777009,
+          25.217605525229324
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 6,
+        "type": "major",
+        "name": "南宁吴圩国际机场",
+        "abbrev": "NNG",
+        "location": "terminal",
+        "gps_code": "ZGNN",
+        "iata_code": "NNG",
+        "wikipedia": "http://en.wikipedia.org/wiki/Nanning_Wuxu_International_Airport",
+        "natlscale": 20,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          108.16801227333096,
+          22.612037054178508
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 6,
+        "type": "mid",
+        "name": "兰州中川机场",
+        "abbrev": "ZGC",
+        "location": "terminal",
+        "gps_code": "ZLLL",
+        "iata_code": "ZGC",
+        "wikipedia": "http://en.wikipedia.org/wiki/Lanzhou_Zhongchuan_Airport",
+        "natlscale": 20,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          103.61541536304331,
+          36.50788424612367
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 6,
+        "type": "major",
+        "name": "三亚凤凰国际机场",
+        "abbrev": "SYX",
+        "location": "terminal",
+        "gps_code": "ZJSY",
+        "iata_code": "SYX",
+        "wikipedia": "http://en.wikipedia.org/wiki/Sanya_Phoenix_International_Airport",
+        "natlscale": 20,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          109.40823949107957,
+          18.309095990859316
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 6,
+        "type": "mid",
+        "name": "拉萨贡嘎机场",
+        "abbrev": "LXA",
+        "location": "terminal",
+        "gps_code": "ZULS",
+        "iata_code": "LXA",
+        "wikipedia": "http://en.wikipedia.org/wiki/Lhasa_Gonggar_Airport",
+        "natlscale": 20,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          90.9005610194027,
+          29.29369361231842
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 6,
+        "type": "mid",
+        "name": "和田机场",
+        "abbrev": "HTN",
+        "location": "terminal",
+        "gps_code": "ZWTN",
+        "iata_code": "HTN",
+        "wikipedia": "http://en.wikipedia.org/wiki/Hotan_Airport",
+        "natlscale": 20,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          79.87230052121915,
+          37.04003635097652
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 5,
+        "type": "major",
+        "name": "沈阳桃仙国际机场",
+        "abbrev": "SHE",
+        "location": "terminal",
+        "gps_code": "ZYTX",
+        "iata_code": "SHE",
+        "wikipedia": "http://en.wikipedia.org/wiki/Shenyang_Taoxian_International_Airport",
+        "natlscale": 30,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          123.4879744303385,
+          41.634789133958215
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 5,
+        "type": "major",
+        "name": "深圳宝安国际机场",
+        "abbrev": "SZX",
+        "location": "terminal",
+        "gps_code": "ZGSZ",
+        "iata_code": "SZX",
+        "wikipedia": "http://en.wikipedia.org/wiki/Shenzhen_airport",
+        "natlscale": 30,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          113.81585275108512,
+          22.64650771478675
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 5,
+        "type": "major",
+        "name": "郑州新郑国际机场",
+        "abbrev": "CGO",
+        "location": "terminal",
+        "gps_code": "ZHCC",
+        "iata_code": "CGO",
+        "wikipedia": "http://en.wikipedia.org/wiki/Zhengzhou_Xinzheng_International_Airport",
+        "natlscale": 30,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          113.84183130284451,
+          34.52630271989567
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 5,
+        "type": "major",
+        "name": "大连周水子国际机场",
+        "abbrev": "DLC",
+        "location": "terminal",
+        "gps_code": "ZYTL",
+        "iata_code": "DLC",
+        "wikipedia": "http://en.wikipedia.org/wiki/Dalian_Zhoushuizi_International_Airport",
+        "natlscale": 30,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.53891378010117,
+          38.96157023002216
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 4,
+        "type": "major",
+        "name": "高雄国际机场",
+        "abbrev": "KHH",
+        "location": "terminal",
+        "gps_code": "RCKH",
+        "iata_code": "KHH",
+        "wikipedia": "http://en.wikipedia.org/wiki/Kaohsiung_International_Airport",
+        "natlscale": 50,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          120.34515634215063,
+          22.57170610544221
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 4,
+        "type": "major",
+        "name": "西安咸阳机场",
+        "abbrev": "XIY",
+        "location": "terminal",
+        "gps_code": "ZLXY",
+        "iata_code": "XIY",
+        "wikipedia": "http://en.wikipedia.org/wiki/Xi'an_Xianyang_International_Airport",
+        "natlscale": 50,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          108.75581134215064,
+          34.442939105442214
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 4,
+        "type": "major",
+        "name": "广州白云国际机场",
+        "abbrev": "CAN",
+        "location": "terminal",
+        "gps_code": "ZGGG",
+        "iata_code": "CAN",
+        "wikipedia": "http://en.wikipedia.org/wiki/Guangzhou_Baiyun_International_Airport",
+        "natlscale": 50,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          113.29751655217066,
+          23.3891511573243
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 4,
+        "type": "mid",
+        "name": "喀什机场",
+        "abbrev": "KHG",
+        "location": "terminal",
+        "gps_code": "ZWSH",
+        "iata_code": "KHG",
+        "wikipedia": "http://en.wikipedia.org/wiki/Kashgar_Airport",
+        "natlscale": 50,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          76.01301480600748,
+          39.537968630625755
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 4,
+        "type": "major",
+        "name": "上海浦东国际机场",
+        "abbrev": "PVG",
+        "location": "terminal",
+        "gps_code": "ZSPD",
+        "iata_code": "PVG",
+        "wikipedia": "http://en.wikipedia.org/wiki/Shanghai_Pudong_International_Airport",
+        "natlscale": 50,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.80151876057847,
+          31.152309029553294
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 3,
+        "type": "major",
+        "name": "重庆江北国际机场",
+        "abbrev": "CKG",
+        "location": "terminal",
+        "gps_code": "ZUCK",
+        "iata_code": "CKG",
+        "wikipedia": "http://en.wikipedia.org/wiki/Chongqing_Jiangbei_International_Airport",
+        "natlscale": 75,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          106.63801970481096,
+          29.724042224168777
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 2,
+        "type": "major",
+        "name": "香港国际机场",
+        "abbrev": "HKG",
+        "location": "terminal",
+        "gps_code": "VHHH",
+        "iata_code": "HKG",
+        "wikipedia": "http://en.wikipedia.org/wiki/Hong_Kong_International_Airport",
+        "natlscale": 150,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          113.93501638737635,
+          22.315332828086753
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 2,
+        "type": "major",
+        "name": "桃园机场",
+        "abbrev": "TPE",
+        "location": "terminal",
+        "gps_code": "RCTP",
+        "iata_code": "TPE",
+        "wikipedia": "http://en.wikipedia.org/wiki/Taiwan_Taoyuan_International_Airport",
+        "natlscale": 150,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.23137045332327,
+          25.076741104334637
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 2,
+        "type": "major",
+        "name": "北京首都机场",
+        "abbrev": "PEK",
+        "location": "terminal",
+        "gps_code": "ZBAA",
+        "iata_code": "PEK",
+        "wikipedia": "http://en.wikipedia.org/wiki/Beijing_Capital_International_Airport",
+        "natlscale": 150,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          116.58817400466103,
+          40.07876633633102
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 2,
+        "type": "major",
+        "name": "成都双流机场",
+        "abbrev": "CTU",
+        "location": "terminal",
+        "gps_code": "ZUUU",
+        "iata_code": "CTU",
+        "wikipedia": "http://en.wikipedia.org/wiki/Chengdu_Shuangliu_International_Airport",
+        "natlscale": 150,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          103.95613648169501,
+          30.581071264746427
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "scalerank": 2,
+        "type": "major",
+        "name": "上海虹桥机场",
+        "abbrev": "SHA",
+        "location": "terminal",
+        "gps_code": "ZSSS",
+        "iata_code": "SHA",
+        "wikipedia": "http://en.wikipedia.org/wiki/Shanghai_Hongqiao_International_Airport",
+        "natlscale": 150,
+        "featureclass": "Airport"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          121.34118378856714,
+          31.187257431407843
+        ]
+      }
+    }
+  ]
+}
