@@ -1921,15 +1921,17 @@ export default {
         return Cesium.Cartesian3.fromDegrees(lon, lat, totalH / count);
       }
 
-      // 经纬度 → 屏幕坐标，优先使用地形高度 Cartesian3
+      // 经纬度 → 屏幕坐标（CSS像素），优先使用地形高度 Cartesian3
+      var dpr = window.devicePixelRatio || 1;
       function projectLonLat(lon, lat) {
         var cart = findCartesian3(lon, lat) || getInterpolatedCartesian3(lon, lat) || Cesium.Cartesian3.fromDegrees(lon, lat, 0);
         var sc = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, cart);
         if (!Cesium.defined(sc)) return null;
-        return { x: sc.x - cesiumRect.left, y: sc.y - cesiumRect.top };
+        // wgs84ToWindowCoordinates 返回物理像素，需转为 CSS 像素
+        return { x: sc.x / dpr - cesiumRect.left, y: sc.y / dpr - cesiumRect.top };
       }
 
-      // 计算缓冲区像素半径
+      // 计算缓冲区像素半径（CSS 像素）
       function calcPixelRadius(lonLat, radiusM) {
         if (!radiusM || radiusM <= 0 || !lonLat) return 0;
         var latRad = lonLat[1] * Math.PI / 180;
@@ -1938,7 +1940,7 @@ export default {
         var c1 = Cesium.Cartesian3.fromDegrees(lonLat[0] + dLonDeg, lonLat[1], 0);
         var s0 = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, c0);
         var s1 = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, c1);
-        if (Cesium.defined(s0) && Cesium.defined(s1)) return Math.abs(s1.x - s0.x);
+        if (Cesium.defined(s0) && Cesium.defined(s1)) return Math.abs(s1.x - s0.x) / dpr;
         return 0;
       }
 
