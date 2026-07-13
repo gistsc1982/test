@@ -350,15 +350,18 @@
     "icon": "🧱"
   },
   {
-    "id": "wmts-placeholder",
-    "name": "（暂无可用WMTS服务）",
+    "id": "wmts-esri-street",
+    "name": "ESRI 全球街道底图（WMTS）",
     "parentId": "folder-wmts",
     "nodeType": "layer",
-    "url": "",
+    "url": "https://services.arcgisonline.com/arcgis/rest/services/World_Street_Map/MapServer/WMTS/1.0.0/WMTSCapabilities.xml",
     "sortOrder": 1,
-    "visible": 0,
-    "description": "当前网络环境下暂无可用的 WMTS 预渲染瓦片服务。同源数据（BlueMarble、ASTER GDEM、SRTM、VIIRS、NDVI）已作为 WMS 图层提供，功能等效。如需 WMTS 测试，可配置天地图（需有效 tk）或自建 GeoServer WMTS 服务。",
-    "icon": "🚫"
+    "visible": 1,
+    "description": "来源：ESRI（ArcGIS Online）| 服务类型：ArcGIS WMTS | 全球街道底图，与项目已有的ESRI XYZ瓦片同源。无需API Key，中国大陆可访问。",
+    "icon": "🗺️",
+    "centerLon": 116.4,
+    "centerLat": 39.9,
+    "centerHeight": 50000
   },
   {
     "id": "folder-geojson",
