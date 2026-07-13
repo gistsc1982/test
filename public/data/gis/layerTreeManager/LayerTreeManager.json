@@ -662,24 +662,6 @@
     "wcsRenderMode": "2d"
   },
   {
-    "id": "wcs-rasdaman-s2",
-    "name": "rasdaman 德国 DTM (WCS 2.0)",
-    "parentId": "folder-wcs",
-    "nodeType": "layer",
-    "url": "https://ows.rasdaman.org/rasdaman/ows",
-    "sortOrder": 2,
-    "visible": 1,
-    "description": "rasdaman 公共 WCS 2.0.1 服务，Coverage=Germany_DTM。德国全境数字地形模型（色带渲染）。",
-    "icon": "🇩🇪",
-    "centerLon": 10,
-    "centerLat": 51,
-    "centerHeight": 500000,
-    "wcsCoverageName": "Germany_DTM",
-    "wcsFormat": "image/tiff",
-    "wcsVersion": "2.0.1",
-    "wcsRenderMode": "2d"
-  },
-  {
     "id": "wcs-rasdaman-avgtemp",
     "name": "rasdaman 全球地表温度(WCS 3D-Timeline)",
     "parentId": "folder-wcs",
