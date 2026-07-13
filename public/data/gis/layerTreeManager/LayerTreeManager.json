@@ -361,7 +361,8 @@
     "icon": "🗺️",
     "centerLon": 116.4,
     "centerLat": 39.9,
-    "centerHeight": 50000
+    "centerHeight": 50000,
+    "wmtsTileMatrixSet": "GoogleMapsCompatible"
   },
   {
     "id": "folder-geojson",
