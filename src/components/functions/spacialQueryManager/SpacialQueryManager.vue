@@ -395,9 +395,6 @@ export default {
     this._drawingManager = new DrawingToolManager();
     this.discoverWfsLayers();
 
-    // 预加载本地图层名称缓存（保证下拉首次展开就有正确名称）
-    this._fetchLocalLayerNamesFromJson();
-
     // 动态加载 Turf.js（用于精确空间运算，buffer / booleanIntersects 等）
     if (!window.turf) {
       var turfScript = document.createElement('script');
@@ -1643,8 +1640,10 @@ export default {
       var Cesium = this.getCesium();
       if (!viewer || !Cesium || !feature || !feature.geometry) return;
 
+      // 暂关重绘监听，避免 flyTo 途中触发查询区域 canvas 重绘
+      this._cleanupCameraRedrawListeners();
+
       try {
-        // 计算几何的经纬度范围
         var extent = this._calcGeometryExtent(feature.geometry);
         if (!extent) {
           // 无法计算范围时回退到单点定位
@@ -2270,24 +2269,21 @@ export default {
           }
         }
       } catch (e) {}
-      // 2. JSON 文件兜底（面板未打开时状态为空）
+      // 2. JSON 文件同步兜底（确保首次调用即有数据）
       if (Object.keys(this._localLayerNameCache).length === 0) {
-        this._fetchLocalLayerNamesFromJson();
+        try {
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', '/data/gis/GeoJsonLayerManager/GeoJsonLayerManager.json', false); // 同步
+          xhr.send();
+          if (xhr.status === 200) {
+            var items = JSON.parse(xhr.responseText);
+            if (Array.isArray(items)) {
+              items.forEach(function (it) { this._localLayerNameCache[it.id] = it.name || it.id; }.bind(this));
+            }
+          }
+        } catch (e) {}
       }
       return this._localLayerNameCache;
-    },
-
-    // 异步从 JSON 文件加载名称（不阻塞，本次用不上则下次用）
-    async _fetchLocalLayerNamesFromJson() {
-      try {
-        var resp = await fetch('/data/gis/GeoJsonLayerManager/GeoJsonLayerManager.json');
-        if (!resp.ok) return;
-        var items = await resp.json();
-        if (Array.isArray(items)) {
-          var self = this;
-          items.forEach(function (it) { self._localLayerNameCache[it.id] = it.name || it.id; });
-        }
-      } catch (e) {}
     },
 
     /** 获取 geojsonId 对应的显示名称（用于下拉和 DataSource 匹配） */
