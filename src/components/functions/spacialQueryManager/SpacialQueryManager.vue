@@ -344,6 +344,7 @@ export default {
       _blinkTimeout: null,
       _blinkDataSource: null,
       _blinkEntities: [],
+      _blinkDirectEntities: [],  // 直接创建的 point 实体（不走 GeoJsonDataSource）
 
       toolLabels: {
         point: '📍 点',
@@ -1501,10 +1502,48 @@ export default {
       console.log('[' + this.componentName + '] _startBlink: index=' + index + ', geometry.type=' + feature.geometry.type);
       this._blinkIndex = index;
 
-      // 剥离 Vue 响应式 Proxy，得到纯 GeoJSON Feature
-      var plainFeature = JSON.parse(JSON.stringify(feature));
-
       var self = this;
+
+      // ⭐ 隐藏绿色查询高亮
+      for (var h = 0; h < self._highlightEntities.length; h++) {
+        var hds = self._highlightEntities[h];
+        if (hds && !hds.isDestroyed) hds.show = false;
+      }
+
+      var geomType = feature.geometry.type;
+
+      // ⭐ Point/MultiPoint：直接创建 Cesium point 实体（GeoJsonDataSource 会生成 billboard，SDK 无法正确闪烁）
+      if (geomType === 'Point' || geomType === 'MultiPoint') {
+        var pointColor = Cesium.Color.fromCssColorString('#9C27B0');
+        var pointEntities = [];
+        var coordsList = geomType === 'Point' ? [feature.geometry.coordinates] : feature.geometry.coordinates;
+
+        for (var p = 0; p < coordsList.length; p++) {
+          var coord = coordsList[p];
+          var ptEntity = viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(coord[0], coord[1]),
+            point: {
+              pixelSize: 12,
+              color: new Cesium.ConstantProperty(pointColor),
+              outlineColor: new Cesium.ConstantProperty(Cesium.Color.WHITE),
+              outlineWidth: 2,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+            }
+          });
+          pointEntities.push(ptEntity);
+        }
+
+        self._blinkDirectEntities = pointEntities;
+        self._blinkEntities = pointEntities;
+        console.log('[' + self.componentName + '] _startBlink: 直接创建 ' + pointEntities.length + ' 个 point 实体');
+
+        viewer.scene.requestRender();
+        self._flashLoop(viewer);
+        return;
+      }
+
+      // ⭐ LineString / Polygon 等：保持 GeoJsonDataSource.load（线/面 SDK 可正常闪烁）
+      var plainFeature = JSON.parse(JSON.stringify(feature));
       var loadPromise = Cesium.GeoJsonDataSource.load(plainFeature, {
         stroke: Cesium.Color.fromCssColorString('#9C27B0'),
         strokeWidth: 4,
@@ -1513,17 +1552,8 @@ export default {
         markerSize: 20
       });
 
-      // 使用 .then(onFulfilled, onRejected) 兼容 Cesium 的 thenable
       loadPromise.then(function (dataSource) {
-        if (self._blinkIndex !== index) {
-          return;
-        }
-
-        // ⭐ 隐藏绿色查询高亮
-        for (var h = 0; h < self._highlightEntities.length; h++) {
-          var hds = self._highlightEntities[h];
-          if (hds && !hds.isDestroyed) hds.show = false;
-        }
+        if (self._blinkIndex !== index) return;
 
         viewer.dataSources.add(dataSource);
         self._blinkDataSource = dataSource;
@@ -1537,8 +1567,6 @@ export default {
         console.log('[' + self.componentName + '] _startBlink: GeoJsonDataSource 已加载, ' + entities.length + ' 个实体');
 
         viewer.scene.requestRender();
-
-        // ⭐ 收集所有 entity，统一启动 setInterval + SDK 闪烁
         self._flashLoop(viewer);
       }, function (err) {
         console.warn('[' + self.componentName + '] GeoJsonDataSource.load 失败:', err);
@@ -1631,6 +1659,255 @@ export default {
         } catch (e) { /* ignore */ }
       }
       this._blinkDataSource = null;
+
+      // ⭐ 清理直接创建的 point 实体
+      if (viewer && this._blinkDirectEntities.length > 0) {
+        for (var d = 0; d < this._blinkDirectEntities.length; d++) {
+          var ent = this._blinkDirectEntities[d];
+          if (ent && !ent.isDestroyed) {
+            viewer.entities.remove(ent);
+          }
+        }
+      }
+      this._blinkDirectEntities = [];
+      this._blinkEntities = [];
+      this._blinkIndex = -1;
+    },
+
+    /**
+     * 定位后闪烁 3 次（flyToFeature complete 回调中使用）
+     * - Point：创建临时 point 实体闪烁（SDK 对 point 闪烁效果最好）
+     * - LineString：创建临时加粗 polyline 实体闪烁（现有细线 alpha 变化不可见）
+     * - Polygon：直接闪烁现有绿色高亮实体（填充面 alpha 变化明显）
+     */
+    _blinkThreeTimes(feature) {
+      var viewer = this.getViewer();
+      var Cesium = this.getCesium();
+      if (!viewer || !Cesium || !feature || !feature.geometry) return;
+
+      var self = this;
+      var geomType = feature.geometry.type;
+
+      // 先停止当前正在进行的闪烁（toggleHighlightFeature 触发的）
+      this._stopBlink();
+
+      // ⭐ 从已有查询高亮 DataSource 中查找匹配的实体
+      var matchingEntities = this._findMatchingHighlightEntities(feature);
+
+      // ⭐ Polygon：直接闪烁现有实体（填充区域大，alpha 变化肉眼可见）
+      if (matchingEntities.length > 0 && (geomType === 'Polygon' || geomType === 'MultiPolygon')) {
+        console.log('[' + this.componentName + '] _blinkThreeTimes: 找到 ' + matchingEntities.length + ' 个匹配实体（Polygon），直接闪烁现有图形');
+        self._blinkEntities = matchingEntities;
+        self._blinkDirectEntities = [];
+        self._doThreeFlashes(viewer);
+        return;
+      }
+
+      // ⭐ 其他类型（Point / LineString 或未匹配到实体）：创建临时实体闪烁
+      if (matchingEntities.length > 0) {
+        console.log('[' + this.componentName + '] _blinkThreeTimes: 找到匹配实体但类型为 ' + geomType + '，创建临时实体以确保闪烁可见');
+      } else {
+        console.log('[' + this.componentName + '] _blinkThreeTimes: 未找到匹配实体，回退创建临时实体 (type=' + geomType + ')');
+      }
+
+      // 隐藏绿色查询高亮，让临时闪烁实体更明显
+      for (var h = 0; h < this._highlightEntities.length; h++) {
+        var hds = this._highlightEntities[h];
+        if (hds && !hds.isDestroyed) hds.show = false;
+      }
+
+      var flashColor = Cesium.Color.fromCssColorString('#FF5722');
+
+      // ⭐ Point：直接创建 Cesium point 实体
+      if (geomType === 'Point' || geomType === 'MultiPoint') {
+        var pointEntities = [];
+        var coordsList = geomType === 'Point' ? [feature.geometry.coordinates] : feature.geometry.coordinates;
+
+        for (var p = 0; p < coordsList.length; p++) {
+          var coord = coordsList[p];
+          var ptEntity = viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(coord[0], coord[1]),
+            point: {
+              pixelSize: 16,
+              color: new Cesium.ConstantProperty(flashColor),
+              outlineColor: new Cesium.ConstantProperty(Cesium.Color.WHITE),
+              outlineWidth: 2,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+            }
+          });
+          pointEntities.push(ptEntity);
+        }
+
+        self._blinkDirectEntities = pointEntities;
+        self._blinkEntities = pointEntities;
+        viewer.scene.requestRender();
+        self._doThreeFlashes(viewer);
+        return;
+      }
+
+      // ⭐ LineString / MultiLineString / Polygon（未匹配到实体时）：使用 GeoJsonDataSource.load
+      //    直接创建 entity 的材质类型不被 SDK FlashEntityByColor 支持，必须走 DataSource
+      if (geomType === 'LineString' || geomType === 'MultiLineString') {
+        console.log('[' + this.componentName + '] _blinkThreeTimes: LineString 通过 GeoJsonDataSource.load 创建闪烁实体');
+      }
+
+      var plainFeature = JSON.parse(JSON.stringify(feature));
+      var loadPromise = Cesium.GeoJsonDataSource.load(plainFeature, {
+        stroke: Cesium.Color.fromCssColorString('#00FF00'),
+        strokeWidth: 10,
+        fill: Cesium.Color.fromCssColorString('#00FF00').withAlpha(0.45),
+        markerColor: Cesium.Color.fromCssColorString('#00FF00'),
+        markerSize: 20
+      });
+
+      loadPromise.then(function (dataSource) {
+        viewer.dataSources.add(dataSource);
+        self._blinkDataSource = dataSource;
+
+        var entities = [];
+        var values = dataSource.entities.values;
+        for (var i = 0; i < values.length; i++) {
+          entities.push(values[i]);
+        }
+        self._blinkEntities = entities;
+
+        viewer.scene.requestRender();
+        self._doThreeFlashes(viewer);
+      }, function (err) {
+        console.warn('[' + self.componentName + '] _blinkThreeTimes 加载失败:', err);
+        for (var rh = 0; rh < self._highlightEntities.length; rh++) {
+          var rhds = self._highlightEntities[rh];
+          if (rhds && !rhds.isDestroyed) rhds.show = true;
+        }
+      });
+    },
+
+    /**
+     * 从已有查询高亮 DataSource 中查找与 feature 几何匹配的实体
+     * 使用 BBox 近似比较（容差 ~10m）
+     */
+    _findMatchingHighlightEntities(feature) {
+      var targetBbox = _bboxOfGeometry(feature.geometry);
+      if (!targetBbox) return [];
+
+      var result = [];
+      var tol = 0.0001; // ~10m 容差
+
+      for (var h = 0; h < this._highlightEntities.length; h++) {
+        var ds = this._highlightEntities[h];
+        if (!ds || ds.isDestroyed) continue;
+
+        var entities = ds.entities.values;
+        for (var i = 0; i < entities.length; i++) {
+          var ent = entities[i];
+          if (!ent || ent.isDestroyed) continue;
+
+          var entGeom = _entityToGeoJson(ent);
+          if (!entGeom) continue;
+
+          var entBbox = _bboxOfGeometry(entGeom);
+          if (!entBbox) continue;
+
+          // BBox 容差比较
+          if (Math.abs(entBbox[0] - targetBbox[0]) < tol &&
+              Math.abs(entBbox[1] - targetBbox[1]) < tol &&
+              Math.abs(entBbox[2] - targetBbox[2]) < tol &&
+              Math.abs(entBbox[3] - targetBbox[3]) < tol) {
+            result.push(ent);
+          }
+        }
+      }
+
+      return result;
+    },
+
+    /**
+     * 执行 3 次 FlashEntityByColor 闪烁，完成后自动清理
+     */
+    _doThreeFlashes(viewer) {
+      var self = this;
+      var flashCount = 0;
+      var MAX_FLASHES = 3;
+      var FLASH_INTERVAL = 900; // ms
+
+      if (typeof SGKJ_SDK === 'undefined' || !SGKJ_SDK.SceneEffect) {
+        console.warn('[' + this.componentName + '] SDK 不可用，跳过闪烁');
+        self._cleanupThreeFlashes();
+        return;
+      }
+
+      function doFlash() {
+        for (var i = 0; i < self._blinkEntities.length; i++) {
+          var ent = self._blinkEntities[i];
+          if (!ent || ent.isDestroyed) continue;
+          var geoType = self._detectEntityGeoType(ent);
+          try {
+            var effect = new SGKJ_SDK.SceneEffect(viewer);
+            effect.FlashEntityByColor(ent, geoType, {
+              time: 0.6,
+              step: 0.04,
+              minValue: 0.1,
+              maxValue: 1
+            });
+          } catch (e) { /* ignore */ }
+        }
+
+        flashCount++;
+
+        if (flashCount >= MAX_FLASHES) {
+          // 闪烁完成，清理
+          clearInterval(self._blinkInterval);
+          self._blinkInterval = null;
+          self._cleanupThreeFlashes();
+        }
+      }
+
+      // 立即触发第一次闪烁
+      doFlash();
+
+      // 按间隔触发后续闪烁
+      this._blinkInterval = setInterval(function () {
+        doFlash();
+      }, FLASH_INTERVAL);
+    },
+
+    /**
+     * 清理 3 次闪烁（不恢复 _blinkIndex 状态，因为此闪烁独立于 toggleHighlight）
+     */
+    _cleanupThreeFlashes() {
+      var viewer = this.getViewer();
+
+      if (this._blinkInterval) {
+        clearInterval(this._blinkInterval);
+        this._blinkInterval = null;
+      }
+
+      // ⭐ 恢复绿色查询高亮
+      for (var h = 0; h < this._highlightEntities.length; h++) {
+        var hds = this._highlightEntities[h];
+        if (hds && !hds.isDestroyed) hds.show = true;
+      }
+
+      // 清理 GeoJsonDataSource
+      if (viewer && this._blinkDataSource) {
+        try {
+          if (!this._blinkDataSource.isDestroyed) {
+            viewer.dataSources.remove(this._blinkDataSource, true);
+          }
+        } catch (e) { /* ignore */ }
+      }
+      this._blinkDataSource = null;
+
+      // 清理直接创建的 point 实体
+      if (viewer && this._blinkDirectEntities.length > 0) {
+        for (var d = 0; d < this._blinkDirectEntities.length; d++) {
+          var ent = this._blinkDirectEntities[d];
+          if (ent && !ent.isDestroyed) {
+            viewer.entities.remove(ent);
+          }
+        }
+      }
+      this._blinkDirectEntities = [];
       this._blinkEntities = [];
       this._blinkIndex = -1;
     },
@@ -1642,6 +1919,11 @@ export default {
 
       // 暂关重绘监听，避免 flyTo 途中触发查询区域 canvas 重绘
       this._cleanupCameraRedrawListeners();
+      // 清除旧的重绘画布和绘图管理器的交互 canvas，避免 flyTo 后残留在错误位置
+      this._removeRedrawCanvas();
+      if (this._drawingManager) this._drawingManager.deactivate();
+
+      var self = this;
 
       try {
         var extent = this._calcGeometryExtent(feature.geometry);
@@ -1652,15 +1934,23 @@ export default {
           viewer.camera.flyTo({
             destination: Cesium.Cartesian3.fromDegrees(coord[0], coord[1], 5000),
             orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-60), roll: 0 },
-            duration: 1.0
+            duration: 1.0,
+            complete: function () {
+              // 重新注册相机重绘监听，确保后续平移缩放能正确重绘查询区域
+              self._reRegisterCameraRedrawListeners();
+              // 定位完成后执行 3 次图形闪烁
+              self._blinkThreeTimes(feature);
+            }
           });
           return;
         }
 
         var dLon = extent.maxLon - extent.minLon;
         var dLat = extent.maxLat - extent.minLat;
-        if (dLon < 0.0001) dLon = 0.0001;
-        if (dLat < 0.0001) dLat = 0.0001;
+
+        // 最小范围 ~220m，防止点要素定位时 Rectangle 太小导致相机拉得过近
+        if (dLon < 0.002) dLon = 0.002;
+        if (dLat < 0.002) dLat = 0.002;
 
         // 10% margin
         var marginLon = dLon * 0.10;
@@ -1680,7 +1970,13 @@ export default {
 
         viewer.camera.flyTo({
           destination: rectangle,
-          duration: 1.0
+          duration: 1.0,
+          complete: function () {
+            // 重新注册相机重绘监听，确保后续平移缩放能正确重绘查询区域
+            self._reRegisterCameraRedrawListeners();
+            // 定位完成后执行 3 次图形闪烁
+            self._blinkThreeTimes(feature);
+          }
         });
       } catch (e) {
         console.warn('[' + this.componentName + '] flyToFeature 失败:', e);
@@ -2036,6 +2332,29 @@ export default {
           this._cameraMoveEndCb = null;
         }
       }
+    },
+
+    /**
+     * 重新注册相机移动重绘监听（flyToFeature 完成后调用）
+     * 确保定位后用户平移缩放时，查询区域图形能正确重绘
+     */
+    _reRegisterCameraRedrawListeners() {
+      var viewer = this.getViewer();
+      if (!viewer || !this.drawnGeometry) return;
+
+      // 先清理旧的
+      this._cleanupCameraRedrawListeners();
+
+      var self = this;
+      this._cameraMoveStartCb = function () {
+        self._removeRedrawCanvas();
+        if (self._drawingManager) self._drawingManager.deactivate();
+      };
+      this._cameraMoveEndCb = function () {
+        self._redrawGeometryOnCanvas();
+      };
+      viewer.camera.moveStart.addEventListener(this._cameraMoveStartCb);
+      viewer.camera.moveEnd.addEventListener(this._cameraMoveEndCb);
     },
 
     replayHistory(item) {
