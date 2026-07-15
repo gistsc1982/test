@@ -640,8 +640,8 @@
             } else if (ctrlConfig.kind == graphkind.pen) {
                 cxt.stroke();
             }
-            if (ctrlConfig.kind != graphkind.poly && ctrlConfig.kind != graphkind.line && ctrlConfig.kind != graphkind.rect) {
-                // 多边形、线条、矩形只有右键点击才能结束绘制
+            if (ctrlConfig.kind != graphkind.poly && ctrlConfig.kind != graphkind.line && ctrlConfig.kind != graphkind.rect && ctrlConfig.kind != graphkind.circle) {
+                // 多边形、线条、矩形、圆只有右键点击或第二次点击才能结束绘制
                 stopDrawing();//结束绘制
             }
         }

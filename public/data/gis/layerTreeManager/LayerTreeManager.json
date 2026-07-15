@@ -435,6 +435,21 @@
     "wmtsTileMatrixSet": "GoogleMapsCompatible"
   },
   {
+    "id": "wmts-tianditu-img",
+    "name": "天地图 影像底图（WMTS）",
+    "parentId": "folder-wmts",
+    "nodeType": "layer",
+    "url": "https://t0.tianditu.gov.cn/img_w/wmts?service=WMTS&request=GetCapabilities&version=1.0.0&tk=27984d5140486e5259f51c1ccf420ed5",
+    "sortOrder": 2,
+    "visible": 1,
+    "description": "来源：天地图（国家基础地理信息中心）| 服务类型：WMTS 1.0.0 | 天地图影像底图服务，提供全球高分辨率卫星影像瓦片。使用天地图Key(tk参数)认证，支持WMTS标准协议。",
+    "icon": "🛰️",
+    "centerLon": 116.4,
+    "centerLat": 39.9,
+    "centerHeight": 50000,
+    "wmtsTileMatrixSet": "w"
+  },
+  {
     "id": "folder-geojson",
     "name": "GeoJSON 矢量要素",
     "parentId": "root-ogc",
