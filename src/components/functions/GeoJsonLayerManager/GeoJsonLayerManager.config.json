@@ -71,7 +71,7 @@
     "sizeField": "",
     "sizeFieldMin": 10,
     "sizeFieldMax": 64,
-    "labelField": "name",
+    "labelField": "",
     "labelFontSize": 28,
     "labelScale": 1.2,
     "labelColor": "#a6fd1c",

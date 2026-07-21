@@ -127,6 +127,7 @@ async function initDatabase() {
     console.log('🚀 API 服务器准备就绪');
   } catch (error) {
     console.error('❌ 数据库初始化失败:', error);
+    if (dbManager) dbManager.close();
     process.exit(1);
   }
 }
@@ -315,17 +316,16 @@ app.get('/api/proxy/wfs', async (req, res) => {
     });
   }
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
 
+  try {
     const fetchResp = await fetch(targetUrl, {
       signal: controller.signal,
       headers: {
         'Accept': 'application/json, application/geo+json, */*'
       }
     });
-    clearTimeout(timeout);
 
     if (!fetchResp.ok) {
       const body = await fetchResp.text().catch(() => '');
@@ -355,6 +355,8 @@ app.get('/api/proxy/wfs', async (req, res) => {
       success: false,
       error: `代理请求失败: ${error.message}`
     });
+  } finally {
+    clearTimeout(timeout);
   }
 });
 
@@ -441,8 +443,12 @@ app.all('/api/proxy/mapserver', async (req, res) => {
     const timeout = setTimeout(() => controller.abort(), 60000);
     fetchConfig.signal = controller.signal;
 
-    const fetchResp = await fetch(targetUrl, fetchConfig);
-    clearTimeout(timeout);
+    let fetchResp;
+    try {
+      fetchResp = await fetch(targetUrl, fetchConfig);
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!fetchResp.ok) {
       const body = await fetchResp.text().catch(() => '');
@@ -472,18 +478,25 @@ app.all('/api/proxy/mapserver', async (req, res) => {
       });
     }
 
-    // —— 大响应：流式管道转发，不把几百 MB 全部读进内存 ——
+    // —— 大响应：流式管道转发，逐块读取不占满内存 ——
     res.setHeader('Content-Type', respContentType || 'application/octet-stream');
     res.setHeader('x-proxy-stream', '1');
     if (contentLength) res.setHeader('Content-Length', contentLength);
 
     const { Readable } = require('stream');
-    const bodyBuffer = Buffer.from(await fetchResp.arrayBuffer());
-
+    const reader = fetchResp.body.getReader();
     const readable = new Readable({
-      read() {
-        this.push(bodyBuffer);
-        this.push(null);
+      async read() {
+        try {
+          const { done, value } = await reader.read();
+          if (done) {
+            this.push(null);
+          } else {
+            this.push(Buffer.from(value));
+          }
+        } catch (err) {
+          this.destroy(err);
+        }
       }
     });
 
@@ -552,20 +565,24 @@ async function startServer() {
     });
   } catch (error) {
     console.error('启动失败:', error);
+    if (dbManager) dbManager.close();
     process.exit(1);
   }
 }
 
 startServer();
 
-process.on('SIGINT', async () => {
-  console.log('\n👋 服务器正在关闭...');
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+async function gracefulShutdown(signal) {
+  console.log(`\n👋 收到 ${signal}，服务器正在关闭...`);
 
   if (dbManager) {
     dbManager.close();
   }
 
   process.exit(0);
-});
+}
 
 module.exports = app;
