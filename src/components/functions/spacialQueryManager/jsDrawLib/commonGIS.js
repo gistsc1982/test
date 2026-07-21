@@ -6,7 +6,7 @@ export const commonGIS = {
 
 // 创建地图
 commonGIS.createMap = function (div, blnTerrain) {
-    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiYzhlMjI3ZC0yOTU5LTQ4YjMtYTA4Ni03NWJjNzFmYjJmMjEiLCJpZCI6NzkzMDIsImlhdCI6MTY1ODcyMDMxOH0.QWrO_62LVYFOmlYdZnfG4XIFpi9yLNdOgIntrmdDkTA';
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlNWI0YWVmNi0zNDAwLTRiYjAtYmE2MC1hOWQyY2IzMzI0ZGMiLCJpZCI6MzI5Njk0LCJpYXQiOjE3NTQ1NTkzMTR9.B7sdzo3vc2yo7LxG2JxlRJ8psm4c3QLW7SIoyql36-4';
     let myTerrain = null;
     if (blnTerrain) {
         myTerrain = Cesium.createWorldTerrain({

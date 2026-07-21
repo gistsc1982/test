@@ -124,8 +124,6 @@
    * 将 heightmap-1.0 Int16LE 数组解码为 raw meters
    * 预生成瓦片编码: value = elevation * 5 → elevation = value / 5
    */
-  // ⭐ Cesium 1.97: 不做客户端解码，传原始 stored_value，通过 heightScale=1/5 让 Cesium 内部换算
-  // 避免自己解码导致的 interpolateHeight NaN 问题
   function rawHeightsFromBuffer(rawBuffer, gridSize) {
     return new Int16Array(rawBuffer, 0, gridSize * gridSize);
   }
@@ -155,12 +153,23 @@
         }
         var heights = rawHeightsFromBuffer(buf, self._gridSize);
 
-        // ⭐ 不按 valid 占比拒绝瓦片！粗级别瓦片即使大部分为 0 也要返回，
-        // 作为"路标"引导 Cesium 细化到更高级别。只有在完全没有数据时才拒绝。
+        // 🔍 诊断：计算实际高程范围（解码后 ÷5）
+        var hMin = Infinity, hMax = -Infinity, hNonZero = 0;
+        for (var hi = 0; hi < heights.length; hi++) {
+          var hv = heights[hi];
+          if (hv !== 0) { hNonZero++; if (hv < hMin) hMin = hv; if (hv > hMax) hMax = hv; }
+        }
+
         var td = makeTerrainData(self, x, y, level, heights);
         self._tileCache[key] = td;
         self._tileSuccessCount++;
         self._version++;
+
+        if (hNonZero > 0 && (self._tileSuccessCount <= 3 || self._tileSuccessCount % 20 === 0)) {
+          console.log('[LocalTerrainProvider] 🔍 tile ' + key +
+            ' 非零=' + hNonZero + '/' + heights.length +
+            ' 高程=' + (hMin/5).toFixed(0) + '~' + (hMax/5).toFixed(0) + 'm');
+        }
 
         // 缓存淘汰
         var keys = Object.keys(self._tileCache);
@@ -198,7 +207,7 @@
   // 保留旧 prefetchTile 供外部需要时使用（内部已改用 Promise）
 
   /**
-   * 请求 tile — 返回 Promise<HeightmapTerrainData> 或 undefined
+   * 请求 tile — 返回 HeightmapTerrainData、Promise 或 undefined
    * 缓存命中 → 同步返回 HeightmapTerrainData
    * 未命中 → 返回 Promise，Cesium 等待异步加载完成后渲染
    */
@@ -208,16 +217,16 @@
 
     var key = cacheKey(x, y, level);
 
-    // 缓存命中 → 同步返回
+    // 缓存命中 → Promise 返回（与 GeoTiffTerrainProvider 一致，避免 Cesium 1.97 四叉树 bug）
     if (this._tileCache[key]) {
-      return this._tileCache[key];
+      return Promise.resolve(this._tileCache[key]);
     }
 
     // 粗级别 (< minLevel)：无 .terrain 文件，直接生成占位 tile
     if (level < this._minLevel) {
       var stub = makeStubTile(this, x, y, level);
       this._tileCache[key] = stub;
-      return stub;
+      return Promise.resolve(stub);
     }
 
     // 细级别但未缓存 → 异步 fetch，返回 Promise

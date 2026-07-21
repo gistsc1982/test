@@ -4454,10 +4454,8 @@ export default {
             // 步骤5：保存当前 terrainProvider 用于卸载时恢复
             this._previousTerrainProvider = viewer.scene.terrainProvider;
 
-            // 步骤6：设置到 globe
-            // ⭐ 使用 window.__cesiumViewer__ 绕开 Vue Proxy，避免 Cesium 内部 _scene 引用丢失
-window.__cesiumViewer__.scene.globe.terrainProvider =terrainProvider;
-            viewer.scene.globe.depthTestAgainstTerrain = true;
+            // 步骤6：设置 terrain（使用 scene.terrainProvider setter 同时更新 _terrainProvider 和 globe）
+window.__cesiumViewer__.scene.terrainProvider = terrainProvider;
 
             // 步骤7：存储到 _cesiumLayers
             this._cesiumLayers.set(node.id, {
@@ -4482,7 +4480,6 @@ window.__cesiumViewer__.scene.globe.terrainProvider =terrainProvider;
               throw new Error('LocalTerrainProvider 未加载');
             }
 
-            // 从 layer.json 读取元数据
             var layerJsonUrl = tilesBaseUrl.replace(/\/$/, '') + '/layer.json';
             var metaResp = await fetch(layerJsonUrl, { signal: createTimeoutSignal(10000) });
             if (!metaResp.ok) throw new Error('layer.json 加载失败 (HTTP ' + metaResp.status + ')');
@@ -4491,43 +4488,119 @@ window.__cesiumViewer__.scene.globe.terrainProvider =terrainProvider;
             var tBounds;
             if (meta.bounds && meta.bounds.length >= 4) {
               tBounds = {
-                west: meta.bounds[0],
-                south: meta.bounds[1],
-                east: meta.bounds[2],
-                north: meta.bounds[3]
+                west: meta.bounds[0], south: meta.bounds[1],
+                east: meta.bounds[2], north: meta.bounds[3]
               };
             } else {
               throw new Error('layer.json 缺少 bounds');
             }
 
-            // ⭐ 限制 maxLevel=8：减少瓦片数 ~16 个，加载快速
-            var useMinLevel = meta.minzoom || 0;
-            var useMaxLevel = Math.min(meta.maxzoom || 12, 8);
-
-            console.log('[LayerTreeManager] 🌍 Terrain Tiles 范围: ' +
+            // maxLevel=10：平衡细节与四叉树规模。LocalTerrainProvider 正确处理 heightScale=1/5
+            // ⭐ 强制 minLevel >= 7：粗级别(0-6)仅返回占位 tile 引导细化，不 fetch 几乎全为 0 的 .terrain 文件
+            //    与 GeoTiffTerrainProvider 策略一致——DEM 仅覆盖 1°×1°，粗级瓦片 99% 是海平面会淹没细级高程
+            var useMinLevel = Math.max(meta.minzoom || 0, 7);
+            var useMaxLevel = Math.min(meta.maxzoom || 12, 10);
+            console.log('[LayerTreeManager] 🌍 Terrain Tiles: ' +
               tBounds.west.toFixed(4) + '°~' + tBounds.east.toFixed(4) + '°E, ' +
-              tBounds.south.toFixed(4) + '°~' + tBounds.north.toFixed(4) + '°N' +
-              ' zoom=' + useMinLevel + '~' + useMaxLevel);
+              tBounds.south.toFixed(4) + '°~' + tBounds.north.toFixed(4) + '°N z' + useMinLevel + '~' + useMaxLevel);
 
             var terrainProvider = new window.LocalTerrainProvider({
-              baseUrl: tilesBaseUrl,
-              bounds: tBounds,
-              minLevel: useMinLevel,
-              maxLevel: useMaxLevel
+              baseUrl: tilesBaseUrl, bounds: tBounds,
+              minLevel: useMinLevel, maxLevel: useMaxLevel
             });
 
-            this._previousTerrainProvider = viewer.scene.globe.terrainProvider;
-            // ⭐ 使用 window.__cesiumViewer__ 绕开 Vue Proxy，避免 Cesium 内部 _scene 引用丢失
-window.__cesiumViewer__.scene.globe.terrainProvider = terrainProvider;
-            viewer.scene.globe.depthTestAgainstTerrain = true;
+            this._previousTerrainProvider = viewer.scene.terrainProvider;
+            window.__cesiumViewer__.scene.terrainProvider = terrainProvider;
 
             this._cesiumLayers.set(node.id, {
-              type: 'local-terrain-tiles',
-              provider: terrainProvider,
-              _bounds: tBounds
+              type: 'local-terrain-tiles', provider: terrainProvider, _bounds: tBounds
             });
             console.log('[LayerTreeManager] 🌐 LocalTerrainProvider 已激活');
             console.log(`[${this.componentName}] ✅ 本地 Terrain Tiles 加载成功: "${node.name}"`);
+
+            // ⭐ 自动叠加 DEM 伪彩色图作为影像层（离线时肉眼才能看到地形起伏）
+            // 从 terrain 路径推导 GeoTIFF 路径：/data/dem/terrain/{name} → /data/dem/{name}.tif
+            var terrainName = tilesBaseUrl.replace(/\\/g, '/').split('/').filter(Boolean).pop();
+            var geotiffUrl = tilesBaseUrl.replace(/\/terrain\/[^/]+$/, '') + '/' + terrainName + '.tif';
+            console.log('[LayerTreeManager] 🖼️ 尝试加载对应 GeoTIFF 伪彩色图: ' + geotiffUrl);
+
+            try {
+              await this._ensureGeoTiff();
+              if (typeof window.GeoTIFF !== 'undefined') {
+                var imgResp = await fetch(geotiffUrl, { signal: createTimeoutSignal(30000) });
+                if (imgResp.ok) {
+                  var imgBlob = await imgResp.blob();
+                  var tiff = await window.GeoTIFF.fromArrayBuffer(await imgBlob.arrayBuffer());
+                  var tifImg = await tiff.getImage();
+                  var tifRaster = await tifImg.readRasters();
+                  var band = tifRaster[0];
+                  var tw = tifImg.getWidth(), th = tifImg.getHeight();
+
+                  // 计算实际地理范围
+                  var tifOrigin = tifImg.getOrigin();
+                  var tifResolution = tifImg.getResolution();
+                  var imgWest, imgEast, imgSouth, imgNorth;
+                  if (tifOrigin && tifResolution && tifOrigin.length >= 2 && tifResolution.length >= 2) {
+                    imgWest = tifOrigin[0];
+                    imgNorth = tifOrigin[1];
+                    imgEast = tifOrigin[0] + tw * Math.abs(tifResolution[0]);
+                    imgSouth = tifOrigin[1] - th * Math.abs(tifResolution[1]);
+                  } else {
+                    imgWest = tBounds.west; imgEast = tBounds.east;
+                    imgSouth = tBounds.south; imgNorth = tBounds.north;
+                  }
+
+                  // 计算高程范围
+                  var tMin = Infinity, tMax = -Infinity;
+                  for (var ri = 0; ri < band.length; ri++) {
+                    var v = band[ri];
+                    if (isFinite(v) && v > -9999) { if (v < tMin) tMin = v; if (v > tMax) tMax = v; }
+                  }
+
+                  // 伪彩色渲染
+                  var tCvs = document.createElement('canvas'); tCvs.width = tw; tCvs.height = th;
+                  var tCtx = tCvs.getContext('2d');
+                  var tImgData = tCtx.createImageData(tw, th);
+                  var tSt = (tMax > tMin) ? 1 / (tMax - tMin) : 1;
+                  for (var ri = 0; ri < band.length; ri++) {
+                    var val = band[ri], pi = ri * 4;
+                    if (!isFinite(val) || val <= -9999) { tImgData.data[pi+3] = 0; continue; }
+                    var nt = Math.max(0, Math.min(1, (val - tMin) * tSt));
+                    var tr, tg, tb;
+                    if (nt < 0.25)      { var s = nt / 0.25;          tr = Math.round(34 + s * 100);  tg = Math.round(139 - s * 50);  tb = Math.round(34 - s * 30); }
+                    else if (nt < 0.6)  { var s = (nt - 0.25) / 0.35; tr = Math.round(134 + s * 86);  tg = Math.round(89 + s * 25);   tb = Math.round(4 + s * 50); }
+                    else if (nt < 0.85) { var s = (nt - 0.6) / 0.25;  tr = Math.round(220 + s * 20);  tg = Math.round(114 - s * 24);  tb = Math.round(54 + s * 96); }
+                    else                { var s = (nt - 0.85) / 0.15; tr = Math.round(240 + s * 15);  tg = Math.round(90 + s * 165);  tb = Math.round(150 + s * 105); }
+                    tImgData.data[pi]=tr; tImgData.data[pi+1]=tg; tImgData.data[pi+2]=tb; tImgData.data[pi+3]=255;
+                  }
+                  tCtx.putImageData(tImgData, 0, 0);
+
+                  // 创建影像图层叠加到地形上
+                  var imageUrl = tCvs.toDataURL('image/png');
+                  var imgProvider = new Cesium.SingleTileImageryProvider({
+                    url: imageUrl,
+                    rectangle: Cesium.Rectangle.fromDegrees(imgWest, imgSouth, imgEast, imgNorth)
+                  });
+                  var imgLayer = viewer.imageryLayers.addImageryProvider(imgProvider);
+                  imgLayer.alpha = 0.7;
+
+                  // 存储引用以便卸载时清理
+                  var entry = this._cesiumLayers.get(node.id);
+                  if (entry) {
+                    entry._demImageLayer = imgLayer;
+                    entry._demImageProvider = imgProvider;
+                  }
+                  console.log('[LayerTreeManager] 🖼️ DEM 伪彩色图已叠加到地形 (alpha=0.7, ' +
+                    imgWest.toFixed(4) + '°~' + imgEast.toFixed(4) + '°E, ' +
+                    imgSouth.toFixed(4) + '°~' + imgNorth.toFixed(4) + '°N, ' +
+                    tMin.toFixed(0) + '~' + tMax.toFixed(0) + 'm)');
+                } else {
+                  console.log('[LayerTreeManager] ℹ️ 未找到对应 GeoTIFF 文件，跳过伪彩色图叠加');
+                }
+              }
+            } catch (e) {
+              console.warn('[LayerTreeManager] ⚠️ 加载 DEM 伪彩色图失败: ' + (e?.message || e));
+            }
             break;
           }
           case 'local-dem': {
@@ -5426,20 +5499,17 @@ window.__cesiumViewer__.scene.globe.terrainProvider = terrainProvider;
             break;
           }
           case 'local-terrain': {
-            // 恢复之前的 terrainProvider
-            // ⭐ 使用 window.__cesiumViewer__ 绕开 Vue Proxy，避免 Cesium 内部 _scene 引用丢失
-window.__cesiumViewer__.scene.globe.terrainProvider =this._previousTerrainProvider
+            // 恢复之前的 terrainProvider（同时更新 _terrainProvider 和 globe）
+window.__cesiumViewer__.scene.terrainProvider = this._previousTerrainProvider
               || new Cesium.EllipsoidTerrainProvider();
             this._previousTerrainProvider = null;
             console.log('[LayerTreeManager] ⛰️ Terrain Provider 已恢复为默认');
             break;
           }
           case 'local-terrain-tiles': {
-            // 恢复为默认地形或之前的地形
-            // ⭐ 使用 window.__cesiumViewer__ 绕开 Vue Proxy，避免 Cesium 内部 _scene 引用丢失
-window.__cesiumViewer__.scene.globe.terrainProvider =this._previousTerrainProvider
+            // 恢复为默认地形或之前的地形（同时更新 _terrainProvider 和 globe）
+window.__cesiumViewer__.scene.terrainProvider = this._previousTerrainProvider
               || new Cesium.EllipsoidTerrainProvider();
-            viewer.scene.globe.depthTestAgainstTerrain = true;
             this._previousTerrainProvider = null;
             console.log('[LayerTreeManager] 🌐 Terrain tiles Provider 已恢复为默认');
             break;
@@ -5519,11 +5589,11 @@ window.__cesiumViewer__.scene.globe.terrainProvider =this._previousTerrainProvid
           const b = entry._bounds;
           const flyLon = (b.west + b.east) / 2;
           const flyLat = (b.south + b.north) / 2;
-          // ⭐ 使用 Cartesian3.fromDegrees 控制飞行高度，避免 Rectangle 自动计算的过高视角
-          // 高度基于数据范围估算：每度 ~110km，取 1.5 倍确保完整可见但不至于太高
           const lonSpan = Math.abs(b.east - b.west);
           const latSpan = Math.abs(b.north - b.south);
-          const flyHeight = Math.max(lonSpan, latSpan) * 110000 * 1.5;
+          // terrain 瓦片粗级全为 0，必须飞得够低才能看到起伏（level 8-10 才有有效数据）
+          // 1° × 110km/° × 0.15 ≈ 16.5km，Cesium 自然使用 level 8-9 瓦片
+          var flyHeight = Math.max(lonSpan, latSpan) * 110000 * 0.15;
           viewer.camera.flyTo({
             destination: Cesium.Cartesian3.fromDegrees(flyLon, flyLat, flyHeight),
             duration: 2

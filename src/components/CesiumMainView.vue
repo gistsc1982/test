@@ -1491,6 +1491,32 @@ export default {
     },
 
     /**
+     * 加载 Cesium World Terrain（Ion 全球地形）
+     * 参考 ja-yjjg-dp 项目修复方案：使用 Ion 全球地形作为 3D 可视化源，
+     * 所有缩放层级都有真实高程数据，覆盖物兼容性好。
+     * 离线 fallback：Ion 不可用时，用户手动加载本地 Terrain 瓦片
+     * （LocalTerrainProvider）替代 scene.terrainProvider 显示地形起伏。
+     */
+    _loadWorldTerrain(Cesium) {
+      if (!this.cesiumViewer) return;
+      try {
+        // ⭐ 无条件覆盖 Cesium 内置的默认 token（id=259, 2018年已过期）
+        // Cesium 1.97 构建时硬编码了过期 token，必须覆盖否则 createWorldTerrain 401
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlNWI0YWVmNi0zNDAwLTRiYjAtYmE2MC1hOWQyY2IzMzI0ZGMiLCJpZCI6MzI5Njk0LCJpYXQiOjE3NTQ1NTkzMTR9.B7sdzo3vc2yo7LxG2JxlRJ8psm4c3QLW7SIoyql36-4';
+        const terrain = Cesium.createWorldTerrain({
+          requestVertexNormals: true,
+          requestWaterMask: false
+        });
+        this.cesiumViewer.terrainProvider = terrain;
+        this.cesiumViewer.scene.globe.depthTestAgainstTerrain = false;
+        console.log('[地形] Cesium World Terrain (Ion) 已加载');
+      } catch (e) {
+        console.warn('[地形] Ion 地形加载失败:', e?.message || e);
+        console.warn('[地形] 将在用户手动加载本地 DEM 时才显示地形起伏');
+      }
+    },
+
+    /**
      * 报告Cesium性能状态
      */
     reportCesiumPerformance() {
@@ -3582,6 +3608,11 @@ export default {
       if (typeof window !== 'undefined') {
         window.Cesium = Cesium;
         window.viewer = this.cesiumViewer; // 暴露到全局以便调试
+
+        // ⭐ 加载 Cesium World Terrain（Ion 全球地形）用于 3D 可视化
+        // 与 ja-yjjg-dp 项目一致：全局覆盖所有层级，覆盖物兼容性好
+        // 注意：Ion token 在 commonGIS.js 中设置，此处确保使用同一 token
+        this._loadWorldTerrain(Cesium);
 
         // ⭐ 触发 Cesium 就绪事件
         performance.mark('cesium-ready-trigger');
