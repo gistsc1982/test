@@ -262,6 +262,10 @@
    * ⭐ 使用 Math.pow 替代 1<<level，避免 level≥31 时 32 位有符号整数溢出
    */
   GeoTiffTerrainProvider.prototype.getLevelMaximumGeometricError = function (level) {
+    // ⭐ 超过 _maxLevel 返回 0，阻止 Cesium 细化到不存在数据的级别
+    //    返回 0 使 SSE=0，Cesium 认为该级别已足够精确，不再创建子 tile
+    //    这是修复黑块的关键：L12 返回 0 → 不创建 L13 子 tile → 避免 FAILED 状态
+    if (level >= this._maxLevel) return 0;
     return this._levelZeroMaximumGeometricError / Math.pow(2, level);
   };
 

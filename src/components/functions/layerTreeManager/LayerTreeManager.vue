@@ -4452,10 +4452,11 @@ export default {
             });
 
             // 步骤5：保存当前 terrainProvider 用于卸载时恢复
-            this._previousTerrainProvider = viewer.scene.terrainProvider;
+            this._previousTerrainProvider = viewer.terrainProvider;
 
-            // 步骤6：设置 terrain（使用 scene.terrainProvider setter 同时更新 _terrainProvider 和 globe）
-window.__cesiumViewer__.scene.terrainProvider = terrainProvider;
+            // 步骤6：设置 terrain（使用 viewer.terrainProvider 触发完整刷新链）
+            viewer.terrainProvider = terrainProvider;
+            console.log('[LayerTreeManager] 🔍 当前 terrainProvider:', viewer.terrainProvider.constructor.name || viewer.terrainProvider);
 
             // 步骤7：存储到 _cesiumLayers
             this._cesiumLayers.set(node.id, {
@@ -4465,6 +4466,49 @@ window.__cesiumViewer__.scene.terrainProvider = terrainProvider;
             });
             console.log('[LayerTreeManager] ⛰️ Terrain Provider 已激活: ' +
               terrainTw + '×' + terrainTh + ' 高程=' + terrainMin.toFixed(0) + '~' + terrainMax.toFixed(0) + 'm');
+
+            // ⭐ 自动叠加 DEM 伪彩色图作为影像层（参考 local-terrain-tiles 成功方案）
+            //    离线/弱光条件下肉眼才能看到地形起伏，复用已解码的 terrainBand 数据
+            try {
+              var tCvs = document.createElement('canvas');
+              tCvs.width = terrainTw; tCvs.height = terrainTh;
+              var tCtx = tCvs.getContext('2d');
+              var tImgData = tCtx.createImageData(terrainTw, terrainTh);
+              var tSt = (terrainMax > terrainMin) ? 1 / (terrainMax - terrainMin) : 1;
+              for (var ri = 0; ri < terrainBand.length; ri++) {
+                var val = terrainBand[ri], pi = ri * 4;
+                if (!isFinite(val) || val <= -9999) { tImgData.data[pi + 3] = 0; continue; }
+                var nt = Math.max(0, Math.min(1, (val - terrainMin) * tSt));
+                var tr, tg, tb;
+                if (nt < 0.25)      { var s = nt / 0.25;          tr = Math.round(34 + s * 100);  tg = Math.round(139 - s * 50);  tb = Math.round(34 - s * 30); }
+                else if (nt < 0.6)  { var s = (nt - 0.25) / 0.35; tr = Math.round(134 + s * 86);  tg = Math.round(89 + s * 25);   tb = Math.round(4 + s * 50); }
+                else if (nt < 0.85) { var s = (nt - 0.6) / 0.25;  tr = Math.round(220 + s * 20);  tg = Math.round(114 - s * 24);  tb = Math.round(54 + s * 96); }
+                else                { var s = (nt - 0.85) / 0.15; tr = Math.round(240 + s * 15);  tg = Math.round(90 + s * 165);  tb = Math.round(150 + s * 105); }
+                tImgData.data[pi] = tr; tImgData.data[pi + 1] = tg; tImgData.data[pi + 2] = tb; tImgData.data[pi + 3] = 255;
+              }
+              tCtx.putImageData(tImgData, 0, 0);
+
+              var imageUrl = tCvs.toDataURL('image/png');
+              var imgProvider = new Cesium.SingleTileImageryProvider({
+                url: imageUrl,
+                rectangle: Cesium.Rectangle.fromDegrees(terrainWest, terrainSouth, terrainEast, terrainNorth)
+              });
+              var imgLayer = viewer.imageryLayers.addImageryProvider(imgProvider);
+              imgLayer.alpha = 0.7;
+
+              // 存储引用以便卸载时清理
+              var entry = this._cesiumLayers.get(node.id);
+              if (entry) {
+                entry._demImageLayer = imgLayer;
+                entry._demImageProvider = imgProvider;
+              }
+              console.log('[LayerTreeManager] 🖼️ DEM 伪彩色图已叠加到地形 (alpha=0.7, ' +
+                terrainWest.toFixed(4) + '°~' + terrainEast.toFixed(4) + '°E, ' +
+                terrainSouth.toFixed(4) + '°~' + terrainNorth.toFixed(4) + '°N, ' +
+                terrainMin.toFixed(0) + '~' + terrainMax.toFixed(0) + 'm)');
+            } catch (e) {
+              console.warn('[LayerTreeManager] ⚠️ DEM 伪彩色图叠加失败: ' + (e?.message || e));
+            }
             console.log(`[${this.componentName}] ✅ 本地 DEM 地形加载成功: "${node.name}"`);
             break;
           }
@@ -5495,14 +5539,24 @@ window.__cesiumViewer__.scene.terrainProvider = terrainProvider;
             break;
           }
           case 'local-terrain': {
-            // 恢复之前的 terrainProvider（同时更新 _terrainProvider 和 globe）
-window.__cesiumViewer__.scene.terrainProvider = this._previousTerrainProvider
+            // 清除 DEM 伪彩色图叠加层（如果添加了）
+            if (entry._demImageLayer) {
+              viewer.imageryLayers.remove(entry._demImageLayer, false);
+              entry._demImageLayer = null;
+            }
+            // 恢复之前的 terrainProvider
+            viewer.terrainProvider = this._previousTerrainProvider
               || new Cesium.EllipsoidTerrainProvider();
             this._previousTerrainProvider = null;
             console.log('[LayerTreeManager] ⛰️ Terrain Provider 已恢复为默认');
             break;
           }
           case 'local-terrain-tiles': {
+            // 清除 DEM 伪彩色图叠加层（如果添加了）
+            if (entry._demImageLayer) {
+              viewer.imageryLayers.remove(entry._demImageLayer, false);
+              entry._demImageLayer = null;
+            }
             // 恢复为默认地形或之前的地形（同时更新 _terrainProvider 和 globe）
 window.__cesiumViewer__.scene.terrainProvider = this._previousTerrainProvider
               || new Cesium.EllipsoidTerrainProvider();
