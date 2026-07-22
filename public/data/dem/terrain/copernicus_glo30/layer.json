@@ -15,5 +15,5 @@
   ],
   "minzoom": 0,
   "maxzoom": 12,
-  "tilingScheme": "geographic"
+  "tilingScheme": "geodetic"
 }

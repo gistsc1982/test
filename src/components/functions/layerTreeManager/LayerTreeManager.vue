@@ -4469,53 +4469,30 @@ window.__cesiumViewer__.scene.terrainProvider = terrainProvider;
             break;
           }
           case 'local-terrain-tiles': {
-            // ⭐ Cesium 1.97: 使用 LocalTerrainProvider 加载 heightmap-1.0 预生成瓦片
+            // ⭐ 使用 Cesium 原生 CesiumTerrainProvider 构造函数加载本地预生成瓦片
+            //    参考 ja-yjjg-dp 项目方案：原生方法自动处理 layer.json 解析、tiling scheme 匹配、
+            //    .terrain 文件格式检测（含 4 字节标准头），避免自定义 Provider 导致的坐标映射错误和黑块
             var tilesBaseUrl = node.url;
             console.log(`[${this.componentName}] 🌐 加载本地 Terrain Tiles: ${tilesBaseUrl}`);
 
             deadline = Math.max(deadline, Date.now() + 30000);
-            await this._ensureLocalTerrainProvider();
 
-            if (typeof window.LocalTerrainProvider === 'undefined') {
-              throw new Error('LocalTerrainProvider 未加载');
-            }
-
-            var layerJsonUrl = tilesBaseUrl.replace(/\/$/, '') + '/layer.json';
-            var metaResp = await fetch(layerJsonUrl, { signal: createTimeoutSignal(10000) });
-            if (!metaResp.ok) throw new Error('layer.json 加载失败 (HTTP ' + metaResp.status + ')');
-            var meta = await metaResp.json();
-
-            var tBounds;
-            if (meta.bounds && meta.bounds.length >= 4) {
-              tBounds = {
-                west: meta.bounds[0], south: meta.bounds[1],
-                east: meta.bounds[2], north: meta.bounds[3]
-              };
-            } else {
-              throw new Error('layer.json 缺少 bounds');
-            }
-
-            // maxLevel=10：平衡细节与四叉树规模。LocalTerrainProvider 正确处理 heightScale=1/5
-            // ⭐ 强制 minLevel >= 7：粗级别(0-6)仅返回占位 tile 引导细化，不 fetch 几乎全为 0 的 .terrain 文件
-            //    与 GeoTiffTerrainProvider 策略一致——DEM 仅覆盖 1°×1°，粗级瓦片 99% 是海平面会淹没细级高程
-            var useMinLevel = Math.max(meta.minzoom || 0, 7);
-            var useMaxLevel = Math.min(meta.maxzoom || 12, 10);
-            console.log('[LayerTreeManager] 🌍 Terrain Tiles: ' +
-              tBounds.west.toFixed(4) + '°~' + tBounds.east.toFixed(4) + '°E, ' +
-              tBounds.south.toFixed(4) + '°~' + tBounds.north.toFixed(4) + '°N z' + useMinLevel + '~' + useMaxLevel);
-
-            var terrainProvider = new window.LocalTerrainProvider({
-              baseUrl: tilesBaseUrl, bounds: tBounds,
-              minLevel: useMinLevel, maxLevel: useMaxLevel
+            // ⭐ 使用 Cesium 原生 CesiumTerrainProvider 构造函数加载本地预生成瓦片
+            //    Cesium 1.81 兼容：直接 new CesiumTerrainProvider({url}) 自动处理 layer.json、
+            //    tiling scheme、.terrain 文件格式检测（含 4 字节标准头），避免黑块
+            var terrainProvider = new Cesium.CesiumTerrainProvider({
+              url: tilesBaseUrl,
+              requestVertexNormals: true,
+              requestWaterMask: false,
             });
 
             this._previousTerrainProvider = viewer.scene.terrainProvider;
             window.__cesiumViewer__.scene.terrainProvider = terrainProvider;
 
             this._cesiumLayers.set(node.id, {
-              type: 'local-terrain-tiles', provider: terrainProvider, _bounds: tBounds
+              type: 'local-terrain-tiles', provider: terrainProvider
             });
-            console.log('[LayerTreeManager] 🌐 LocalTerrainProvider 已激活');
+            console.log('[LayerTreeManager] 🌐 CesiumTerrainProvider (原生构造函数) 已激活');
             console.log(`[${this.componentName}] ✅ 本地 Terrain Tiles 加载成功: "${node.name}"`);
 
             // ⭐ 自动叠加 DEM 伪彩色图作为影像层（离线时肉眼才能看到地形起伏）
@@ -4546,8 +4523,11 @@ window.__cesiumViewer__.scene.terrainProvider = terrainProvider;
                     imgEast = tifOrigin[0] + tw * Math.abs(tifResolution[0]);
                     imgSouth = tifOrigin[1] - th * Math.abs(tifResolution[1]);
                   } else {
-                    imgWest = tBounds.west; imgEast = tBounds.east;
-                    imgSouth = tBounds.south; imgNorth = tBounds.north;
+                    // GeoTIFF 无地理元数据时的兜底：使用 DEM 节点中心 ±5°
+                    imgWest = node.centerLon != null ? node.centerLon - 5 : -180;
+                    imgEast = node.centerLon != null ? node.centerLon + 5 : 180;
+                    imgSouth = node.centerLat != null ? node.centerLat - 5 : -90;
+                    imgNorth = node.centerLat != null ? node.centerLat + 5 : 90;
                   }
 
                   // 计算高程范围
@@ -5698,20 +5678,6 @@ window.__cesiumViewer__.scene.terrainProvider = this._previousTerrainProvider
         document.head.appendChild(script);
       });
       return this._terrainProviderLoading;
-    },
-
-    _ensureLocalTerrainProvider() {
-      if (typeof window.LocalTerrainProvider !== 'undefined') return Promise.resolve();
-      if (this._localTerrainLoading) return this._localTerrainLoading;
-      var self = this;
-      this._localTerrainLoading = new Promise(function (resolve) {
-        var script = document.createElement('script');
-        script.src = '../../../src/components/utils/LocalTerrainProvider.js';
-        script.onload = function () { console.log('[LayerTreeManager] 🌐 LocalTerrainProvider 加载完成'); resolve(); };
-        script.onerror = function () { console.warn('[LayerTreeManager] ⚠️ LocalTerrainProvider 加载失败'); resolve(); };
-        document.head.appendChild(script);
-      });
-      return this._localTerrainLoading;
     },
 
     /**
