@@ -236,7 +236,8 @@
   };
 
   LocalTerrainProvider.prototype.getLevelMaximumGeometricError = function (level) {
-    return this._levelZeroMaximumGeometricError / (1 << level);
+    // ⭐ 返回 0 让 Cesium 使用内部默认值，避免 level≥31 时 1<<level 位运算溢出
+    return 0;
   };
 
   window.LocalTerrainProvider = LocalTerrainProvider;

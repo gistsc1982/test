@@ -259,9 +259,11 @@
 
   /**
    * 获取指定 level 的最大几何误差（LOD 切换阈值）
+   * ⭐ 返回 0 让 Cesium 使用内部默认值，避免 level≥31 时 1<<level 位运算溢出
+   *    参考 ja-yjjg-dp 项目修复方案
    */
   GeoTiffTerrainProvider.prototype.getLevelMaximumGeometricError = function (level) {
-    return this._levelZeroMaximumGeometricError / (1 << level);
+    return 0;
   };
 
   // 注册到全局
