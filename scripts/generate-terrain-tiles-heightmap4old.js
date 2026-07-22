@@ -639,13 +639,17 @@ function generateHeightmap(band, width, height, bounds, tileX, tileY, level) {
 
 /**
  * 将 Int16Array 写入二进制 .terrain 文件
- * heightmap-1.0 格式: 65×65 Int16 LE = 8450 字节
+ * heightmap-1.0 格式: 65×65 Int16 LE + 1 字节 child mask = 8451 字节
+ * child mask 告诉 Cesium 哪些子瓦片存在，防止 Cesium 不细化
  */
-function writeTerrainFile(filePath, heightmap) {
-  const buf = Buffer.allocUnsafe(TILE_SIZE * TILE_SIZE * 2);
+function writeTerrainFile(filePath, heightmap, level) {
+  const dataLen = TILE_SIZE * TILE_SIZE * 2;
+  const buf = Buffer.allocUnsafe(dataLen + 1);
   for (let i = 0; i < heightmap.length; i++) {
     buf.writeInt16LE(heightmap[i], i * 2);
   }
+  // childMask: level < MAX_ZOOM 时设为 15（4 个子瓦片都存在），MAX_ZOOM 时设为 0
+  buf[dataLen] = level < MAX_ZOOM ? 15 : 0;
   fs.writeFileSync(filePath, buf);
 }
 
@@ -872,12 +876,12 @@ async function main() {
         const tileDir = path.join(OUTPUT_DIR, String(level), String(tx));
         fs.mkdirSync(tileDir, { recursive: true });
         if (heightmap) {
-          writeTerrainFile(path.join(tileDir, `${ty}.terrain`), heightmap);
+          writeTerrainFile(path.join(tileDir, `${ty}.terrain`), heightmap, level);
           levelGenerated++;
         } else {
           // ⭐ 粗级别瓦片即使没有有效 DEM 像素，也要生成占位瓦片
           // 否则 Cesium TerrainProvider 无法从 level 0 逐级细化到有数据的级别
-          writeTerrainFile(path.join(tileDir, `${ty}.terrain`), placeholderHeightmap);
+          writeTerrainFile(path.join(tileDir, `${ty}.terrain`), placeholderHeightmap, level);
           levelPlaceholders++;
         }
       }
@@ -924,7 +928,7 @@ async function main() {
     bounds: [bounds.west, bounds.south, bounds.east, bounds.north],
     minzoom: MIN_ZOOM,
     maxzoom: MAX_ZOOM,
-    tilingScheme: opts.tilingScheme   // ⭐ 显式声明 tiling scheme
+    tilingScheme: opts.tilingScheme === 'geographic' ? 'geodetic' : opts.tilingScheme  // ⭐ Cesium 只认 geodetic/mercator
   };
 
   const layerJsonPath = path.join(OUTPUT_DIR, 'layer.json');
