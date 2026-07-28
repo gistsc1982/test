@@ -61,8 +61,8 @@ const TILE_SIZE = 65;           // Cesium heightmap tile: 65×65 采样点
 const MIN_ZOOM = 0;   // 从 level 0 开始，确保所有相机高度都能看到地形
 const MAX_ZOOM = 12;
 
-const INPUT_TIF = path.resolve(__dirname, '../public/data/dem/copernicus_glo30.tif');
-const OUTPUT_DIR = path.resolve(__dirname, '../public/data/dem/terrain/copernicus_glo30');
+const INPUT_TIF = path.resolve(__dirname, '../public/data/dem/jian_dem.tif');
+const OUTPUT_DIR = path.resolve(__dirname, '../public/data/dem/terrain/jian_glo30');
 
 /**
  * 获取 GeoTIFF 的地理范围
@@ -620,17 +620,50 @@ function generateHeightmap(band, width, height, bounds, tileX, tileY, level) {
 
       let encoded;
       if (isFinite(elevation) && elevation > -9999) {
-        // Cesium heightmap-1.0: storedValue = elevation * 5 (精度 0.2m)
-        encoded = Math.round(elevation * 5.0);
+        // Cesium heightmap-1.0: 最终公式 stored=(elevation+1000)*5
+        encoded = Math.round((elevation + 1000) * 5.0);
         // 限制在 Int16 范围
         encoded = Math.max(-32768, Math.min(32767, encoded));
         hasValid = true;
       } else {
-        // 无数据区域: 使用海平面 (0m → encoded = 0)
+        // 无数据区域: 暂填 0，后面用 DEM 均值覆盖
         encoded = 0;
       }
 
       heightmap[row * TILE_SIZE + col] = encoded;
+    }
+  }
+
+  // 瓦片与 DEM 有交集但 65×65 网格全落在 DEM 外 → 用 DEM 概略值填充
+  if (!hasValid) {
+    const demWest = bounds.west, demEast = bounds.east, demSouth = bounds.south, demNorth = bounds.north;
+    if (tileLonWest < demEast && tileLonEast > demWest && tileLatSouth < demNorth && tileLatNorth > demSouth) {
+      // 在 DEM 栅格中扫描 tile bounds 内的像素，求均值
+      const px0 = Math.max(0, Math.floor((tileLonWest - demWest) / (demEast - demWest) * width));
+      const px1 = Math.min(width - 1, Math.ceil((tileLonEast - demWest) / (demEast - demWest) * width));
+      const py0 = Math.max(0, Math.floor((demNorth - tileLatNorth) / (demNorth - demSouth) * height));
+      const py1 = Math.min(height - 1, Math.ceil((demNorth - tileLatSouth) / (demNorth - demSouth) * height));
+      let sum = 0, cnt = 0, tmin = Infinity, tmax = -Infinity;
+      for (let py = py0; py <= py1; py++) {
+        for (let px = px0; px <= px1; px++) {
+          const v = band[py * width + px];
+          if (isFinite(v) && v > -9999) { sum += v; cnt++; if (v < tmin) tmin = v; if (v > tmax) tmax = v; }
+        }
+      }
+      if (cnt > 0) {
+        const range = tmax - tmin || 10; // 至少 10m 变化确保几何误差非零
+        const mid = (tmax + tmin) / 2;
+        // 填充: 从北高到南低的简单渐变，高程范围从 mid-range/2 到 mid+range/2
+        for (let row = 0; row < TILE_SIZE; row++) {
+          const t = 1 - row / (TILE_SIZE - 1); // 0(南) → 1(北)
+          const elev = mid - range / 2 + range * t;
+          const enc = Math.max(-32768, Math.min(32767, Math.round((elev + 1000) * 5.0)));
+          for (let col = 0; col < TILE_SIZE; col++) {
+            heightmap[row * TILE_SIZE + col] = enc;
+          }
+        }
+        hasValid = true;
+      }
     }
   }
 
@@ -642,14 +675,40 @@ function generateHeightmap(band, width, height, bounds, tileX, tileY, level) {
  * heightmap-1.0 格式: 65×65 Int16 LE + 1 字节 child mask = 8451 字节
  * child mask 告诉 Cesium 哪些子瓦片存在，防止 Cesium 不细化
  */
-function writeTerrainFile(filePath, heightmap, level) {
+/**
+ * 计算子瓦片掩码：检查 4 个子瓦片是否与 DEM bounds 有交集。
+ * child 0=左上(NW), 1=右上(NE), 2=左下(SW), 3=右下(SE)
+ * 注意: scheme.yToLat(y,lvl) 返回 tile y 的南边界
+ */
+function computeChildMask(tx, ty, level, bounds, scheme) {
+  let mask = 0;
+  for (let i = 0; i < 4; i++) {
+    const cx = tx * 2 + (i % 2);
+    const cy = ty * 2 + Math.floor(i / 2);
+    const cw = scheme.xToLon(cx, level + 1);
+    const ce = scheme.xToLon(cx + 1, level + 1);
+    const cs = scheme.yToLat(cy, level + 1);              // 南边界
+    const cn = cy === 0 ? 90 : scheme.yToLat(cy - 1, level + 1); // 北边界
+    if (cw < bounds.east && ce > bounds.west && cs < bounds.north && cn > bounds.south) {
+      mask |= (1 << i);
+    }
+  }
+  return mask;
+}
+
+function writeTerrainFile(filePath, heightmap, level, childMask = undefined) {
   const dataLen = TILE_SIZE * TILE_SIZE * 2;
   const buf = Buffer.allocUnsafe(dataLen + 1);
   for (let i = 0; i < heightmap.length; i++) {
     buf.writeInt16LE(heightmap[i], i * 2);
   }
-  // childMask: level < MAX_ZOOM 时设为 15（4 个子瓦片都存在），MAX_ZOOM 时设为 0
-  buf[dataLen] = level < MAX_ZOOM ? 15 : 0;
+  // childMask: 若调用方显式传入则使用传入值，否则 level < MAX_ZOOM 时设为 15
+  // 占位瓦片必须传 0，防止 Cesium 去请求 DEM 范围外不存在的子瓦片
+  if (childMask !== undefined) {
+    buf[dataLen] = childMask;
+  } else {
+    buf[dataLen] = level < MAX_ZOOM ? 15 : 0;
+  }
   fs.writeFileSync(filePath, buf);
 }
 
@@ -867,23 +926,50 @@ async function main() {
 
     let levelGenerated = 0;
     let levelPlaceholders = 0;
-    // 空 heightmap 占位瓦片（65×65 Int16 全零 = 椭球面高度）
+    // 全零占位瓦片 — 仅用于 level 0-1 重建四叉树入口
     const placeholderHeightmap = new Int16Array(TILE_SIZE * TILE_SIZE);
+    const NEED_PLACEHOLDER = (level <= 1); // 只有最粗两级需要占位
 
-    for (let tx = xStart; tx <= xEnd; tx++) {
-      for (let ty = yStart; ty <= yEnd; ty++) {
-        const heightmap = generateHeightmap(band, width, height, bounds, tx, ty, level);
-        const tileDir = path.join(OUTPUT_DIR, String(level), String(tx));
-        fs.mkdirSync(tileDir, { recursive: true });
-        if (heightmap) {
-          writeTerrainFile(path.join(tileDir, `${ty}.terrain`), heightmap, level);
-          levelGenerated++;
-        } else {
-          // ⭐ 粗级别瓦片即使没有有效 DEM 像素，也要生成占位瓦片
-          // 否则 Cesium TerrainProvider 无法从 level 0 逐级细化到有数据的级别
-          writeTerrainFile(path.join(tileDir, `${ty}.terrain`), placeholderHeightmap, level);
+    // Level 0-1 必须覆盖全部 tile（含 DEM bounds 之外的瓦片），确保四叉树根节点完整
+    // Cesium 从 Level 0 开始遍历，根节点缺失会导致整个地形加载失败
+    const loopXStart = NEED_PLACEHOLDER ? 0 : xStart;
+    const loopXEnd   = NEED_PLACEHOLDER ? maxX : xEnd;
+    const loopYStart = NEED_PLACEHOLDER ? 0 : yStart;
+    const loopYEnd   = NEED_PLACEHOLDER ? maxY : yEnd;
+
+    if (NEED_PLACEHOLDER) {
+      console.log(`   📦 Level ${level}: 覆盖全部 ${loopXEnd - loopXStart + 1}×${loopYEnd - loopYStart + 1} 根瓦片 (含占位)`);
+    }
+
+    for (let tx = loopXStart; tx <= loopXEnd; tx++) {
+      for (let ty = loopYStart; ty <= loopYEnd; ty++) {
+        // 仅在 DEM bounds 内尝试采样真实高程，bounds 外直接占位
+        const inBounds = tx >= xStart && tx <= xEnd && ty >= yStart && ty <= yEnd;
+        if (inBounds) {
+          const heightmap = generateHeightmap(band, width, height, bounds, tx, ty, level);
+          if (heightmap) {
+            const tileDir = path.join(OUTPUT_DIR, String(level), String(tx));
+            fs.mkdirSync(tileDir, { recursive: true });
+            const mask = level < MAX_ZOOM ? computeChildMask(tx, ty, level, bounds, scheme) : 0;
+            writeTerrainFile(path.join(tileDir, `${ty}.terrain`), heightmap, level, mask);
+            levelGenerated++;
+          } else if (NEED_PLACEHOLDER) {
+            // bounds 内但采样太粗无有效像素 → 计算精确 childMask 允许向下细化
+            const tileDir = path.join(OUTPUT_DIR, String(level), String(tx));
+            fs.mkdirSync(tileDir, { recursive: true });
+            const mask = computeChildMask(tx, ty, level, bounds, scheme);
+            writeTerrainFile(path.join(tileDir, `${ty}.terrain`), placeholderHeightmap, level, mask);
+            levelPlaceholders++;
+          }
+        } else if (NEED_PLACEHOLDER) {
+          // DEM bounds 之外的四叉树根节点占位
+          const tileDir = path.join(OUTPUT_DIR, String(level), String(tx));
+          fs.mkdirSync(tileDir, { recursive: true });
+          // childMask=0: 占位瓦片无子节点，防止 Cesium 请求 DEM 范围外不存在的子瓦片
+          writeTerrainFile(path.join(tileDir, `${ty}.terrain`), placeholderHeightmap, level, 0);
           levelPlaceholders++;
         }
+        // else: level >= 2 且无数据 → 跳过
       }
     }
 
@@ -917,7 +1003,38 @@ async function main() {
     }
   }
 
+  // ── 生成 available 数组 ─────────────────────────────────
+  // Cesium 1.132 依赖 available 判断瓦片存在性，比 childMask 优先级更高
+  // jLe 函数会对 available Y 做 TMS 翻转: cesiumY = numYTiles - tmsY - 1
+  // 目录结构使用 Y=0 在北，需转换为 TMS 约定 (Y=0 在南)
+  const available = [];
+  for (let level = MIN_ZOOM; level <= MAX_ZOOM; level++) {
+    const lvDir = path.join(OUTPUT_DIR, String(level));
+    const numY = scheme.ytilesAtLevel(level);  // GeographicTilingScheme: 2^level
+    if (!fs.existsSync(lvDir)) { available.push([]); continue; }
+    const ranges = [];
+    for (const xName of fs.readdirSync(lvDir, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name)) {
+      const x = parseInt(xName);
+      const xDir = path.join(lvDir, xName);
+      const ys = fs.readdirSync(xDir)
+        .filter(f => f.endsWith('.terrain'))
+        .map(f => parseInt(f.replace('.terrain', '')))
+        .filter(n => !isNaN(n))
+        .sort((a, b) => a - b);
+      if (ys.length > 0) {
+        // 目录 Y → TMS Y: TMS_Y = numY - dirY - 1
+        // 范围翻转: TMS_startY = numY - dir_endY - 1
+        const tmsStartY = numY - ys[ys.length - 1] - 1;
+        const tmsEndY = numY - ys[0] - 1;
+        ranges.push({ startX: x, endX: x, startY: tmsStartY, endY: tmsEndY });
+      }
+    }
+    available.push(ranges);
+  }
+
   // ── 生成 layer.json ─────────────────────────────────────
+  // Cesium 只识别 "geodetic" 和 "mercator"，不能写 "geographic"
+  const tilingSchemeForLayer = opts.tilingScheme === 'geographic' ? 'geodetic' : opts.tilingScheme;
   const layerJson = {
     tilejson: '2.1.0',
     name: 'Copernicus GLO-30 DEM (Cesium Terrain)',
@@ -928,7 +1045,9 @@ async function main() {
     bounds: [bounds.west, bounds.south, bounds.east, bounds.north],
     minzoom: MIN_ZOOM,
     maxzoom: MAX_ZOOM,
-    tilingScheme: opts.tilingScheme === 'geographic' ? 'geodetic' : opts.tilingScheme  // ⭐ Cesium 只认 geodetic/mercator
+    scheme: 'slippyMap',                 // 关闭 TMS Y 翻转：瓦片目录 Y 与 Cesium GeographicTilingScheme Y 一致
+    tilingScheme: tilingSchemeForLayer,   // Cesium 兼容：geographic → geodetic
+    available,
   };
 
   const layerJsonPath = path.join(OUTPUT_DIR, 'layer.json');
