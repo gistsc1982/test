@@ -60,12 +60,16 @@
     {
       "imports": {
         "three": "/node_modules/three/build/three.module.js",
-        "three/addons/": "/node_modules/three/examples/jsm/"
+        "three/addons/": "/node_modules/three/examples/jsm/",
+        "xeokit-sdk": "/gis/libs/xeokit/xeokit-sdk.min.es.js",
+        "web-ifc": "/gis/libs/web-ifc-api.js"
       }
     }
     </script>
     <!-- ⭐ 引入 Three.js 全局加载脚本（将 THREE 加载到 window 对象） -->
     <script type="module" src="/gis/load-three-globals.js"></script>
+    <!-- ⭐ 引入 xeokit SDK 加载脚本（将 xeokitSDK 加载到 window 对象） -->
+    <script type="module" src="/gis/libs/xeokit/load-xeokit.js"></script>
     <!-- ⭐ 引入 SGKJ_SDK 依赖 -->
     <script src="/dist/commons-3.0.1.min.js"></script>
     <script src="/dist/main-3.0.1.min.js"></script>
