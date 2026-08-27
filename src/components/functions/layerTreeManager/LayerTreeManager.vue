@@ -1306,7 +1306,8 @@ export default {
 	        { "id": "local-dem-aw3d30","name":"ALOS AW3D30 DEM（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/alos_aw3d30.tif","sortOrder":3,"visible":1,"description":"JAXA ALOS AW3D30 全球 30m DEM，精度~5m。下载：www.eorc.jaxa.jp/ALOS → AW3D30 → 注册后下载","icon":"🗻","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 	        { "id": "local-dem-cop30","name":"本地cop30高程（Copernicus GLO-30 DEM原始geotiff数据）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":4,"visible":1,"description":"ESA Copernicus GLO-30 全球 30m DEM，精度~4m。下载：dataspace.copernicus.eu 或 portal.opentopography.org","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
         { "id": "local-terrain-cop30","name":"本地cop30高程（动态Geotiff转Cesium Terrain）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":5,"visible":1,"description":"将 Copernicus GLO-30 转为 Cesium Terrain，影像图层可贴合地形起伏。使用自定义 GeoTiffTerrainProvider 从 GeoTIFF 直接提供高程数据","icon":"⛰️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"terrain","demElevationScale":1.0},
-        { "id": "local-terrain-cop30-tiles","name":"本地DEM高程数据(Cesium Terrain)","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/terrain/copernicus_glo30","sortOrder":6,"visible":1,"description":"Copernicus GLO-30 预生成 Cesium Terrain 瓦片，通过 layer.json 加载，影像图层可贴合地形起伏","icon":"⛰️","centerLon":103.5,"centerLat":30.5,"centerHeight":100000}
+        { "id": "local-terrain-cop30-tiles","name":"本地DEM高程数据(Cesium Terrain - Copernicus)","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/terrain/copernicus_glo30","sortOrder":6,"visible":1,"description":"Copernicus GLO-30 预生成 Cesium Terrain 瓦片，通过 layer.json 加载，影像图层可贴合地形起伏","icon":"⛰️","centerLon":103.5,"centerLat":30.5,"centerHeight":100000},
+        { "id": "local-terrain-jian-glo30-tiles","name":"本地DEM高程数据(Cesium Terrain - 吉安)","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/terrain/jian_glo30","sortOrder":7,"visible":1,"description":"吉安地区 GLO-30 预生成 Cesium Terrain 瓦片（114°~115°E, 26°~28°N），通过 layer.json 加载，影像图层可贴合地形起伏","icon":"⛰️","centerLon":114.5,"centerLat":27.0,"centerHeight":100000}
       ],
 
       // Cesium 图层加载状态 — 记录已加载的图层 ID → Cesium 对象
@@ -1561,7 +1562,8 @@ export default {
 	        { "id": "local-dem-aw3d30","name":"ALOS AW3D30 DEM（下载后放入文件）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/alos_aw3d30.tif","sortOrder":3,"visible":1,"description":"JAXA ALOS AW3D30 全球 30m DEM，精度~5m。下载：www.eorc.jaxa.jp/ALOS → AW3D30 → 注册后下载","icon":"🗻","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 	        { "id": "local-dem-cop30","name":"本地cop30高程（Copernicus GLO-30 DEM原始geotiff数据）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":4,"visible":1,"description":"ESA Copernicus GLO-30 全球 30m DEM，精度~4m。下载：dataspace.copernicus.eu 或 portal.opentopography.org","icon":"🏔️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"3d","demElevationScale":1.0,"demColorRamp":true},
 		        { "id": "local-terrain-cop30","name":"本地cop30高程（动态Geotiff转Cesium Terrain）","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/copernicus_glo30.tif","sortOrder":5,"visible":1,"description":"将 Copernicus GLO-30 转为 Cesium Terrain，影像图层可贴合地形起伏。使用自定义 GeoTiffTerrainProvider 从 GeoTIFF 直接提供高程数据","icon":"⛰️","centerLon":116,"centerLat":40,"centerHeight":500000,"demRenderMode":"terrain","demElevationScale":1.0},
-        { "id": "local-terrain-cop30-tiles","name":"本地DEM高程数据(Cesium Terrain)","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/terrain/copernicus_glo30","sortOrder":6,"visible":1,"description":"Copernicus GLO-30 预生成 Cesium Terrain 瓦片，通过 layer.json 加载，影像图层可贴合地形起伏","icon":"⛰️","centerLon":103.5,"centerLat":30.5,"centerHeight":100000},
+        { "id": "local-terrain-cop30-tiles","name":"本地DEM高程数据(Cesium Terrain - Copernicus)","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/terrain/copernicus_glo30","sortOrder":6,"visible":1,"description":"Copernicus GLO-30 预生成 Cesium Terrain 瓦片，通过 layer.json 加载，影像图层可贴合地形起伏","icon":"⛰️","centerLon":103.5,"centerLat":30.5,"centerHeight":100000},
+        { "id": "local-terrain-jian-glo30-tiles","name":"本地DEM高程数据(Cesium Terrain - 吉安)","parentId":"folder-local-dem","nodeType":"layer","url":"/data/dem/terrain/jian_glo30","sortOrder":7,"visible":1,"description":"吉安地区 GLO-30 预生成 Cesium Terrain 瓦片（114°~115°E, 26°~28°N），通过 layer.json 加载，影像图层可贴合地形起伏","icon":"⛰️","centerLon":114.5,"centerLat":27.0,"centerHeight":100000},
         // ⭐ WMS 内置层定位在天安门附近，便于对比
         { "id": "wms-nasa", "name": "NASA GIBS 全球影像(WMS)", "parentId": "folder-wms", "nodeType": "layer", "url": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi", "sortOrder": 1, "visible": 1, "description": "NASA官方WMS服务，无需API Key", "icon": "🛰️", "centerLon": 116.4, "centerLat": 39.9, "centerHeight": 50000 },
         { "id": "wms-usgs", "name": "USGS 国家地形图(WMS)", "parentId": "folder-wms", "nodeType": "layer", "url": "https://basemap.nationalmap.gov/arcgis/services/USGSTopo/MapServer/WMSServer", "sortOrder": 2, "visible": 1, "description": "USGS官方WMS", "icon": "🗺️", "centerLon": 116.4, "centerLat": 39.9, "centerHeight": 50000 },
@@ -4513,22 +4515,37 @@ export default {
             break;
           }
           case 'local-terrain-tiles': {
-            // ⭐ 使用 Cesium 原生 CesiumTerrainProvider 加载本地预生成瓦片
-            //    关键修复：URL 必须带尾部斜杠，否则 Cesium 内部 getDerivedResource 会把
-            //    layer.json 解析到父目录（如 /data/dem/terrain/layer.json 而非正确的
-            //    /data/dem/terrain/copernicus_glo30/layer.json），导致全球黑屏
-            //    ja-yjjg-dp 的 fromUrl() 内部自动 appendForwardSlash()，Cesium 1.81 需手动确保
+            // ⭐ 兼容旧版本 Cesium 的地形加载方法
+            //    test 项目使用的是旧版本 Cesium (通过 /gis/Cesium/Cesium.js)，不支持 fromUrl()
+            //    因此使用构造函数方式，但需要确保 URL 处理正确
             var tilesBaseUrl = node.url;
             var terrainUrl = tilesBaseUrl.replace(/\/?$/, '/'); // ⭐ 确保尾部斜杠
             console.log(`[${this.componentName}] 🌐 加载本地 Terrain Tiles: ${terrainUrl}`);
 
             deadline = Math.max(deadline, Date.now() + 30000);
 
-            var terrainProvider = new Cesium.CesiumTerrainProvider({
-              url: terrainUrl,
-              requestVertexNormals: true,
-              requestWaterMask: false,
-            });
+            // ⭐ 兼容性处理：优先使用 fromUrl (如果存在)，否则使用构造函数
+            var terrainProvider;
+            if (typeof Cesium.CesiumTerrainProvider.fromUrl === 'function') {
+              // 新版本 Cesium (如 ja-yjjg-dp 的 1.132.0)
+              terrainProvider = await Cesium.CesiumTerrainProvider.fromUrl(
+                terrainUrl,
+                {
+                  requestVertexNormals: true,
+                  requestWaterMask: false,
+                  heightmapTerrainQuality: 1.0
+                }
+              );
+              console.log('[LayerTreeManager] 🌐 使用 fromUrl() 方法加载地形');
+            } else {
+              // 旧版本 Cesium (test 项目的 CDN 版本)
+              terrainProvider = new Cesium.CesiumTerrainProvider({
+                url: terrainUrl,
+                requestVertexNormals: true,
+                requestWaterMask: false,
+              });
+              console.log('[LayerTreeManager] 🌐 使用构造函数加载地形 (兼容旧版本)');
+            }
 
             this._previousTerrainProvider = viewer.scene.terrainProvider;
             window.__cesiumViewer__.scene.terrainProvider = terrainProvider;
@@ -4550,7 +4567,7 @@ export default {
             this._cesiumLayers.set(node.id, {
               type: 'local-terrain-tiles', provider: terrainProvider, _bounds: tBounds
             });
-            console.log('[LayerTreeManager] 🌐 CesiumTerrainProvider 已激活 (URL with trailing slash)');
+            console.log('[LayerTreeManager] 🌐 CesiumTerrainProvider 已激活 (使用 fromUrl 方法)');
             console.log(`[${this.componentName}] ✅ 本地 Terrain Tiles 加载成功: "${node.name}"`);
 
             // ⭐ 自动叠加 DEM 伪彩色图作为影像层（离线时肉眼才能看到地形起伏）
